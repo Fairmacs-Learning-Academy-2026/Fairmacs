@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Bell,
   Award,
@@ -18,8 +18,9 @@ import {
   Briefcase,
   BadgeCheck
 } from 'lucide-react';
+
 import { useAuth } from '../context/AuthContext';
-import { MOCK_NOTIFICATIONS } from '../data/mockData';
+import { notificationService } from '../services/notificationService';
 import FairmacsLogo from './FairmacsLogo';
 import PasswordModal from './PasswordModal';
 
@@ -30,30 +31,288 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Real notifications from backend
+  const [notifications, setNotifications] = useState([]);
+  const [notificationLoading, setNotificationLoading] = useState(false);
 
-  const markAllRead = () => {
-    setNotifications(prev =>
-      prev.map(n => ({ ...n, read: true }))
-    );
+  // ============================================================
+  // LOAD NOTIFICATIONS
+  // ============================================================
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadNotifications = async () => {
+      if (!user) {
+        return;
+      }
+
+      try {
+        setNotificationLoading(true);
+
+        const data = await notificationService.getNotifications();
+
+        if (mounted) {
+          setNotifications(
+            Array.isArray(data) ? data : []
+          );
+        }
+      } catch (error) {
+        console.error(
+          'Failed to load notifications:',
+          error
+        );
+
+        if (mounted) {
+          setNotifications([]);
+        }
+      } finally {
+        if (mounted) {
+          setNotificationLoading(false);
+        }
+      }
+    };
+
+    loadNotifications();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  // ============================================================
+  // UNREAD COUNT
+  // ============================================================
+
+  const unreadCount = notifications.filter(
+    notification => !notification.read
+  ).length;
+
+  // ============================================================
+  // MARK ALL AS READ
+  // ============================================================
+
+  const markAllRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+
+      setNotifications(prev =>
+        prev.map(notification => ({
+          ...notification,
+          read: true
+        }))
+      );
+    } catch (error) {
+      console.error(
+        'Failed to mark all notifications as read:',
+        error
+      );
+    }
   };
+
+  // ============================================================
+  // MARK ONE NOTIFICATION AS READ
+  // ============================================================
+
+  const markNotificationRead = async notificationId => {
+    try {
+      await notificationService.markAsRead(
+        notificationId
+      );
+
+      setNotifications(prev =>
+        prev.map(notification =>
+          notification.id === notificationId
+            ? {
+                ...notification,
+                read: true
+              }
+            : notification
+        )
+      );
+    } catch (error) {
+      console.error(
+        'Failed to mark notification as read:',
+        error
+      );
+    }
+  };
+
+  // ============================================================
+  // NOTIFICATION VISUAL TYPE
+  // ============================================================
+
+  const getNotificationVisual = type => {
+    switch (type) {
+      case 'TRAINING_DUE_SOON':
+      case 'TRAINING_OVERDUE':
+      case 'ASSESSMENT_FAILED':
+        return {
+          background: '#ffe4e6',
+          color: '#e11d48',
+          icon: (
+            <AlertTriangle
+              style={{
+                width: 15,
+                height: 15
+              }}
+            />
+          )
+        };
+
+      case 'CERTIFICATE_ISSUED':
+        return {
+          background: '#fef3c7',
+          color: '#d97706',
+          icon: (
+            <Trophy
+              style={{
+                width: 15,
+                height: 15
+              }}
+            />
+          )
+        };
+
+      case 'COURSE_COMPLETED':
+      case 'ASSESSMENT_RESULT':
+        return {
+          background: '#dcfce7',
+          color: '#16a34a',
+          icon: (
+            <Check
+              style={{
+                width: 15,
+                height: 15
+              }}
+            />
+          )
+        };
+
+      case 'ANNOUNCEMENT':
+        return {
+          background: '#e0f2fe',
+          color: '#0284c7',
+          icon: (
+            <Info
+              style={{
+                width: 15,
+                height: 15
+              }}
+            />
+          )
+        };
+
+      case 'COURSE_ASSIGNED':
+      default:
+        return {
+          background: '#e0f2fe',
+          color: '#0284c7',
+          icon: (
+            <BookOpen
+              style={{
+                width: 15,
+                height: 15
+              }}
+            />
+          )
+        };
+    }
+  };
+
+  // ============================================================
+  // FORMAT NOTIFICATION TIME
+  // ============================================================
+
+  const formatNotificationTime = createdAt => {
+    if (!createdAt) {
+      return '';
+    }
+
+    const created = new Date(createdAt);
+
+    if (Number.isNaN(created.getTime())) {
+      return '';
+    }
+
+    const now = new Date();
+
+    const difference =
+      now.getTime() - created.getTime();
+
+    const seconds = Math.floor(
+      difference / 1000
+    );
+
+    const minutes = Math.floor(
+      seconds / 60
+    );
+
+    const hours = Math.floor(
+      minutes / 60
+    );
+
+    const days = Math.floor(
+      hours / 24
+    );
+
+    if (seconds < 60) {
+      return 'Just now';
+    }
+
+    if (minutes < 60) {
+      return `${minutes} ${
+        minutes === 1 ? 'min' : 'mins'
+      } ago`;
+    }
+
+    if (hours < 24) {
+      return `${hours} ${
+        hours === 1 ? 'hour' : 'hours'
+      } ago`;
+    }
+
+    if (days === 1) {
+      return 'Yesterday';
+    }
+
+    if (days < 7) {
+      return `${days} days ago`;
+    }
+
+    return created.toLocaleDateString();
+  };
+
+  // ============================================================
+  // GREETING
+  // ============================================================
 
   const getGreeting = () => {
     const hour = new Date().getHours();
 
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
+    if (hour < 12) {
+      return 'Good morning';
+    }
+
+    if (hour < 18) {
+      return 'Good afternoon';
+    }
 
     return 'Good evening';
   };
 
+  // ============================================================
+  // ROLE LABEL
+  // ============================================================
+
   const roleLabel =
     user?.roleLabel ||
-    (user?.role === 'HR_ADMIN'
-      ? 'HR / Admin'
-      : user?.role);
+    (
+      user?.role === 'HR_ADMIN'
+        ? 'HR / Admin'
+        : user?.role
+    );
 
   const firstName =
     user?.name
@@ -63,17 +322,26 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
   return (
     <header className="header">
 
-      {/* Brand Logo */}
+      {/* ======================================================
+          BRAND LOGO
+      ====================================================== */}
+
       <div
         className="brand-logo"
         onClick={onNavigateHome}
         style={{ cursor: 'pointer' }}
         title="Return to Fairmacs Home Page"
       >
-        <FairmacsLogo variant="default" height={42} />
+        <FairmacsLogo
+          variant="default"
+          height={42}
+        />
       </div>
 
-      {/* Dynamic Greeting */}
+      {/* ======================================================
+          DYNAMIC GREETING
+      ====================================================== */}
+
       <div
         style={{
           display: 'flex',
@@ -121,7 +389,10 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
         </span>
       </div>
 
-      {/* User Actions */}
+      {/* ======================================================
+          USER ACTIONS
+      ====================================================== */}
+
       <div
         style={{
           display: 'flex',
@@ -131,7 +402,10 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
         }}
       >
 
-        {/* Certificates */}
+        {/* ====================================================
+            CERTIFICATES
+        ==================================================== */}
+
         <button
           onClick={onOpenCertificates}
           style={{
@@ -148,15 +422,28 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
             cursor: 'pointer'
           }}
         >
-          <Award style={{ width: 16, height: 16 }} />
+          <Award
+            style={{
+              width: 16,
+              height: 16
+            }}
+          />
+
           Certificates
         </button>
 
-        {/* Notifications */}
+        {/* ====================================================
+            NOTIFICATIONS
+        ==================================================== */}
+
         <div style={{ position: 'relative' }}>
+
           <button
             onClick={() => {
-              setShowNotifDrawer(!showNotifDrawer);
+              setShowNotifDrawer(
+                !showNotifDrawer
+              );
+
               setShowDropdown(false);
             }}
             style={{
@@ -170,7 +457,12 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
             }}
             title="Notifications"
           >
-            <Bell style={{ width: 18, height: 18 }} />
+            <Bell
+              style={{
+                width: 18,
+                height: 18
+              }}
+            />
 
             {unreadCount > 0 && (
               <span
@@ -195,7 +487,10 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
             )}
           </button>
 
-          {/* Notifications Drawer */}
+          {/* ==================================================
+              NOTIFICATION DRAWER
+          ================================================== */}
+
           {showNotifDrawer && (
             <div
               style={{
@@ -205,20 +500,26 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 width: '340px',
                 background: 'white',
                 borderRadius: '12px',
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.18)',
+                boxShadow:
+                  '0 10px 30px rgba(0, 0, 0, 0.18)',
                 border: '1px solid #e2e8f0',
                 padding: '1rem',
                 zIndex: 1000,
-                animation: 'fadeIn 0.2s ease-out'
+                animation:
+                  'fadeIn 0.2s ease-out'
               }}
             >
+
+              {/* Notification Header */}
+
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   paddingBottom: '0.75rem',
-                  borderBottom: '1px solid #f1f5f9',
+                  borderBottom:
+                    '1px solid #f1f5f9',
                   marginBottom: '0.75rem'
                 }}
               >
@@ -229,9 +530,15 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                     color: '#0f172a'
                   }}
                 >
-                  Notifications{' '}
+                  Notifications
+
                   {unreadCount > 0 && (
-                    <span style={{ color: '#0284c7' }}>
+                    <span
+                      style={{
+                        color: '#0284c7'
+                      }}
+                    >
+                      {' '}
                       ({unreadCount})
                     </span>
                   )}
@@ -254,6 +561,8 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 )}
               </div>
 
+              {/* Notification List */}
+
               <div
                 style={{
                   display: 'flex',
@@ -263,121 +572,169 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   overflowY: 'auto'
                 }}
               >
-                {notifications.map(notif => (
+
+                {/* Loading */}
+
+                {notificationLoading ? (
+
                   <div
-                    key={notif.id}
                     style={{
-                      background: notif.read
-                        ? '#ffffff'
-                        : '#f0f9ff',
-                      padding: '0.75rem',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      display: 'flex',
-                      gap: '0.6rem',
-                      alignItems: 'flex-start'
+                      padding: '1.5rem',
+                      textAlign: 'center',
+                      fontSize: '0.78rem',
+                      color: '#64748b'
                     }}
                   >
-                    <div
-                      style={{
-                        padding: '0.35rem',
-                        borderRadius: '50%',
-                        background:
-                          notif.type === 'warning'
-                            ? '#ffe4e6'
-                            : notif.type === 'certificate'
-                            ? '#fef3c7'
-                            : notif.type === 'success'
-                            ? '#dcfce7'
-                            : '#e0f2fe',
-
-                        color:
-                          notif.type === 'warning'
-                            ? '#e11d48'
-                            : notif.type === 'certificate'
-                            ? '#d97706'
-                            : notif.type === 'success'
-                            ? '#16a34a'
-                            : '#0284c7',
-
-                        flexShrink: 0
-                      }}
-                    >
-                      {notif.type === 'warning' ? (
-                        <AlertTriangle
-                          style={{
-                            width: 15,
-                            height: 15
-                          }}
-                        />
-                      ) : notif.type === 'certificate' ? (
-                        <Trophy
-                          style={{
-                            width: 15,
-                            height: 15
-                          }}
-                        />
-                      ) : notif.type === 'success' ? (
-                        <Check
-                          style={{
-                            width: 15,
-                            height: 15
-                          }}
-                        />
-                      ) : (
-                        <BookOpen
-                          style={{
-                            width: 15,
-                            height: 15
-                          }}
-                        />
-                      )}
-                    </div>
-
-                    <div>
-                      <div
-                        style={{
-                          fontSize: '0.82rem',
-                          fontWeight: 800,
-                          color: '#0f172a'
-                        }}
-                      >
-                        {notif.title}
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: '0.75rem',
-                          color: '#475569',
-                          marginTop: '0.15rem',
-                          lineHeight: 1.35
-                        }}
-                      >
-                        {notif.message}
-                      </div>
-
-                      <div
-                        style={{
-                          fontSize: '0.68rem',
-                          color: '#94a3b8',
-                          marginTop: '0.35rem'
-                        }}
-                      >
-                        {notif.time}
-                      </div>
-                    </div>
+                    Loading notifications...
                   </div>
-                ))}
+
+                ) : notifications.length === 0 ? (
+
+                  /* Empty */
+
+                  <div
+                    style={{
+                      padding: '1.5rem',
+                      textAlign: 'center',
+                      fontSize: '0.78rem',
+                      color: '#64748b'
+                    }}
+                  >
+                    No notifications
+                  </div>
+
+                ) : (
+
+                  /* Notifications */
+
+                  notifications.map(notif => {
+
+                    const visual =
+                      getNotificationVisual(
+                        notif.type
+                      );
+
+                    return (
+                      <div
+                        key={notif.id}
+                        onClick={() => {
+                          if (!notif.read) {
+                            markNotificationRead(
+                              notif.id
+                            );
+                          }
+                        }}
+                        style={{
+                          background:
+                            notif.read
+                              ? '#ffffff'
+                              : '#f0f9ff',
+
+                          padding: '0.75rem',
+
+                          borderRadius: '8px',
+
+                          border:
+                            '1px solid #e2e8f0',
+
+                          display: 'flex',
+
+                          gap: '0.6rem',
+
+                          alignItems:
+                            'flex-start',
+
+                          cursor:
+                            notif.read
+                              ? 'default'
+                              : 'pointer'
+                        }}
+                      >
+
+                        {/* Notification Icon */}
+
+                        <div
+                          style={{
+                            padding: '0.35rem',
+                            borderRadius: '50%',
+                            background:
+                              visual.background,
+                            color:
+                              visual.color,
+                            flexShrink: 0
+                          }}
+                        >
+                          {visual.icon}
+                        </div>
+
+                        {/* Notification Content */}
+
+                        <div>
+
+                          <div
+                            style={{
+                              fontSize: '0.82rem',
+                              fontWeight: 800,
+                              color: '#0f172a'
+                            }}
+                          >
+                            {notif.title}
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: '0.75rem',
+                              color: '#475569',
+                              marginTop: '0.15rem',
+                              lineHeight: 1.35
+                            }}
+                          >
+                            {notif.message}
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: '0.68rem',
+                              color: '#94a3b8',
+                              marginTop: '0.35rem'
+                            }}
+                          >
+                            {formatNotificationTime(
+                              notif.createdAt
+                            )}
+                          </div>
+
+                        </div>
+
+                      </div>
+                    );
+                  })
+
+                )}
+
               </div>
+
             </div>
           )}
+
         </div>
 
-        {/* Profile Dropdown */}
-        <div style={{ position: 'relative' }}>
+        {/* ====================================================
+            PROFILE DROPDOWN
+        ==================================================== */}
+
+        <div
+          style={{
+            position: 'relative'
+          }}
+        >
+
           <button
             onClick={() => {
-              setShowDropdown(!showDropdown);
+              setShowDropdown(
+                !showDropdown
+              );
+
               setShowNotifDrawer(false);
             }}
             style={{
@@ -385,13 +742,15 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
               alignItems: 'center',
               gap: '0.75rem',
               paddingLeft: '0.75rem',
-              borderLeft: '1px solid #e2e8f0',
+              borderLeft:
+                '1px solid #e2e8f0',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
               textAlign: 'left'
             }}
           >
+
             <img
               src={
                 user?.avatar ||
@@ -403,11 +762,13 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 height: 38,
                 borderRadius: '50%',
                 objectFit: 'cover',
-                border: '2px solid #0284c7'
+                border:
+                  '2px solid #0284c7'
               }}
             />
 
             <div>
+
               <div
                 style={{
                   fontSize: '0.85rem',
@@ -437,10 +798,15 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
               >
                 {user?.designation}
               </div>
+
             </div>
+
           </button>
 
-          {/* User Account Menu */}
+          {/* ==================================================
+              USER ACCOUNT MENU
+          ================================================== */}
+
           {showDropdown && (
             <div
               style={{
@@ -452,20 +818,27 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 borderRadius: '12px',
                 boxShadow:
                   '0 10px 25px rgba(0, 0, 0, 0.15)',
-                border: '1px solid #e2e8f0',
+                border:
+                  '1px solid #e2e8f0',
                 padding: '0.75rem',
                 zIndex: 1000,
-                animation: 'fadeIn 0.2s ease-out'
+                animation:
+                  'fadeIn 0.2s ease-out'
               }}
             >
+
               {/* User Summary */}
+
               <div
                 style={{
-                  padding: '0.5rem 0.75rem',
-                  borderBottom: '1px solid #f1f5f9',
+                  padding:
+                    '0.5rem 0.75rem',
+                  borderBottom:
+                    '1px solid #f1f5f9',
                   marginBottom: '0.5rem'
                 }}
               >
+
                 <div
                   style={{
                     fontSize: '0.85rem',
@@ -482,7 +855,9 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                     color: '#64748b'
                   }}
                 >
-                  ID: {user?.employeeId || user?.id}
+                  ID:{' '}
+                  {user?.employeeId ||
+                    user?.id}
                 </div>
 
                 <div
@@ -494,9 +869,11 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 >
                   {user?.email}
                 </div>
+
               </div>
 
               {/* About */}
+
               <button
                 onClick={() => {
                   setShowDropdown(false);
@@ -507,7 +884,8 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.6rem',
-                  padding: '0.6rem 0.75rem',
+                  padding:
+                    '0.6rem 0.75rem',
                   borderRadius: '6px',
                   border: 'none',
                   background: 'transparent',
@@ -524,10 +902,12 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                     color: '#0284c7'
                   }}
                 />
+
                 About
               </button>
 
               {/* Change Password */}
+
               <button
                 onClick={() => {
                   setShowDropdown(false);
@@ -538,7 +918,8 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.6rem',
-                  padding: '0.6rem 0.75rem',
+                  padding:
+                    '0.6rem 0.75rem',
                   borderRadius: '6px',
                   border: 'none',
                   background: 'transparent',
@@ -555,10 +936,12 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                     color: '#64748b'
                   }}
                 />
+
                 Change Password
               </button>
 
               {/* Sign Out */}
+
               <button
                 onClick={() => {
                   setShowDropdown(false);
@@ -569,7 +952,8 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.6rem',
-                  padding: '0.6rem 0.75rem',
+                  padding:
+                    '0.6rem 0.75rem',
                   borderRadius: '6px',
                   border: 'none',
                   background: 'transparent',
@@ -586,25 +970,37 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                     height: 16
                   }}
                 />
+
                 Sign Out
               </button>
+
             </div>
           )}
+
         </div>
+
       </div>
 
-      {/* About Modal */}
+      {/* ======================================================
+          ABOUT MODAL
+      ====================================================== */}
+
       {showAboutModal && (
         <div
           className="modal-overlay"
-          onClick={() => setShowAboutModal(false)}
+          onClick={() =>
+            setShowAboutModal(false)
+          }
           style={{
             zIndex: 2000
           }}
         >
+
           <div
             className="modal-content animate-fade-in"
-            onClick={e => e.stopPropagation()}
+            onClick={e =>
+              e.stopPropagation()
+            }
             style={{
               width: '100%',
               maxWidth: '520px',
@@ -612,7 +1008,9 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
               overflow: 'hidden'
             }}
           >
+
             {/* Modal Header */}
+
             <div
               style={{
                 background:
@@ -622,13 +1020,17 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 position: 'relative'
               }}
             >
+
               <button
-                onClick={() => setShowAboutModal(false)}
+                onClick={() =>
+                  setShowAboutModal(false)
+                }
                 style={{
                   position: 'absolute',
                   right: '1rem',
                   top: '1rem',
-                  background: 'rgba(255,255,255,0.15)',
+                  background:
+                    'rgba(255,255,255,0.15)',
                   border: 'none',
                   color: 'white',
                   width: 32,
@@ -655,6 +1057,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   gap: '1rem'
                 }}
               >
+
                 <img
                   src={
                     user?.avatar ||
@@ -666,17 +1069,20 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                     height: 72,
                     borderRadius: '50%',
                     objectFit: 'cover',
-                    border: '3px solid rgba(255,255,255,0.9)'
+                    border:
+                      '3px solid rgba(255,255,255,0.9)'
                   }}
                 />
 
                 <div>
+
                   <div
                     style={{
                       fontSize: '0.72rem',
                       fontWeight: 700,
                       color: '#7dd3fc',
-                      textTransform: 'uppercase',
+                      textTransform:
+                        'uppercase',
                       letterSpacing: '0.8px',
                       marginBottom: '0.2rem'
                     }}
@@ -701,13 +1107,18 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                       color: '#cbd5e1'
                     }}
                   >
-                    {user?.designation || 'Employee'}
+                    {user?.designation ||
+                      'Employee'}
                   </div>
+
                 </div>
+
               </div>
+
             </div>
 
             {/* Details */}
+
             <div
               style={{
                 padding: '1.5rem',
@@ -716,6 +1127,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 gap: '0.8rem'
               }}
             >
+
               <div
                 style={{
                   fontSize: '0.85rem',
@@ -730,16 +1142,20 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
+                  gridTemplateColumns:
+                    '1fr 1fr',
                   gap: '0.75rem'
                 }}
               >
+
                 {/* Employee ID */}
+
                 <div
                   style={{
                     padding: '0.85rem',
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    border:
+                      '1px solid #e2e8f0',
                     borderRadius: '10px'
                   }}
                 >
@@ -760,6 +1176,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                         height: 14
                       }}
                     />
+
                     Employee ID
                   </div>
 
@@ -770,16 +1187,20 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                       color: '#0f172a'
                     }}
                   >
-                    {user?.employeeId || user?.id || 'N/A'}
+                    {user?.employeeId ||
+                      user?.id ||
+                      'N/A'}
                   </div>
                 </div>
 
                 {/* Role */}
+
                 <div
                   style={{
                     padding: '0.85rem',
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    border:
+                      '1px solid #e2e8f0',
                     borderRadius: '10px'
                   }}
                 >
@@ -800,6 +1221,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                         height: 14
                       }}
                     />
+
                     Role
                   </div>
 
@@ -815,11 +1237,13 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 </div>
 
                 {/* Email */}
+
                 <div
                   style={{
                     padding: '0.85rem',
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    border:
+                      '1px solid #e2e8f0',
                     borderRadius: '10px'
                   }}
                 >
@@ -840,6 +1264,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                         height: 14
                       }}
                     />
+
                     Email
                   </div>
 
@@ -856,11 +1281,13 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 </div>
 
                 {/* Department */}
+
                 <div
                   style={{
                     padding: '0.85rem',
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    border:
+                      '1px solid #e2e8f0',
                     borderRadius: '10px'
                   }}
                 >
@@ -881,6 +1308,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                         height: 14
                       }}
                     />
+
                     Department
                   </div>
 
@@ -891,16 +1319,19 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                       color: '#0f172a'
                     }}
                   >
-                    {user?.department || 'N/A'}
+                    {user?.department ||
+                      'N/A'}
                   </div>
                 </div>
 
                 {/* Designation */}
+
                 <div
                   style={{
                     padding: '0.85rem',
                     background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    border:
+                      '1px solid #e2e8f0',
                     borderRadius: '10px',
                     gridColumn: '1 / -1'
                   }}
@@ -922,6 +1353,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                         height: 14
                       }}
                     />
+
                     Designation
                   </div>
 
@@ -932,12 +1364,15 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                       color: '#0f172a'
                     }}
                   >
-                    {user?.designation || 'N/A'}
+                    {user?.designation ||
+                      'N/A'}
                   </div>
                 </div>
+
               </div>
 
               {/* Account Status */}
+
               <div
                 style={{
                   display: 'flex',
@@ -946,10 +1381,12 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   marginTop: '0.25rem',
                   padding: '0.85rem 1rem',
                   background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
+                  border:
+                    '1px solid #bbf7d0',
                   borderRadius: '10px'
                 }}
               >
+
                 <div
                   style={{
                     display: 'flex',
@@ -988,10 +1425,13 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 >
                   {user?.status || 'ACTIVE'}
                 </span>
+
               </div>
 
               <button
-                onClick={() => setShowAboutModal(false)}
+                onClick={() =>
+                  setShowAboutModal(false)
+                }
                 className="btn-primary"
                 style={{
                   width: '100%',
@@ -1001,12 +1441,18 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
               >
                 Close
               </button>
+
             </div>
+
           </div>
+
         </div>
       )}
 
-      {/* Password Modal */}
+      {/* ======================================================
+          PASSWORD MODAL
+      ====================================================== */}
+
       {showPasswordModal && (
         <PasswordModal
           onClose={() =>
@@ -1014,6 +1460,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
           }
         />
       )}
+
     </header>
   );
 }

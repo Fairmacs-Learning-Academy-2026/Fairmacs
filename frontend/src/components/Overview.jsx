@@ -543,9 +543,11 @@ export default function Overview({
             }}
           >
             <Award
+              onClick={onOpenCertificates}
               style={{
                 width: 20,
-                height: 20
+                height: 20,
+                cursor: 'pointer'
               }}
             />
           </div>

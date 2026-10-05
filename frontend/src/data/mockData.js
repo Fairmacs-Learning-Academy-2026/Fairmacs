@@ -10,7 +10,6 @@ export const MOCK_USERS_DATABASE = [
     department: 'Operations',
     branch: 'Chennai HQ',
     email: 'arjun.kumar@fairmacs.com',
-    password: 'Employee@123',
     joiningDate: '2024-03-15',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250'
@@ -24,7 +23,6 @@ export const MOCK_USERS_DATABASE = [
     department: 'Documentation',
     branch: 'Chennai HQ',
     email: 'kavita.sharma@fairmacs.com',
-    password: 'Employee@123',
     joiningDate: '2023-11-01',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=250'
@@ -38,7 +36,6 @@ export const MOCK_USERS_DATABASE = [
     department: 'Accounts',
     branch: 'Mumbai Branch',
     email: 'priya.nair@fairmacs.com',
-    password: 'Employee@123',
     joiningDate: '2023-05-12',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250'
@@ -52,7 +49,6 @@ export const MOCK_USERS_DATABASE = [
     department: 'HR',
     branch: 'Corporate HQ',
     email: 'ananya.rao@fairmacs.com',
-    password: 'Employee@123',
     joiningDate: '2024-01-10',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=250'
@@ -66,7 +62,6 @@ export const MOCK_USERS_DATABASE = [
     department: 'IT',
     branch: 'Chennai HQ',
     email: 'karthik.s@fairmacs.com',
-    password: 'Employee@123',
     joiningDate: '2023-09-01',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250'
@@ -80,7 +75,6 @@ export const MOCK_USERS_DATABASE = [
     department: 'HR',
     branch: 'Corporate HQ',
     email: 'priya.instructor@fairmacs.com',
-    password: 'Trainer@123',
     joiningDate: '2022-01-10',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=250'
@@ -94,7 +88,6 @@ export const MOCK_USERS_DATABASE = [
     department: 'Operations',
     branch: 'Mumbai Branch',
     email: 'rahul.menon@fairmacs.com',
-    password: 'Manager@123',
     joiningDate: '2019-06-20',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=250'
@@ -108,7 +101,6 @@ export const MOCK_USERS_DATABASE = [
     department: 'HR',
     branch: 'Corporate HQ',
     email: 'admin.hr@fairmacs.com',
-    password: 'Admin@123',
     joiningDate: '2018-04-01',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=250'

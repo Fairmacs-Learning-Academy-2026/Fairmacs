@@ -72,12 +72,18 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenCertificates })
             const Icon = item.icon;
             const isActive = activeTab === item.id;
 
-            const handleClick = () => {
-              if (item.id === 'certificates' && onOpenCertificates) {
-                onOpenCertificates();
-              }
-              setActiveTab(item.id);
-            };
+           const handleClick = () => {
+
+  if (
+    item.id === 'certificates' &&
+    onOpenCertificates
+  ) {
+    onOpenCertificates();
+    return;
+  }
+
+  setActiveTab(item.id);
+};
 
             return (
               <li key={item.id} style={{ position: 'relative' }}>

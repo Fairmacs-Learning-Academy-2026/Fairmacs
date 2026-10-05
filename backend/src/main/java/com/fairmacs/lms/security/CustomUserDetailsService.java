@@ -1,7 +1,9 @@
 package com.fairmacs.lms.security;
 
 import com.fairmacs.lms.entity.User;
+import com.fairmacs.lms.entity.UserStatus;
 import com.fairmacs.lms.repository.UserRepository;
+
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -20,16 +22,23 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username)
             throws UsernameNotFoundException {
 
+        if (username == null || username.trim().isEmpty()) {
+            throw new UsernameNotFoundException("Login ID cannot be empty");
+        }
+
+        String loginId = username.trim();
+
         User user = userRepository
-                .findByEmailOrEmployeeId(username, username)
+                .findByEmailOrEmployeeIdIgnoreCase(loginId)
                 .orElseThrow(() -> new UsernameNotFoundException(
-                        "User not found: " + username));
+                        "User not found: " + loginId
+                ));
 
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
                 .password(user.getPassword())
                 .roles(user.getRole().name())
-                .disabled(user.getStatus() != com.fairmacs.lms.entity.UserStatus.ACTIVE)
+                .disabled(user.getStatus() != UserStatus.ACTIVE)
                 .build();
     }
 }

@@ -37,19 +37,27 @@ export default function EmployeeManagement() {
     return matchesRole && matchesDept && matchesSearch;
   });
 
-  const handleAddSubmit = (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
+
     if (!formData.name || !formData.email || !formData.designation) {
       setFormError('Please fill in all mandatory fields.');
       return;
     }
 
-    const autoId = formData.id.trim() || `EMP${Math.floor(1000 + Math.random() * 9000)}`;
-    const res = createEmployee({ ...formData, id: autoId });
+    const autoId =
+      formData.id.trim() ||
+      `EMP${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const res = await createEmployee({
+      ...formData,
+      id: autoId
+    });
 
     if (res.success) {
       setShowAddModal(false);
+      setFormError('');
       setFormData({
         id: '',
         name: '',
@@ -61,14 +69,41 @@ export default function EmployeeManagement() {
         password: 'Employee@123',
         status: 'Active'
       });
+    } else {
+      setFormError(res.message || 'Unable to create employee.');
     }
   };
 
-  const handleResetPass = (empId, empName) => {
-    const res = resetUserPassword(empId);
-    setResetNotice({ empName, newPass: res.newPass });
-    setTimeout(() => setResetNotice(null), 4000);
-  };
+  const handleResetPass = async (empId, empName) => {
+  const temporaryPassword = 'Reset@123';
+
+  const res = await resetUserPassword(
+    empId,
+    temporaryPassword
+  );
+
+  if (res.success) {
+    setResetNotice({
+      empName,
+      newPass: temporaryPassword
+    });
+
+    setTimeout(
+      () => setResetNotice(null),
+      4000
+    );
+  } else {
+    setFormError(
+      res.message ||
+      'Unable to reset password.'
+    );
+
+    setTimeout(
+      () => setFormError(''),
+      4000
+    );
+  }
+};
 
   const activeDeptRule = DEPARTMENT_LEARNING_PATHS[formData.department];
 

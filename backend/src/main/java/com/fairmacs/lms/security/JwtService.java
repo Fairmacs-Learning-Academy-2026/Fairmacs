@@ -3,8 +3,11 @@ package com.fairmacs.lms.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import javax.crypto.SecretKey;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
@@ -20,37 +23,160 @@ public class JwtService {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
-    public String generateToken(String username, Map<String, Object> extraClaims) {
+
+    // ============================================================
+    // SIGNING KEY
+    // ============================================================
+
+    private SecretKey getSigningKey() {
+
+        if (jwtSecret == null ||
+                jwtSecret.trim().isEmpty()) {
+
+            throw new IllegalStateException(
+                    "JWT secret is missing."
+            );
+        }
+
+        return Keys.hmacShaKeyFor(
+                jwtSecret.getBytes(
+                        StandardCharsets.UTF_8
+                )
+        );
+    }
+
+
+    // ============================================================
+    // GENERATE TOKEN
+    // ============================================================
+
+    public String generateToken(
+            String username,
+            Map<String, Object> extraClaims) {
+
         return Jwts.builder()
-                .claims(extraClaims)
+                .claims(
+                        extraClaims != null
+                                ? extraClaims
+                                : new HashMap<>()
+                )
                 .subject(username)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
-                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                .expiration(
+                        new Date(
+                                System.currentTimeMillis()
+                                        + jwtExpiration
+                        )
+                )
+                .signWith(
+                        getSigningKey()
+                )
                 .compact();
     }
 
-    public String generateToken(String username) {
-        return generateToken(username, new HashMap<>());
+
+    // ============================================================
+    // GENERATE TOKEN
+    // ============================================================
+
+    public String generateToken(
+            String username) {
+
+        return generateToken(
+                username,
+                new HashMap<>()
+        );
     }
 
-    public Claims extractClaims(String token) {
+
+    // ============================================================
+    // EXTRACT CLAIMS
+    // ============================================================
+
+    public Claims extractClaims(
+            String token) {
+
+        if (token == null ||
+                token.trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "JWT token is empty."
+            );
+        }
+
         return Jwts.parser()
-                .setSigningKey(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                .verifyWith(
+                        getSigningKey()
+                )
                 .build()
-                .parseSignedClaims(token)
+                .parseSignedClaims(
+                        token.trim()
+                )
                 .getPayload();
     }
 
-    public String extractUsername(String token) {
-        return extractClaims(token).getSubject();
+
+    // ============================================================
+    // EXTRACT USERNAME
+    // ============================================================
+
+    public String extractUsername(
+            String token) {
+
+        return extractClaims(
+                token
+        ).getSubject();
     }
 
-    public boolean isTokenValid(String token) {
+
+    // ============================================================
+    // VALIDATE TOKEN
+    // ============================================================
+
+    public boolean isTokenValid(
+            String token) {
+
         try {
-            Claims claims = extractClaims(token);
-            return !claims.getExpiration().before(new Date());
+
+            Claims claims =
+                    extractClaims(token);
+
+            Date expiration =
+                    claims.getExpiration();
+
+            if (expiration == null) {
+
+                System.err.println(
+                        "JWT validation failed: expiration claim is missing."
+                );
+
+                return false;
+            }
+
+            if (expiration.before(new Date())) {
+
+                System.err.println(
+                        "JWT validation failed: token has expired."
+                );
+
+                return false;
+            }
+
+            return true;
+
         } catch (Exception e) {
+
+            /*
+             * IMPORTANT:
+             * Print the REAL reason instead of hiding it.
+             */
+            System.err.println(
+                    "JWT validation failed: "
+                            + e.getClass().getSimpleName()
+                            + " - "
+                            + e.getMessage()
+            );
+
             return false;
         }
     }

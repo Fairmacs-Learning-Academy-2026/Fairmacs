@@ -494,203 +494,217 @@ export default function Login() {
           </form>
         </div>
 
-        {/* Demo Credentials */}
-        <div
-          style={{
-            marginTop: '1.5rem',
-            background: 'rgba(255, 255, 255, 0.06)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: '12px',
-            padding: '1.1rem',
-            backdropFilter: 'blur(4px)',
-            textAlign: 'center'
-          }}
-        >
+        {/* Demo Credentials - Development Only */}
+        {import.meta.env.DEV && (
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.4rem',
-              color: '#eab308',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.8px',
-              marginBottom: '0.75rem',
+              marginTop: '1.5rem',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '12px',
+              padding: '1.1rem',
+              backdropFilter: 'blur(4px)',
               textAlign: 'center'
             }}
           >
-            <KeyRound
+            <div
               style={{
-                width: 14,
-                height: 14
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                color: '#eab308',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.8px',
+                marginBottom: '0.75rem',
+                textAlign: 'center'
               }}
-            />
+            >
+              <KeyRound
+                style={{
+                  width: 14,
+                  height: 14
+                }}
+              />
 
-            1-Click Demo Credentials
+              1-Click Demo Credentials
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '0.5rem'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickLogin(
+                    'EMP1001',
+                    'Employee@123'
+                  )
+                }
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: 'white',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: '#38bdf8'
+                  }}
+                >
+                  Employee
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    color: '#cbd5e1'
+                  }}
+                >
+                  EMP1001 • Arjun
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickLogin(
+                    'TRN2001',
+                    'Trainer@123'
+                  )
+                }
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: 'white',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: '#c084fc'
+                  }}
+                >
+                  Trainer
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    color: '#cbd5e1'
+                  }}
+                >
+                  TRN2001 • Ravi
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickLogin(
+                    'MGR3001',
+                    'Manager@123'
+                  )
+                }
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: 'white',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: '#f59e0b'
+                  }}
+                >
+                  Manager
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    color: '#cbd5e1'
+                  }}
+                >
+                  MGR3001 • Priya
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  handleQuickLogin(
+                    'HR4001',
+                    'Admin@123'
+                  )
+                }
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: 'white',
+                  padding: '0.5rem 0.75rem',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center'
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: '#34d399'
+                  }}
+                >
+                  HR / Admin
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '0.7rem',
+                    color: '#cbd5e1'
+                  }}
+                >
+                  HR4001 • Anita
+                </div>
+              </button>
+            </div>
           </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.5rem'
-            }}
-          >
-            <button
-              type="button"
-              onClick={() =>
-                handleQuickLogin('EMP1001', 'Employee@123')
-              }
-              style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: 'white',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '8px',
-                fontSize: '0.78rem',
-                textAlign: 'center',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 700,
-                  color: '#38bdf8'
-                }}
-              >
-                Employee
-              </div>
-
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: '#cbd5e1'
-                }}
-              >
-                EMP1001 • Arjun
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                handleQuickLogin('TRN2001', 'Trainer@123')
-              }
-              style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: 'white',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '8px',
-                fontSize: '0.78rem',
-                textAlign: 'center',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 700,
-                  color: '#c084fc'
-                }}
-              >
-                Trainer
-              </div>
-
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: '#cbd5e1'
-                }}
-              >
-                TRN2001 • Ravi
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                handleQuickLogin('MGR3001', 'Manager@123')
-              }
-              style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: 'white',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '8px',
-                fontSize: '0.78rem',
-                textAlign: 'center',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 700,
-                  color: '#f59e0b'
-                }}
-              >
-                Manager
-              </div>
-
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: '#cbd5e1'
-                }}
-              >
-                MGR3001 • Priya
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                handleQuickLogin('HR4001', 'Admin@123')
-              }
-              style={{
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                color: 'white',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '8px',
-                fontSize: '0.78rem',
-                textAlign: 'center',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center'
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 700,
-                  color: '#34d399'
-                }}
-              >
-                HR / Admin
-              </div>
-
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  color: '#cbd5e1'
-                }}
-              >
-                HR4001 • Anita
-              </div>
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Security Footer */}
         <div

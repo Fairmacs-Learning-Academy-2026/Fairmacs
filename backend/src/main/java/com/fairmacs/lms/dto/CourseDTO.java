@@ -29,101 +29,280 @@ public class CourseDTO {
     private List<ModuleDTO> modules = new ArrayList<>();
     private Map<String, Object> quiz;
 
-    public Long getDbId() { return dbId; }
-    public void setDbId(Long dbId) { this.dbId = dbId; }
+    public Long getDbId() {
+        return dbId;
+    }
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public void setDbId(Long dbId) {
+        this.dbId = dbId;
+    }
 
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
+    public String getId() {
+        return id;
+    }
 
-    public String getCategory() { return category; }
-    public void setCategory(String category) { this.category = category; }
+    public void setId(String id) {
+        this.id = id;
+    }
 
-    public String getCategorySlug() { return categorySlug; }
-    public void setCategorySlug(String categorySlug) { this.categorySlug = categorySlug; }
+    public String getTitle() {
+        return title;
+    }
 
-    public String getLevel() { return level; }
-    public void setLevel(String level) { this.level = level; }
+    public void setTitle(String title) {
+        this.title = title;
+    }
 
-    public String getDuration() { return duration; }
-    public void setDuration(String duration) { this.duration = duration; }
+    public String getCategory() {
+        return category;
+    }
 
-    public Double getDurationHours() { return durationHours; }
-    public void setDurationHours(Double durationHours) { this.durationHours = durationHours; }
+    public void setCategory(String category) {
+        this.category = category;
+    }
 
-    public Double getRating() { return rating; }
-    public void setRating(Double rating) { this.rating = rating; }
+    public String getCategorySlug() {
+        return categorySlug;
+    }
 
-    public Integer getEnrolledCount() { return enrolledCount; }
-    public void setEnrolledCount(Integer enrolledCount) { this.enrolledCount = enrolledCount; }
+    public void setCategorySlug(String categorySlug) {
+        this.categorySlug = categorySlug;
+    }
 
-    public String getBanner() { return banner; }
-    public void setBanner(String banner) { this.banner = banner; }
+    public String getLevel() {
+        return level;
+    }
 
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
+    public void setLevel(String level) {
+        this.level = level;
+    }
 
-    public Integer getPassingScore() { return passingScore; }
-    public void setPassingScore(Integer passingScore) { this.passingScore = passingScore; }
+    public String getDuration() {
+        return duration;
+    }
 
-    public Boolean getFoundation() { return foundation; }
-    public void setFoundation(Boolean foundation) { this.foundation = foundation; }
+    public void setDuration(String duration) {
+        this.duration = duration;
+    }
 
-    public String getAssignmentType() { return assignmentType; }
-    public void setAssignmentType(String assignmentType) { this.assignmentType = assignmentType; }
+    public Double getDurationHours() {
+        return durationHours;
+    }
 
-    public String getEnrollmentType() { return enrollmentType; }
-    public void setEnrollmentType(String enrollmentType) { this.enrollmentType = enrollmentType; }
+    public void setDurationHours(Double durationHours) {
+        this.durationHours = durationHours;
+    }
 
-    public String getEnrollmentStatus() { return enrollmentStatus; }
-    public void setEnrollmentStatus(String enrollmentStatus) { this.enrollmentStatus = enrollmentStatus; }
+    public Double getRating() {
+        return rating;
+    }
 
-    public Integer getProgressPercent() { return progressPercent; }
-    public void setProgressPercent(Integer progressPercent) { this.progressPercent = progressPercent; }
+    public void setRating(Double rating) {
+        this.rating = rating;
+    }
 
-    public Long getEnrollmentDbId() { return enrollmentDbId; }
-    public void setEnrollmentDbId(Long enrollmentDbId) { this.enrollmentDbId = enrollmentDbId; }
+    public Integer getEnrolledCount() {
+        return enrolledCount;
+    }
 
-    public String getDueDate() { return dueDate; }
-    public void setDueDate(String dueDate) { this.dueDate = dueDate; }
+    public void setEnrolledCount(Integer enrolledCount) {
+        this.enrolledCount = enrolledCount;
+    }
 
-    public List<ModuleDTO> getModules() { return modules; }
-    public void setModules(List<ModuleDTO> modules) { this.modules = modules; }
+    public String getBanner() {
+        return banner;
+    }
 
-    public Map<String, Object> getQuiz() { return quiz; }
-    public void setQuiz(Map<String, Object> quiz) { this.quiz = quiz; }
+    public void setBanner(String banner) {
+        this.banner = banner;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public Integer getPassingScore() {
+        return passingScore;
+    }
+
+    public void setPassingScore(Integer passingScore) {
+        this.passingScore = passingScore;
+    }
+
+    public Boolean getFoundation() {
+        return foundation;
+    }
+
+    public void setFoundation(Boolean foundation) {
+        this.foundation = foundation;
+    }
+
+    public String getAssignmentType() {
+        return assignmentType;
+    }
+
+    public void setAssignmentType(String assignmentType) {
+        this.assignmentType = assignmentType;
+    }
+
+    public String getEnrollmentType() {
+        return enrollmentType;
+    }
+
+    public void setEnrollmentType(String enrollmentType) {
+        this.enrollmentType = enrollmentType;
+    }
+
+    public String getEnrollmentStatus() {
+        return enrollmentStatus;
+    }
+
+    public void setEnrollmentStatus(String enrollmentStatus) {
+        this.enrollmentStatus = enrollmentStatus;
+    }
+
+    public Integer getProgressPercent() {
+        return progressPercent;
+    }
+
+    public void setProgressPercent(Integer progressPercent) {
+        this.progressPercent = progressPercent;
+    }
+
+    public Long getEnrollmentDbId() {
+        return enrollmentDbId;
+    }
+
+    public void setEnrollmentDbId(Long enrollmentDbId) {
+        this.enrollmentDbId = enrollmentDbId;
+    }
+
+    public String getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(String dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    public List<ModuleDTO> getModules() {
+        return modules;
+    }
+
+    public void setModules(List<ModuleDTO> modules) {
+        this.modules = modules;
+    }
+
+    public Map<String, Object> getQuiz() {
+        return quiz;
+    }
+
+    public void setQuiz(Map<String, Object> quiz) {
+        this.quiz = quiz;
+    }
 
     public static class ModuleDTO {
+
         private String id;
         private String title;
         private List<LessonDTO> lessons = new ArrayList<>();
 
-        public String getId() { return id; }
-        public void setId(String id) { this.id = id; }
-        public String getTitle() { return title; }
-        public void setTitle(String title) { this.title = title; }
-        public List<LessonDTO> getLessons() { return lessons; }
-        public void setLessons(List<LessonDTO> lessons) { this.lessons = lessons; }
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public List<LessonDTO> getLessons() {
+            return lessons;
+        }
+
+        public void setLessons(List<LessonDTO> lessons) {
+            this.lessons = lessons;
+        }
     }
 
     public static class LessonDTO {
+
+        /*
+         * Database primary key.
+         *
+         * Used by lesson-progress APIs.
+         */
+        private Long dbId;
+
+        /*
+         * Existing frontend/business lesson ID.
+         *
+         * Example: lesson-1
+         */
         private String id;
+
         private String title;
         private String type;
         private String duration;
         private String assetUrl;
 
-        public String getId() { return id; }
-        public void setId(String id) { this.id = id; }
-        public String getTitle() { return title; }
-        public void setTitle(String title) { this.title = title; }
-        public String getType() { return type; }
-        public void setType(String type) { this.type = type; }
-        public String getDuration() { return duration; }
-        public void setDuration(String duration) { this.duration = duration; }
-        public String getAssetUrl() { return assetUrl; }
-        public void setAssetUrl(String assetUrl) { this.assetUrl = assetUrl; }
+        public Long getDbId() {
+            return dbId;
+        }
+
+        public void setDbId(Long dbId) {
+            this.dbId = dbId;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public String getDuration() {
+            return duration;
+        }
+
+        public void setDuration(String duration) {
+            this.duration = duration;
+        }
+
+        public String getAssetUrl() {
+            return assetUrl;
+        }
+
+        public void setAssetUrl(String assetUrl) {
+            this.assetUrl = assetUrl;
+        }
     }
 }

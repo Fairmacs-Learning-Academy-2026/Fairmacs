@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+
 import {
   BrowserRouter as Router,
   Routes,
@@ -8,7 +9,10 @@ import {
   useLocation
 } from 'react-router-dom';
 
-import { AuthProvider, useAuth } from './context/AuthContext';
+import {
+  AuthProvider,
+  useAuth
+} from './context/AuthContext';
 
 import { enrollmentService } from './services/enrollmentService';
 import { courseService } from './services/courseService';
@@ -26,6 +30,7 @@ import CourseViewer from './components/CourseViewer';
 import CourseDetailsModal from './components/CourseDetailsModal';
 import QuizModal from './components/QuizModal';
 import CertificateViewer from './components/CertificateViewer';
+import CertificatesPage from './components/CertificatesPage';
 import LearningPaths from './components/LearningPaths';
 import TrainingCalendar from './components/TrainingCalendar';
 import ReportsView from './components/ReportsView';
@@ -48,7 +53,8 @@ const tabToPath = {
   mylearning: '/progress',
   paths: '/learning-paths',
   calendar: '/training-calendar',
-  reports: '/reports'
+  reports: '/reports',
+  certificates: '/certificates'
 };
 
 
@@ -62,7 +68,8 @@ const pathToTab = {
   '/progress': 'mylearning',
   '/learning-paths': 'paths',
   '/training-calendar': 'calendar',
-  '/reports': 'reports'
+  '/reports': 'reports',
+  '/certificates': 'certificates'
 };
 
 
@@ -70,8 +77,12 @@ const pathToTab = {
    ROLE DASHBOARD PATH
 ========================================================= */
 
-function getDashboardPath(role) {
-  switch (String(role || '').toUpperCase()) {
+export function getDashboardPath(role) {
+
+  switch (
+    String(role || '').toUpperCase()
+  ) {
+
     case 'TRAINER':
       return '/trainer';
 
@@ -93,12 +104,17 @@ function getDashboardPath(role) {
 ========================================================= */
 
 function MainApp() {
-  const { user, isAuthenticated } = useAuth();
+
+  const {
+    user,
+    isAuthenticated
+  } = useAuth();
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] =
+    useState('dashboard');
 
   const [selectedCourse, setSelectedCourse] =
     useState(null);
@@ -120,25 +136,37 @@ function MainApp() {
 
 
   /* =========================================================
-     AUTHENTICATION
-  ========================================================== */
-
-  if (!isAuthenticated || !user) {
-    return <Navigate to="/login" replace />;
-  }
-
-
-  /* =========================================================
      KEEP ACTIVE TAB SYNCHRONIZED WITH URL
+
+     IMPORTANT:
+     This hook must run BEFORE any conditional return.
   ========================================================== */
 
   useEffect(() => {
-    const currentTab = pathToTab[location.pathname];
+
+    const currentTab =
+      pathToTab[location.pathname];
 
     if (currentTab) {
       setActiveTab(currentTab);
     }
+
   }, [location.pathname]);
+
+
+  /* =========================================================
+     AUTHENTICATION
+  ========================================================== */
+
+  if (!isAuthenticated || !user) {
+
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
 
 
   /* =========================================================
@@ -150,23 +178,23 @@ function MainApp() {
     setSelectedCourse(null);
     setSelectedCourseDetails(null);
 
-    if (tab === 'certificates') {
-      setShowCertModal(true);
-      return;
-    }
-
     setActiveTab(tab);
 
     /*
-      Dashboard navigation is role-specific.
-    */
+     * Dashboard navigation is always role-specific.
+     */
     if (tab === 'dashboard') {
-      navigate(getDashboardPath(user.role));
+
+      navigate(
+        getDashboardPath(user.role)
+      );
+
       return;
     }
 
     const path =
-      tabToPath[tab] || getDashboardPath(user.role);
+      tabToPath[tab] ||
+      getDashboardPath(user.role);
 
     navigate(path);
   };
@@ -177,22 +205,31 @@ function MainApp() {
   ========================================================== */
 
   const handleSelectCourse = async (course) => {
+
     try {
+
       const courseCode =
-        course.id || course.courseId;
+        course.id ||
+        course.courseId;
 
       const fullCourse =
-        await courseService.getCourseById(courseCode);
+        await courseService.getCourseById(
+          courseCode
+        );
 
       if (!fullCourse) {
+
         throw new Error(
           'Unable to load course details.'
         );
       }
 
-      setSelectedCourse(fullCourse);
+      setSelectedCourse(
+        fullCourse
+      );
 
     } catch (error) {
+
       console.error(
         'Open course error:',
         error
@@ -206,22 +243,32 @@ function MainApp() {
   };
 
 
-  const handleOpenCourseDetails = (course) => {
-    setSelectedCourseDetails(course);
+  const handleOpenCourseDetails = (
+    course
+  ) => {
+
+    setSelectedCourseDetails(
+      course
+    );
   };
 
 
-  const handleStartLearning = async (course) => {
+  const handleStartLearning = async (
+    course
+  ) => {
+
     try {
+
       const courseCode =
-        course.id || course.courseId;
+        course.id ||
+        course.courseId;
 
       const courseDbId =
         course.dbId;
 
       /*
-        Already enrolled.
-      */
+       * Already enrolled.
+       */
       if (course.enrollmentDbId) {
 
         const fullCourse =
@@ -230,31 +277,37 @@ function MainApp() {
           );
 
         if (!fullCourse) {
+
           throw new Error(
             'Unable to load course details.'
           );
         }
 
-        setSelectedCourse(fullCourse);
-        setSelectedCourseDetails(null);
+        setSelectedCourse(
+          fullCourse
+        );
+
+        setSelectedCourseDetails(
+          null
+        );
 
         return;
       }
 
 
       /*
-        New enrollment.
-      */
+       * New enrollment.
+       */
       const enrolledCourse =
         await enrollmentService.enrollInCourse(
           courseDbId
         );
 
-
       if (
         !enrolledCourse ||
         enrolledCourse.success === false
       ) {
+
         throw new Error(
           enrolledCourse?.error ||
           'Unable to enroll in this course.'
@@ -267,16 +320,21 @@ function MainApp() {
           courseCode
         );
 
-
       if (!fullCourse) {
+
         throw new Error(
           'Enrollment succeeded, but course details could not be loaded.'
         );
       }
 
 
-      setSelectedCourse(fullCourse);
-      setSelectedCourseDetails(null);
+      setSelectedCourse(
+        fullCourse
+      );
+
+      setSelectedCourseDetails(
+        null
+      );
 
     } catch (error) {
 
@@ -297,8 +355,13 @@ function MainApp() {
      QUIZ HANDLERS
   ========================================================== */
 
-  const handleStartQuiz = (quiz) => {
-    setActiveQuiz(quiz);
+  const handleStartQuiz = (
+    quiz
+  ) => {
+
+    setActiveQuiz(
+      quiz
+    );
   };
 
 
@@ -306,11 +369,21 @@ function MainApp() {
      CERTIFICATE HANDLERS
   ========================================================== */
 
-  const handlePassCertificate = (certData) => {
+  const handlePassCertificate = (
+    certData
+  ) => {
 
-    setCertVerificationData(null);
-    setActiveCert(certData);
-    setShowCertModal(true);
+    setCertVerificationData(
+      null
+    );
+
+    setActiveCert(
+      certData
+    );
+
+    setShowCertModal(
+      true
+    );
   };
 
 
@@ -319,13 +392,17 @@ function MainApp() {
     verificationData
   ) => {
 
-    setActiveCert(cert);
+    setActiveCert(
+      cert
+    );
 
     setCertVerificationData(
       verificationData
     );
 
-    setShowCertModal(true);
+    setShowCertModal(
+      true
+    );
   };
 
 
@@ -340,12 +417,15 @@ function MainApp() {
     ------------------------------------------ */
 
     if (selectedCourse) {
+
       return (
         <CourseViewer
           course={selectedCourse}
+
           onBack={() =>
             setSelectedCourse(null)
           }
+
           onStartQuiz={
             handleStartQuiz
           }
@@ -358,12 +438,16 @@ function MainApp() {
        COURSE CATALOG
     ------------------------------------------ */
 
-    if (activeTab === 'catalog') {
+    if (
+      activeTab === 'catalog'
+    ) {
+
       return (
         <CourseCatalog
           onSelectCourse={
             handleSelectCourse
           }
+
           onOpenCourseDetails={
             handleOpenCourseDetails
           }
@@ -376,8 +460,13 @@ function MainApp() {
        LEARNING PATHS
     ------------------------------------------ */
 
-    if (activeTab === 'paths') {
-      return <LearningPaths />;
+    if (
+      activeTab === 'paths'
+    ) {
+
+      return (
+        <LearningPaths />
+      );
     }
 
 
@@ -385,8 +474,13 @@ function MainApp() {
        TRAINING CALENDAR
     ------------------------------------------ */
 
-    if (activeTab === 'calendar') {
-      return <TrainingCalendar />;
+    if (
+      activeTab === 'calendar'
+    ) {
+
+      return (
+        <TrainingCalendar />
+      );
     }
 
 
@@ -394,31 +488,60 @@ function MainApp() {
        REPORTS
     ------------------------------------------ */
 
-    if (activeTab === 'reports') {
+    if (
+      activeTab === 'reports'
+    ) {
+
       return (
         <ReportsView
-          currentRole={user.role}
+          currentRole={
+            user.role
+          }
         />
       );
     }
+    /* -----------------------------------------
+   CERTIFICATES
+------------------------------------------ */
 
+if (
+  activeTab === 'certificates'
+) {
+
+  return (
+    <CertificatesPage
+
+      onViewCertificate={
+        handlePassCertificate
+      }
+
+    />
+  );
+}
 
     /* -----------------------------------------
        MY LEARNING
     ------------------------------------------ */
 
-    if (activeTab === 'mylearning') {
+    if (
+      activeTab === 'mylearning'
+    ) {
+
       return (
         <MyLearning
+
           onSelectCourse={
             handleSelectCourse
           }
+
           onOpenCertificates={() =>
             setShowCertModal(true)
           }
+
           onOpenCourseDetails={
             handleOpenCourseDetails
           }
+
         />
       );
     }
@@ -429,10 +552,13 @@ function MainApp() {
     ------------------------------------------ */
 
     switch (
-      String(user.role || '').toUpperCase()
+      String(
+        user.role || ''
+      ).toUpperCase()
     ) {
 
       case 'TRAINER':
+
         return (
           <TrainerDashboard
             onSelectCourse={
@@ -443,6 +569,7 @@ function MainApp() {
 
 
       case 'MANAGER':
+
         return (
           <ManagerDashboard
             onOpenVerifiedCertificate={
@@ -453,6 +580,7 @@ function MainApp() {
 
 
       case 'HR_ADMIN':
+
         return (
           <HrAdminDashboard
             onOpenVerifiedCertificate={
@@ -463,22 +591,29 @@ function MainApp() {
 
 
       case 'EMPLOYEE':
+
       default:
+
         return (
           <Overview
-            onSelectCourse={
-              handleSelectCourse
-            }
-            onOpenCertificates={() =>
-              setShowCertModal(true)
-            }
-            setActiveTab={
-              handleTabChange
-            }
-            onOpenCourseDetails={
-              handleOpenCourseDetails
-            }
-          />
+
+  onSelectCourse={
+    handleSelectCourse
+  }
+
+  onOpenCertificates={() =>
+    handleTabChange('certificates')
+  }
+
+  setActiveTab={
+    handleTabChange
+  }
+
+  onOpenCourseDetails={
+    handleOpenCourseDetails
+  }
+
+/>
         );
     }
   };
@@ -492,28 +627,43 @@ function MainApp() {
     <div className="app-container">
 
       <Header
-        onOpenCertificates={() =>
-          setShowCertModal(true)
-        }
-        onNavigateHome={() =>
-          handleTabChange('dashboard')
-        }
-      />
+
+  onOpenCertificates={() =>
+    handleTabChange('certificates')
+  }
+
+  onNavigateHome={() =>
+    handleTabChange(
+      'dashboard'
+    )
+  }
+
+/>
 
 
       <div className="app-main-layout">
 
         <Sidebar
-          activeTab={activeTab}
-          setActiveTab={handleTabChange}
-          onOpenCertificates={() =>
-            setShowCertModal(true)
-          }
-        />
+
+  activeTab={
+    activeTab
+  }
+
+  setActiveTab={
+    handleTabChange
+  }
+
+  onOpenCertificates={() =>
+    handleTabChange('certificates')
+  }
+
+/>
 
 
         <main className="main-content">
+
           {renderContent()}
+
         </main>
 
       </div>
@@ -524,15 +674,25 @@ function MainApp() {
       ====================================================== */}
 
       {selectedCourseDetails && (
+
         <CourseDetailsModal
-          course={selectedCourseDetails}
-          onClose={() =>
-            setSelectedCourseDetails(null)
+
+          course={
+            selectedCourseDetails
           }
+
+          onClose={() =>
+            setSelectedCourseDetails(
+              null
+            )
+          }
+
           onStartLearning={
             handleStartLearning
           }
+
         />
+
       )}
 
 
@@ -541,17 +701,25 @@ function MainApp() {
       ====================================================== */}
 
       {activeQuiz && (
+
         <QuizModal
-          quiz={activeQuiz}
+
+          quiz={
+            activeQuiz
+          }
 
           onClose={() =>
-            setActiveQuiz(null)
+            setActiveQuiz(
+              null
+            )
           }
 
           onPassCertificate={
             handlePassCertificate
           }
+
         />
+
       )}
 
 
@@ -560,18 +728,31 @@ function MainApp() {
       ====================================================== */}
 
       {showCertModal && (
+
         <CertificateViewer
-          certificate={activeCert}
+
+          certificate={
+            activeCert
+          }
 
           onClose={() => {
-            setShowCertModal(false);
-            setCertVerificationData(null);
+
+            setShowCertModal(
+              false
+            );
+
+            setCertVerificationData(
+              null
+            );
+
           }}
 
           verificationData={
             certVerificationData
           }
+
         />
+
       )}
 
     </div>
@@ -586,6 +767,7 @@ function MainApp() {
 export default function App() {
 
   return (
+
     <Router>
 
       <AuthProvider>
@@ -598,7 +780,9 @@ export default function App() {
 
           <Route
             path="/"
-            element={<PublicHome />}
+            element={
+              <PublicHome />
+            }
           />
 
 
@@ -608,7 +792,9 @@ export default function App() {
 
           <Route
             path="/login"
-            element={<Login />}
+            element={
+              <Login />
+            }
           />
 
 
@@ -618,7 +804,9 @@ export default function App() {
 
           <Route
             path="/unauthorized"
-            element={<Unauthorized />}
+            element={
+              <Unauthorized />
+            }
           />
 
 
@@ -629,11 +817,17 @@ export default function App() {
           <Route
             path="/dashboard"
             element={
+
               <RoleRoute
-                allowedRoles={['EMPLOYEE']}
+                allowedRoles={[
+                  'EMPLOYEE'
+                ]}
               >
+
                 <MainApp />
+
               </RoleRoute>
+
             }
           />
 
@@ -645,11 +839,17 @@ export default function App() {
           <Route
             path="/trainer"
             element={
+
               <RoleRoute
-                allowedRoles={['TRAINER']}
+                allowedRoles={[
+                  'TRAINER'
+                ]}
               >
+
                 <MainApp />
+
               </RoleRoute>
+
             }
           />
 
@@ -661,11 +861,17 @@ export default function App() {
           <Route
             path="/manager"
             element={
+
               <RoleRoute
-                allowedRoles={['MANAGER']}
+                allowedRoles={[
+                  'MANAGER'
+                ]}
               >
+
                 <MainApp />
+
               </RoleRoute>
+
             }
           />
 
@@ -677,11 +883,17 @@ export default function App() {
           <Route
             path="/admin"
             element={
+
               <RoleRoute
-                allowedRoles={['HR_ADMIN']}
+                allowedRoles={[
+                  'HR_ADMIN'
+                ]}
               >
+
                 <MainApp />
+
               </RoleRoute>
+
             }
           />
 
@@ -693,11 +905,17 @@ export default function App() {
           <Route
             path="/progress"
             element={
+
               <RoleRoute
-                allowedRoles={['EMPLOYEE']}
+                allowedRoles={[
+                  'EMPLOYEE'
+                ]}
               >
+
                 <MainApp />
+
               </RoleRoute>
+
             }
           />
 
@@ -710,9 +928,13 @@ export default function App() {
           <Route
             path="/courses"
             element={
+
               <ProtectedRoute>
+
                 <MainApp />
+
               </ProtectedRoute>
+
             }
           />
 
@@ -725,9 +947,13 @@ export default function App() {
           <Route
             path="/learning-paths"
             element={
+
               <ProtectedRoute>
+
                 <MainApp />
+
               </ProtectedRoute>
+
             }
           />
 
@@ -740,9 +966,13 @@ export default function App() {
           <Route
             path="/training-calendar"
             element={
+
               <ProtectedRoute>
+
                 <MainApp />
+
               </ProtectedRoute>
+
             }
           />
 
@@ -755,6 +985,7 @@ export default function App() {
           <Route
             path="/reports"
             element={
+
               <RoleRoute
                 allowedRoles={[
                   'TRAINER',
@@ -762,11 +993,26 @@ export default function App() {
                   'HR_ADMIN'
                 ]}
               >
+
                 <MainApp />
+
               </RoleRoute>
+
             }
           />
+          {/* =================================================
+              CERTIFICATES
+              Authenticated users
+            ================================================= */}
 
+          <Route
+            path="/certificates"
+            element={
+              <ProtectedRoute>
+                <MainApp />
+              </ProtectedRoute>
+            }
+          />
 
           {/* =================================================
               UNKNOWN ROUTES
@@ -774,7 +1020,12 @@ export default function App() {
 
           <Route
             path="*"
-            element={<Navigate to="/" replace />}
+            element={
+              <Navigate
+                to="/"
+                replace
+              />
+            }
           />
 
         </Routes>

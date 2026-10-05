@@ -37,17 +37,14 @@ export default function CourseViewer({
   /*
    * The enrollment ID is created by the backend when the employee
    * starts the course.
-   *
-   * Depending on the CourseDTO shape, it may be available as:
-   * enrollmentDbId or enrollmentId.
    */
   const [resolvedEnrollmentId, setResolvedEnrollmentId] =
-  useState(
-    course?.enrollmentDbId ??
-      course?.enrollmentId ??
-      course?.enrollment?.id ??
-      null
-  );
+    useState(
+      course?.enrollmentDbId ??
+        course?.enrollmentId ??
+        course?.enrollment?.id ??
+        null
+    );
 
   const enrollmentId = resolvedEnrollmentId;
 
@@ -57,149 +54,154 @@ export default function CourseViewer({
    * ---------------------------------------------------------
    */
   useEffect(() => {
-  let cancelled = false;
+    let cancelled = false;
 
-  const resolveEnrollmentAndProgress = async () => {
-    if (allLessons.length === 0) {
-      setLoadingProgress(false);
-      return;
-    }
-
-    try {
-      setLoadingProgress(true);
-
-      let currentEnrollmentId =
-        course?.enrollmentDbId ??
-        course?.enrollmentId ??
-        course?.enrollment?.id ??
-        null;
-
-      /*
-       * If the course details do not contain the enrollment ID,
-       * get the employee's enrollments and find this course.
-       */
-      if (!currentEnrollmentId) {
-        const enrollments =
-          await enrollmentService.getUserEnrollments();
-
-        const courseId =
-          course?.dbId ??
-          course?.courseId ??
-          course?.id;
-
-        const matchingEnrollment =
-          Array.isArray(enrollments)
-            ? enrollments.find(enrollment => {
-                const enrollmentCourseId =
-                  enrollment?.courseId ??
-                  enrollment?.course?.id ??
-                  enrollment?.course?.dbId ??
-                  enrollment?.course?.courseId;
-
-                return (
-                  String(enrollmentCourseId) ===
-                  String(courseId)
-                );
-              })
-            : null;
-
-        currentEnrollmentId =
-          matchingEnrollment?.id ??
-          matchingEnrollment?.enrollmentId ??
-          matchingEnrollment?.dbId ??
-          matchingEnrollment?.enrollmentDbId ??
-          null;
-      }
-
-      if (cancelled) return;
-
-      if (!currentEnrollmentId) {
-        console.error(
-          'Unable to resolve enrollment ID for course:',
-          course
-        );
-
+    const resolveEnrollmentAndProgress = async () => {
+      if (allLessons.length === 0) {
         setLoadingProgress(false);
         return;
       }
 
-      setResolvedEnrollmentId(
-        currentEnrollmentId
-      );
+      try {
+        setLoadingProgress(true);
 
-      /*
-       * Now load the actual lesson progress.
-       */
-      const progressList =
-        await enrollmentService.getEnrollmentProgress(
+        let currentEnrollmentId =
+          course?.enrollmentDbId ??
+          course?.enrollmentId ??
+          course?.enrollment?.id ??
+          null;
+
+        /*
+         * If the course details do not contain the enrollment ID,
+         * get the employee's enrollments and find this course.
+         */
+        if (!currentEnrollmentId) {
+          const enrollments =
+            await enrollmentService.getUserEnrollments();
+
+          const courseId =
+            course?.dbId ??
+            course?.courseId ??
+            course?.id;
+
+          const matchingEnrollment =
+            Array.isArray(enrollments)
+              ? enrollments.find(enrollment => {
+                  const enrollmentCourseId =
+                    enrollment?.courseId ??
+                    enrollment?.course?.id ??
+                    enrollment?.course?.dbId ??
+                    enrollment?.course?.courseId;
+
+                  return (
+                    String(enrollmentCourseId) ===
+                    String(courseId)
+                  );
+                })
+              : null;
+
+          currentEnrollmentId =
+            matchingEnrollment?.id ??
+            matchingEnrollment?.enrollmentId ??
+            matchingEnrollment?.dbId ??
+            matchingEnrollment?.enrollmentDbId ??
+            null;
+        }
+
+        if (cancelled) return;
+
+        if (!currentEnrollmentId) {
+          console.error(
+            'Unable to resolve enrollment ID for course:',
+            course
+          );
+
+          setLoadingProgress(false);
+          return;
+        }
+
+        setResolvedEnrollmentId(
           currentEnrollmentId
         );
 
-      if (cancelled) return;
+        /*
+         * Now load the actual lesson progress.
+         */
+        const progressList =
+          await enrollmentService.getEnrollmentProgress(
+            currentEnrollmentId
+          );
 
-      const completed = {};
-      const progressMap = {};
+        if (cancelled) return;
 
-      if (Array.isArray(progressList)) {
-        progressList.forEach(item => {
-          const lessonId =
-            item?.lessonId ??
-            item?.lesson?.id;
+        const completed = {};
+        const progressMap = {};
 
-          if (!lessonId) return;
+        if (Array.isArray(progressList)) {
+          progressList.forEach(item => {
 
-          const percent =
-            Number(
-              item?.completionPercent ?? 0
-            );
+            /*
+             * Backend progress records use the actual
+             * database Lesson ID.
+             */
+            const lessonDbId =
+              item?.lessonId ??
+              item?.lesson?.id;
 
-          const completedValue =
-            Boolean(item?.completed) ||
-            percent >= 100;
+            if (!lessonDbId) return;
 
-          progressMap[lessonId] = {
-            completionPercent: percent,
-            watchedSeconds:
+            const percent =
               Number(
-                item?.watchedSeconds ?? 0
-              ),
-            lastPositionSeconds:
-              Number(
-                item?.lastPositionSeconds ?? 0
-              ),
-            completed: completedValue
-          };
+                item?.completionPercent ?? 0
+              );
 
-          if (completedValue) {
-            completed[lessonId] = true;
-          }
-        });
+            const completedValue =
+              Boolean(item?.completed) ||
+              percent >= 100;
+
+            progressMap[lessonDbId] = {
+              completionPercent: percent,
+              watchedSeconds:
+                Number(
+                  item?.watchedSeconds ?? 0
+                ),
+              lastPositionSeconds:
+                Number(
+                  item?.lastPositionSeconds ?? 0
+                ),
+              completed: completedValue
+            };
+
+            if (completedValue) {
+              completed[lessonDbId] = true;
+            }
+          });
+        }
+
+        setLessonProgress(progressMap);
+        setCompletedLessons(completed);
+
+      } catch (error) {
+        console.error(
+          'Failed to load lesson progress:',
+          error
+        );
+      } finally {
+        if (!cancelled) {
+          setLoadingProgress(false);
+        }
       }
+    };
 
-      setLessonProgress(progressMap);
-      setCompletedLessons(completed);
+    resolveEnrollmentAndProgress();
 
-    } catch (error) {
-      console.error(
-        'Failed to load lesson progress:',
-        error
-      );
-    } finally {
-      if (!cancelled) {
-        setLoadingProgress(false);
-      }
-    }
-  };
-
-  resolveEnrollmentAndProgress();
-
-  return () => {
-    cancelled = true;
-  };
-}, [
-  course,
-  allLessons.length
-]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    course,
+    allLessons.length
+  ]);
 
   /*
    * ---------------------------------------------------------
@@ -290,10 +292,25 @@ export default function CourseViewer({
     watchedSeconds = 0,
     lastPositionSeconds = 0
   ) => {
-    if (!enrollmentId || !lesson?.id) {
+
+    /*
+     * IMPORTANT:
+     * Use the actual database Lesson ID for the
+     * backend progress API.
+     */
+    const lessonDbId =
+      lesson?.dbId;
+
+    if (!enrollmentId || !lessonDbId) {
       console.warn(
-        'Cannot save progress: enrollment ID or lesson ID is missing.'
+        'Cannot save progress: enrollment ID or lesson database ID is missing.',
+        {
+          enrollmentId,
+          lessonDbId,
+          lesson
+        }
       );
+
       return;
     }
 
@@ -303,7 +320,7 @@ export default function CourseViewer({
       const result =
         await enrollmentService.updateLessonProgress(
           enrollmentId,
-          lesson.id,
+          lessonDbId,
           completionPercent,
           watchedSeconds,
           lastPositionSeconds
@@ -312,9 +329,12 @@ export default function CourseViewer({
       const completed =
         completionPercent >= 100;
 
+      /*
+       * Store progress using the database ID.
+       */
       setLessonProgress(prev => ({
         ...prev,
-        [lesson.id]: {
+        [lessonDbId]: {
           completionPercent,
           watchedSeconds,
           lastPositionSeconds,
@@ -325,16 +345,17 @@ export default function CourseViewer({
       if (completed) {
         setCompletedLessons(prev => ({
           ...prev,
-          [lesson.id]: true
+          [lessonDbId]: true
         }));
       } else {
         setCompletedLessons(prev => ({
           ...prev,
-          [lesson.id]: false
+          [lessonDbId]: false
         }));
       }
 
       return result;
+
     } catch (error) {
       console.error(
         'Failed to save lesson progress:',
@@ -360,11 +381,13 @@ export default function CourseViewer({
     );
 
     /*
-     * Don't call the backend on every video frame.
-     * Save only at useful checkpoints.
+     * Use database lesson ID for progress lookup.
      */
+    const activeLessonDbId =
+      activeLesson?.dbId;
+
     const previous =
-      lessonProgress[activeLesson?.id]
+      lessonProgress[activeLessonDbId]
         ?.completionPercent ?? 0;
 
     const checkpoint =
@@ -471,6 +494,7 @@ export default function CourseViewer({
         gap: '1.25rem'
       }}
     >
+
       {/* =====================================================
           TOP HEADER
       ====================================================== */}
@@ -619,6 +643,7 @@ export default function CourseViewer({
           gap: '1.5rem'
         }}
       >
+
         {/* ===================================================
             LEFT SIDE
         ==================================================== */}
@@ -630,6 +655,7 @@ export default function CourseViewer({
             gap: '1rem'
           }}
         >
+
           {/* =================================================
               MEDIA PLAYER
           ================================================== */}
@@ -646,7 +672,8 @@ export default function CourseViewer({
               position: 'relative'
             }}
           >
-            {activeLesson?.type === 'video' ? (
+
+            {activeLesson?.type?.toLowerCase() === 'video' ? (
               <video
                 key={activeLesson.id}
                 controls
@@ -725,20 +752,20 @@ export default function CourseViewer({
                     }
                     disabled={
                       completedLessons[
-                        activeLesson?.id
+                        activeLesson?.dbId
                       ] || savingProgress
                     }
                     style={{
                       background:
                         completedLessons[
-                          activeLesson?.id
+                          activeLesson?.dbId
                         ]
                           ? '#16a34a'
                           : '#0284c7'
                     }}
                   >
                     {completedLessons[
-                      activeLesson?.id
+                      activeLesson?.dbId
                     ] ? (
                       <>
                         <Check
@@ -955,6 +982,7 @@ export default function CourseViewer({
             gap: '1rem'
           }}
         >
+
           {/* Course Progress */}
 
           <div>
@@ -1058,6 +1086,7 @@ export default function CourseViewer({
                   >
                     {module.lessons.map(
                       lesson => {
+
                         const idxInAll =
                           allLessons.findIndex(
                             l =>
@@ -1069,10 +1098,17 @@ export default function CourseViewer({
                           currentLessonIndex ===
                           idxInAll;
 
+                        /*
+                         * Progress uses the actual
+                         * database lesson ID.
+                         */
+                        const lessonDbId =
+                          lesson.dbId;
+
                         const isDone =
                           Boolean(
                             completedLessons[
-                              lesson.id
+                              lessonDbId
                             ]
                           );
 

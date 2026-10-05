@@ -22,6 +22,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.security.core.userdetails.UserDetailsService;
 
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
@@ -53,29 +54,29 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         // ==========================================
+                        // CORS PREFLIGHT
+                        // ==========================================
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**")
+                        .permitAll()
+
+                        // ==========================================
                         // PUBLIC AUTHENTICATION ENDPOINTS
                         // ==========================================
                         .requestMatchers("/api/auth/**")
                         .permitAll()
 
-
                         // ==========================================
                         // CERTIFICATES
                         // ==========================================
-                        // Recent certificates are restricted to
-                        // Manager and HR Admin.
                         .requestMatchers("/api/certificates/recent")
                         .hasAnyRole("MANAGER", "HR_ADMIN")
 
-                        // Other certificate APIs require login.
                         .requestMatchers("/api/certificates/**")
                         .authenticated()
-
 
                         // ==========================================
                         // ALL OTHER LMS APIs
                         // ==========================================
-                        // Every other API now requires a valid JWT.
                         .anyRequest()
                         .authenticated()
                 )
@@ -88,7 +89,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-
     // ============================================================
     // CORS
     // ============================================================
@@ -100,9 +100,10 @@ public class SecurityConfig {
                 new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                Arrays.asList(
-                        allowedOrigins.split(",")
-                )
+                Arrays.stream(allowedOrigins.split(","))
+                        .map(String::trim)
+                        .filter(origin -> !origin.isEmpty())
+                        .collect(Collectors.toList())
         );
 
         configuration.setAllowedMethods(
@@ -110,13 +111,25 @@ public class SecurityConfig {
                         "GET",
                         "POST",
                         "PUT",
+                        "PATCH",
                         "DELETE",
                         "OPTIONS"
                 )
         );
 
         configuration.setAllowedHeaders(
-                Arrays.asList("*")
+                Arrays.asList(
+                        "Authorization",
+                        "Content-Type",
+                        "Accept",
+                        "Origin"
+                )
+        );
+
+        configuration.setExposedHeaders(
+                Arrays.asList(
+                        "Authorization"
+                )
         );
 
         configuration.setAllowCredentials(true);
@@ -131,7 +144,6 @@ public class SecurityConfig {
 
         return source;
     }
-
 
     // ============================================================
     // AUTHENTICATION PROVIDER
@@ -156,7 +168,6 @@ public class SecurityConfig {
         return provider;
     }
 
-
     // ============================================================
     // AUTHENTICATION MANAGER
     // ============================================================
@@ -168,7 +179,6 @@ public class SecurityConfig {
 
         return config.getAuthenticationManager();
     }
-
 
     // ============================================================
     // PASSWORD ENCODER

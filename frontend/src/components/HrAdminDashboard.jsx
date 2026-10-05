@@ -11,7 +11,7 @@ import { useEnrollmentStore } from '../stores/enrollmentStore';
 export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
   const { user } = useAuth();
   const { verifyCertificate, verifiedCertificate, verifiedCertificateError, fetchRecentCertificates, recentCertificates } = useEnrollmentStore();
-  const [activeHrSubTab, setActiveHrSubTab] = useState('overview'); 
+  const [activeHrSubTab, setActiveHrSubTab] = useState('overview');
   // 'overview' | 'employees' | 'departments' | 'courses' | 'paths' | 'assignments' | 'reports' | 'announcements' | 'settings' | 'certificates'
 
   const [selectedDeptForDrilldown, setSelectedDeptForDrilldown] = useState(null);
@@ -57,7 +57,67 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
     onOpenVerifiedCertificate?.(cert, verificationData);
   };
 
-  const metrics = MOCK_HR_METRICS;
+  const [metrics, setMetrics] = useState({
+    totalEmployees: 0,
+    activeEmployees: 0,
+    activeLearners: 0,
+    overallCompletionRate: 0,
+    avgTrainingHours: 0,
+    certificatesIssued: 0,
+    mandatoryComplianceRate: 0,
+    departmentStats: []
+  });
+
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [metricsError, setMetricsError] = useState('');
+
+  useEffect(() => {
+    const loadHrMetrics = async () => {
+      try {
+        setMetricsLoading(true);
+        setMetricsError('');
+
+        const token =
+          localStorage.getItem('fairmacs_lms_token') ||
+          localStorage.getItem('fairmacs_token');
+
+        const response = await fetch(
+          'http://localhost:8080/api/hr/dashboard/metrics',
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Failed to load HR metrics (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        setMetrics({
+          totalEmployees: data.totalEmployees ?? 0,
+          activeEmployees: data.activeEmployees ?? 0,
+          activeLearners: data.activeLearners ?? 0,
+          overallCompletionRate: data.overallCompletionRate ?? 0,
+          avgTrainingHours: data.avgTrainingHours ?? 0,
+          certificatesIssued: data.certificatesIssued ?? 0,
+          mandatoryComplianceRate: data.mandatoryComplianceRate ?? 0,
+          departmentStats: data.departmentStats ?? []
+        });
+      } catch (error) {
+        console.error('HR metrics loading error:', error);
+        setMetricsError('Unable to load live HR metrics.');
+      } finally {
+        setMetricsLoading(false);
+      }
+    };
+
+    loadHrMetrics();
+  }, []);
   const [announcements, setAnnouncements] = useState([
     { id: 1, title: 'Annual Mandatory Cybersecurity Certification Deadline', target: 'All Employees', date: '20 Sep 2026' },
     { id: 2, title: 'New Incoterms 2020 Refresher Module Launched', target: 'Operations & Sales', date: '15 Sep 2026' }
@@ -96,6 +156,37 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
           </button>
         </div>
       </div>
+
+      {metricsLoading && (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '10px',
+            color: '#64748b',
+            fontSize: '0.85rem'
+          }}
+        >
+          Loading live HR metrics...
+        </div>
+      )}
+
+      {metricsError && (
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            background: '#fff1f2',
+            border: '1px solid #fecdd3',
+            borderRadius: '10px',
+            color: '#be123c',
+            fontSize: '0.85rem',
+            fontWeight: 600
+          }}
+        >
+          {metricsError}
+        </div>
+      )}
 
       {/* HR KPIs Bar */}
       <div className="card-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', marginTop: 0, gap: '0.85rem' }}>
