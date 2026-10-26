@@ -21,6 +21,8 @@ import com.fairmacs.lms.repository.QuizProgressRepository;
 import com.fairmacs.lms.repository.QuizQuestionRepository;
 import com.fairmacs.lms.repository.QuizRepository;
 import com.fairmacs.lms.repository.UserRepository;
+import com.fairmacs.lms.security.SecurityContextUtil;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.time.Duration;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -47,6 +51,7 @@ public class QuizService {
     private final ModuleRepository moduleRepository;
     private final ObjectMapper objectMapper;
     private final EnrollmentService enrollmentService;
+    private final SecurityContextUtil securityContextUtil;
 
     public QuizService(
             QuizRepository quizRepository,
@@ -58,7 +63,8 @@ public class QuizService {
             LessonProgressRepository lessonProgressRepository,
             ModuleRepository moduleRepository,
             ObjectMapper objectMapper,
-            EnrollmentService enrollmentService
+            EnrollmentService enrollmentService,
+            SecurityContextUtil securityContextUtil
     ) {
         this.quizRepository = quizRepository;
         this.quizQuestionRepository = quizQuestionRepository;
@@ -70,6 +76,7 @@ public class QuizService {
         this.moduleRepository = moduleRepository;
         this.objectMapper = objectMapper;
         this.enrollmentService = enrollmentService;
+        this.securityContextUtil = securityContextUtil;
     }
 
     /**
@@ -83,10 +90,73 @@ public class QuizService {
      * Final quiz rules:
      * 1. All module quizzes in the course must be passed.
      */
+
+    private static final long FAILED_ATTEMPT_COOLDOWN_HOURS = 12;
+
+    private Map<String, Object> getCooldownStatus(Long quizId, Long userId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+
+    Optional<QuizAttempt> latestAttempt =
+            quizAttemptRepository
+                    .findTopByQuiz_IdAndUser_IdAndCompletedAtIsNotNullOrderByCompletedAtDesc(
+                            quizId, userId
+                    );
+
+    LocalDateTime now = LocalDateTime.now();
+
+    if (latestAttempt.isPresent()) {
+        QuizAttempt attempt = latestAttempt.get();
+
+        if (Boolean.FALSE.equals(attempt.getPassed())
+                && attempt.getCompletedAt() != null) {
+
+            LocalDateTime unlockAt =
+                    attempt.getCompletedAt()
+                            .plusHours(FAILED_ATTEMPT_COOLDOWN_HOURS);
+
+            if (now.isBefore(unlockAt)) {
+                long remainingSeconds =
+                        Duration.between(now, unlockAt).getSeconds();
+
+                result.put("cooldownActive", true);
+                result.put("retryAvailableAt", unlockAt.toString());
+                result.put("remainingSeconds", remainingSeconds);
+                result.put(
+                        "message",
+                        "You failed this assessment. You can retry after 12 hours."
+                );
+                return result;
+            }
+        }
+    }
+
+    result.put("cooldownActive", false);
+    result.put("remainingSeconds", 0);
+    result.put("retryAvailableAt", null);
+
+    return result;
+}
+
+    private void enforceFailedAttemptCooldown(Long quizId, Long userId) {
+        Map<String, Object> status = getCooldownStatus(quizId, userId);
+
+    if (Boolean.TRUE.equals(status.get("cooldownActive"))) {
+        throw new IllegalStateException(
+                String.valueOf(status.get("message"))
+                        + " Retry available at "
+                        + status.get("retryAvailableAt")
+                        + "."
+        );
+    }
+}
     public Map<String, Object> startQuiz(
-            Long quizId,
-            Long userId
+            Long quizId
     ) {
+
+        Long userId = securityContextUtil.getCurrentUserId();
+        if (userId == null) {
+            throw new AccessDeniedException("Unable to identify the authenticated employee.");
+        }
 
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() ->
@@ -97,6 +167,8 @@ public class QuizService {
                 .orElseThrow(() ->
                         new IllegalArgumentException("User not found.")
                 );
+
+        enforceFailedAttemptCooldown(quizId, userId);
 
         if (!Boolean.TRUE.equals(quiz.getActive())) {
             throw new IllegalStateException(
@@ -173,7 +245,7 @@ public class QuizService {
 
                 boolean previousQuizPassed =
                         quizProgressRepository
-                                .existsByQuizIdAndUserIdAndPassedTrue(
+                                .existsByQuiz_IdAndUser_IdAndPassedTrue(
                                         previousModuleQuiz.getId(),
                                         userId
                                 );
@@ -217,7 +289,7 @@ public class QuizService {
 
                 boolean passed =
                         quizProgressRepository
-                                .existsByQuizIdAndUserIdAndPassedTrue(
+                                .existsByQuiz_IdAndUser_IdAndPassedTrue(
                                         moduleQuiz.getId(),
                                         userId
                                 );
@@ -246,7 +318,7 @@ public class QuizService {
 
         QuizProgress progress =
                 quizProgressRepository
-                        .findByQuizIdAndUserId(
+                        .findByQuiz_IdAndUser_Id(
                                 quizId,
                                 userId
                         )
@@ -377,78 +449,63 @@ public class QuizService {
         }
 
         /*
-         * ---------------------------------------------------------
-         * CREATE ATTEMPT
-         * ---------------------------------------------------------
+         * CREATE / LOAD QUIZ PROGRESS BEFORE CREATING THE ATTEMPT.
+         * This ensures a new attempt is not saved without its progress row.
          */
+        if (progress == null) {
+    progress = quizProgressRepository
+            .findByQuiz_IdAndUser_Id(quiz.getId(), user.getId())
+            .orElseGet(() -> {
+                QuizProgress newProgress = new QuizProgress();
+                newProgress.setQuiz(quiz);
+                newProgress.setUser(user);
+                newProgress.setAttemptsUsed(0);
+                newProgress.setBestScore(0);
+                newProgress.setPassed(false);
+                return newProgress;
+            });
+
+    progress = quizProgressRepository.saveAndFlush(progress);
+}
+
+        // Read the latest count from the persisted progress row.
+        attemptsUsed = progress.getAttemptsUsed() == null
+                ? 0
+                : progress.getAttemptsUsed();
+
+        if (Boolean.TRUE.equals(progress.getPassed())) {
+            throw new IllegalStateException("You have already passed this quiz.");
+        }
+
+        if (attemptsUsed >= maxAttempts) {
+            throw new IllegalStateException("Maximum quiz attempts reached.");
+        }
 
         int attemptNumber = attemptsUsed + 1;
 
+        /* CREATE ATTEMPT */
         QuizAttempt attempt = new QuizAttempt();
-
-        attempt.setAttemptId(
-                "ATT-" + UUID.randomUUID()
-        );
-
+        attempt.setAttemptId("ATT-" + UUID.randomUUID());
         attempt.setQuiz(quiz);
         attempt.setUser(user);
         attempt.setAttemptNumber(attemptNumber);
-        attempt.setTotalQuestions(
-                selectedQuestions.size()
-        );
+        attempt.setTotalQuestions(selectedQuestions.size());
         attempt.setCorrectAnswers(0);
         attempt.setWrongAnswers(0);
         attempt.setScore(0);
         attempt.setPassed(false);
 
         try {
-
-            attempt.setQuestionIds(
-                    objectMapper.writeValueAsString(
-                            questionIds
-                    )
-            );
-
-            attempt.setOptionOrderJson(
-                    objectMapper.writeValueAsString(
-                            optionOrder
-                    )
-            );
-
+            attempt.setQuestionIds(objectMapper.writeValueAsString(questionIds));
+            attempt.setOptionOrderJson(objectMapper.writeValueAsString(optionOrder));
         } catch (JsonProcessingException e) {
-
-            throw new IllegalStateException(
-                    "Unable to prepare quiz attempt data.",
-                    e
-            );
+            throw new IllegalStateException("Unable to prepare quiz attempt data.", e);
         }
 
-        QuizAttempt savedAttempt =
-                quizAttemptRepository.save(attempt);
+        QuizAttempt savedAttempt = quizAttemptRepository.save(attempt);
 
-        /*
-         * ---------------------------------------------------------
-         * CREATE / UPDATE QUIZ PROGRESS
-         * ---------------------------------------------------------
-         */
-
-        if (progress == null) {
-
-            progress = new QuizProgress();
-
-            progress.setQuiz(quiz);
-            progress.setUser(user);
-            progress.setAttemptsUsed(1);
-            progress.setBestScore(0);
-            progress.setPassed(false);
-
-        } else {
-
-            progress.setAttemptsUsed(
-                    attemptsUsed + 1
-            );
-        }
-
+        // Increment progress only after the attempt has been created successfully.
+        progress.setAttemptsUsed(attemptNumber);
         quizProgressRepository.save(progress);
 
         /*
@@ -522,13 +579,86 @@ public class QuizService {
         return response;
     }
 
+
+    /**
+     * HR/Admin-only quiz preview.
+     * This method is read-only: it does not create QuizAttempt records,
+     * update QuizProgress, or change lesson/enrollment progress.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> previewQuiz(Long quizId) {
+
+        Long userId = securityContextUtil.getCurrentUserId();
+
+    if (userId == null) {
+        throw new AccessDeniedException(
+                "Unable to identify the authenticated user."
+        );
+    }
+
+    Quiz quiz = quizRepository.findById(quizId)
+            .orElseThrow(() ->
+                    new IllegalArgumentException("Quiz not found.")
+            );
+
+    List<QuizQuestion> questionBank =
+            quizQuestionRepository.findByQuiz_Id(quizId);
+
+    Map<String, Object> response = new LinkedHashMap<>();
+    response.put("quizId", quiz.getId());
+    response.put("quizCode", quiz.getQuizId());
+    response.put("title", quiz.getTitle());
+    response.put("type", quiz.getType().name());
+    response.put("courseId", quiz.getCourse().getId());
+    response.put(
+            "moduleId",
+            quiz.getModule() == null ? null : quiz.getModule().getId()
+    );
+    response.put("passingScore", quiz.getPassingScore());
+    response.put("timeLimitMinutes", quiz.getTimeLimitMinutes());
+    response.put("maxAttempts", quiz.getMaxAttempts());
+    response.put("totalQuestions", questionBank.size());
+    response.put("previewMode", true);
+
+    List<Map<String, Object>> questions = questionBank.stream()
+            .map(question -> {
+                Map<String, Object> item = new LinkedHashMap<>();
+
+                item.put("id", question.getId());
+                item.put("questionId", question.getQuestionId());
+                item.put("question", question.getQuestionText());
+                item.put("questionType", question.getQuestionType());
+                item.put("orderIndex", question.getOrderIndex());
+
+                Map<String, String> options = new LinkedHashMap<>();
+                options.put("A", question.getOptionA());
+                options.put("B", question.getOptionB());
+                options.put("C", question.getOptionC());
+                options.put("D", question.getOptionD());
+
+                item.put("options", options);
+                item.put("correctAnswer", question.getCorrectAnswer());
+
+                return item;
+            })
+            .collect(Collectors.toList());
+
+        response.put("questions", questions);
+
+        return response;
+    }
+
     /**
      * Returns whether a quiz is currently unlocked for a user.
      */
     public Map<String, Object> getQuizUnlockStatus(
-            Long quizId,
-            Long userId
+            Long quizId
     ) {
+
+        Long userId = securityContextUtil.getCurrentUserId();
+        if (userId == null) {
+            throw new AccessDeniedException("Unable to identify the authenticated employee.");
+        }
 
         Quiz quiz =
                 quizRepository.findById(quizId)
@@ -563,6 +693,10 @@ public class QuizService {
                 quiz.getType()
         );
 
+        Map<String, Object> cooldownStatus = getCooldownStatus(quizId, userId);
+        response.putAll(cooldownStatus);
+        boolean cooldownActive = Boolean.TRUE.equals(cooldownStatus.get("cooldownActive"));
+
         /*
          * ---------------------------------------------------------
          * FINAL QUIZ
@@ -586,7 +720,7 @@ public class QuizService {
 
                 boolean passed =
                         quizProgressRepository
-                                .existsByQuizIdAndUserIdAndPassedTrue(
+                                .existsByQuiz_IdAndUser_IdAndPassedTrue(
                                         moduleQuiz.getId(),
                                         userId
                                 );
@@ -616,12 +750,12 @@ public class QuizService {
                     allModuleQuizzesPassed
             );
 
-            response.put(
-                    "unlocked",
-                    allModuleQuizzesPassed
-            );
+            boolean unlocked = allModuleQuizzesPassed && !cooldownActive;
+            response.put("unlocked", unlocked);
 
-            if (allModuleQuizzesPassed) {
+            if (cooldownActive) {
+                response.put("reason", cooldownStatus.get("message"));
+            } else if (allModuleQuizzesPassed) {
 
                 response.put(
                         "reason",
@@ -713,7 +847,7 @@ public class QuizService {
 
                 boolean passed =
                         quizProgressRepository
-                                .existsByQuizIdAndUserIdAndPassedTrue(
+                                .existsByQuiz_IdAndUser_IdAndPassedTrue(
                                         previousQuiz.getId(),
                                         userId
                                 );
@@ -727,7 +861,8 @@ public class QuizService {
 
             boolean unlocked =
                     allLessonsCompleted
-                            && previousModulesPassed;
+                            && previousModulesPassed
+                            && !cooldownActive;
 
             response.put(
                     "moduleId",
@@ -754,7 +889,11 @@ public class QuizService {
                     unlocked
             );
 
-            if (unlocked) {
+            if (cooldownActive) {
+
+                response.put("reason", cooldownStatus.get("message"));
+
+            } else if (unlocked) {
 
                 response.put(
                         "reason",
@@ -813,6 +952,13 @@ public class QuizService {
                                         "Quiz attempt not found."
                                 )
                         );
+
+        Long currentUserId = securityContextUtil.getCurrentUserId();
+        if (currentUserId == null
+                || attempt.getUser() == null
+                || !currentUserId.equals(attempt.getUser().getId())) {
+            throw new AccessDeniedException("You are not authorized to submit this quiz attempt.");
+        }
 
         if (attempt.getCompletedAt() != null) {
 
@@ -985,7 +1131,7 @@ public class QuizService {
 
         QuizProgress progress =
                 quizProgressRepository
-                        .findByQuizIdAndUserId(
+                        .findByQuiz_IdAndUser_Id(
                                 quiz.getId(),
                                 attempt.getUser().getId()
                         )
@@ -1155,6 +1301,9 @@ if (passed &&
                 "quizPassed",
                 progress.getPassed()
         );
+
+        Map<String, Object> cooldownStatus = getCooldownStatus(quiz.getId(), attempt.getUser().getId());
+        response.putAll(cooldownStatus);
 
         /*
          * Tell frontend that the course was completed.

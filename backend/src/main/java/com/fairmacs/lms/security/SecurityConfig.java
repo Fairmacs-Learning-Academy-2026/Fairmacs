@@ -1,3 +1,4 @@
+
 package com.fairmacs.lms.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,13 +37,16 @@ public class SecurityConfig {
     private String allowedOrigins;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http) throws Exception {
 
         http
                 .csrf(csrf -> csrf.disable())
 
                 .cors(cors ->
-                        cors.configurationSource(corsConfigurationSource())
+                        cors.configurationSource(
+                                corsConfigurationSource()
+                        )
                 )
 
                 .sessionManagement(session ->
@@ -53,30 +57,32 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
 
-                        // ==========================================
-                        // CORS PREFLIGHT
-                        // ==========================================
-                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**")
-                        .permitAll()
+                        // CORS preflight
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.OPTIONS,
+                                "/**"
+                        ).permitAll()
 
-                        // ==========================================
-                        // PUBLIC AUTHENTICATION ENDPOINTS
-                        // ==========================================
+                        // Public authentication endpoints
                         .requestMatchers("/api/auth/**")
                         .permitAll()
 
-                        // ==========================================
-                        // CERTIFICATES
-                        // ==========================================
-                        .requestMatchers("/api/certificates/recent")
-                        .hasAnyRole("MANAGER", "HR_ADMIN")
+                        // Zoho OAuth callback: Zoho redirects here
+                        // without the Fairmacs LMS JWT.
+                        // OAuth state must be validated by the callback.
+                        .requestMatchers(
+                                "/api/integrations/zoho/callback"
+                        ).permitAll()
+
+                        // Certificates
+                        .requestMatchers(
+                                "/api/certificates/recent"
+                        ).hasAnyRole("MANAGER", "HR_ADMIN")
 
                         .requestMatchers("/api/certificates/**")
                         .authenticated()
 
-                        // ==========================================
-                        // ALL OTHER LMS APIs
-                        // ==========================================
+                        // All other LMS APIs remain protected
                         .anyRequest()
                         .authenticated()
                 )
@@ -89,10 +95,7 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // ============================================================
     // CORS
-    // ============================================================
-
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
 
@@ -127,9 +130,7 @@ public class SecurityConfig {
         );
 
         configuration.setExposedHeaders(
-                Arrays.asList(
-                        "Authorization"
-                )
+                Arrays.asList("Authorization")
         );
 
         configuration.setAllowCredentials(true);
@@ -145,10 +146,7 @@ public class SecurityConfig {
         return source;
     }
 
-    // ============================================================
-    // AUTHENTICATION PROVIDER
-    // ============================================================
-
+    // Authentication provider
     @Bean
     public AuthenticationProvider authenticationProvider(
             UserDetailsService userDetailsService,
@@ -157,21 +155,13 @@ public class SecurityConfig {
         DaoAuthenticationProvider provider =
                 new DaoAuthenticationProvider();
 
-        provider.setUserDetailsService(
-                userDetailsService
-        );
-
-        provider.setPasswordEncoder(
-                passwordEncoder
-        );
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
 
         return provider;
     }
 
-    // ============================================================
-    // AUTHENTICATION MANAGER
-    // ============================================================
-
+    // Authentication manager
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config)
@@ -180,10 +170,7 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    // ============================================================
-    // PASSWORD ENCODER
-    // ============================================================
-
+    // Password encoder
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

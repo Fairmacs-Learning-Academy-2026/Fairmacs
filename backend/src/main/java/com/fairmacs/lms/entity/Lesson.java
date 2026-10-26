@@ -25,6 +25,9 @@ public class Lesson {
     @Column
     private String contentUrl;
 
+    @Column(name = "workdrive_file_id")
+    private String workdriveFileId;
+
     @Column
     private String duration;
 
@@ -55,6 +58,9 @@ public class Lesson {
 
     public String getContentUrl() { return contentUrl; }
     public void setContentUrl(String contentUrl) { this.contentUrl = contentUrl; }
+
+    public String getWorkdriveFileId() { return workdriveFileId; }
+    public void setWorkdriveFileId(String workdriveFileId) { this.workdriveFileId = workdriveFileId; }
 
     public String getDuration() { return duration; }
     public void setDuration(String duration) { this.duration = duration; }

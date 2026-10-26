@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
 import {
   X,
   CheckCircle,
@@ -9,113 +15,837 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
-  Loader2
+  Loader2,
+  Lock,
 } from 'lucide-react';
+
 import confetti from 'canvas-confetti';
 
 import { useAuth } from '../context/AuthContext';
 import { useEnrollmentStore } from '../stores/enrollmentStore';
+import quizService from '../services/quizService';
 
 export default function QuizModal({
   quiz,
   onClose,
-  onPassCertificate
+  onPassCertificate,
 }) {
   const { user } = useAuth();
 
   const {
     completeCourse,
-    isLoading
+    isLoading,
   } = useEnrollmentStore();
 
+  const [attempt, setAttempt] = useState(null);
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [flagged, setFlagged] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
+  const [result, setResult] = useState(null);
 
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState(
-    (quiz.timeLimitMinutes || 15) * 60
-  );
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  const [loadingQuiz, setLoadingQuiz] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [cooldownStatus, setCooldownStatus] = useState(null);
+  const [cooldownNow, setCooldownNow] = useState(Date.now());
+  const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
 
   const [generatingCert, setGeneratingCert] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
 
-  // Timer Countdown
+  // Preview mode is read-only and must never start a learner attempt.
+  const previewMode = Boolean(quiz?.previewMode);
+
+  const answersRef = useRef({});
+  const submittedRef = useRef(false);
+  const attemptStartedAtRef = useRef(null);
+
+  const userId =
+    user?.id ??
+    user?.userId ??
+    user?.dbId ??
+    null;
+
+  const quizId = (() => {
+    const id = quiz?.id ?? quiz?.dbId ?? quiz?.quizDbId;
+
+    if (id == null || !/^\d+$/.test(String(id))) {
+      return null;
+    }
+
+    return String(id);
+  })();
+
+  const questions = attempt?.questions || [];
+  const currentQ = questions[currentQIndex];
+
+  const getAuthToken = () =>
+    localStorage.getItem('fairmacs_token') ||
+    localStorage.getItem('fairmacs_lms_token') ||
+    localStorage.getItem('accessToken') ||
+    localStorage.getItem('token') ||
+    '';
+
+  const getApiBaseUrl = () =>
+    (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+
+  const loadCooldownStatus = useCallback(async () => {
+    if (!quizId || previewMode) return null;
+    const token = getAuthToken();
+    if (!token) return null;
+
+    try {
+      const response = await fetch(
+        `${getApiBaseUrl()}/quizzes/${encodeURIComponent(quizId)}/unlock-status`,
+        {
+          method: 'GET',
+          headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        }
+      );
+      if (!response.ok) return null;
+      const payload = await response.json();
+      // Support both a direct DTO and common { data: DTO } API envelopes.
+      const data = payload?.data && typeof payload.data === 'object'
+        ? payload.data
+        : payload;
+      setCooldownStatus(data);
+      setCooldownNow(Date.now());
+      return data;
+    } catch (statusError) {
+      console.warn('Unable to load quiz cooldown status:', statusError);
+      return null;
+    }
+  }, [quizId, previewMode]);
+
   useEffect(() => {
-    if (submitted) return;
+    if (!cooldownStatus?.cooldownActive) return undefined;
+    const timer = setInterval(() => setCooldownNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [cooldownStatus]);
+
+  const retryAtMs = cooldownStatus?.retryAvailableAt
+    ? new Date(cooldownStatus.retryAvailableAt).getTime()
+    : NaN;
+  const cooldownSecondsRemaining = Number.isFinite(retryAtMs)
+    ? Math.max(0, Math.ceil((retryAtMs - cooldownNow) / 1000))
+    : Math.max(0, Number(cooldownStatus?.remainingSeconds || 0));
+  const cooldownIsActive = Boolean(
+    cooldownStatus?.cooldownActive && cooldownSecondsRemaining > 0
+  );
+  const formatCooldown = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours}h ${minutes}m ${secs}s`;
+  };
+
+  const resetAttemptState = useCallback(() => {
+    setAttempt(null);
+    setCurrentQIndex(0);
+    setAnswers({});
+    answersRef.current = {};
+    setFlagged({});
+    setSubmitted(false);
+    submittedRef.current = false;
+    setResult(null);
+    setElapsedSeconds(0);
+    setError('');
+  }, []);
+
+  const loadQuizPreview = useCallback(async () => {
+    if (!quizId) {
+      setError('This assessment is not linked to a valid quiz ID.');
+      setLoadingQuiz(false);
+      return;
+    }
+
+    try {
+      setLoadingQuiz(true);
+      setError('');
+      setPreviewData(null);
+
+      const token =
+        localStorage.getItem('fairmacs_token') ||
+        localStorage.getItem('fairmacs_lms_token') ||
+        localStorage.getItem('accessToken') ||
+        localStorage.getItem('token') ||
+        '';
+
+      if (!token) {
+        throw new Error('Your session has expired. Please sign in again.');
+      }
+
+      const apiBaseUrl =
+        import.meta.env.VITE_API_BASE_URL ||
+        'http://localhost:8080/api';
+
+      const response = await fetch(
+        `${apiBaseUrl}/quizzes/${encodeURIComponent(quizId)}/preview`,
+        {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please sign in again.');
+        }
+        if (response.status === 403) {
+          throw new Error('Only HR/Admin users can preview quiz answers.');
+        }
+        if (response.status === 404) {
+          throw new Error('Quiz not found.');
+        }
+        throw new Error(`Unable to load quiz preview (HTTP ${response.status}).`);
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data?.questions)) {
+        throw new Error('The server returned an invalid quiz preview.');
+      }
+
+      setPreviewData(data);
+    } catch (err) {
+      console.error('Load quiz preview error:', err);
+      setError(err?.message || 'Unable to load quiz preview.');
+    } finally {
+      setLoadingQuiz(false);
+    }
+  }, [quizId]);
+
+  const startQuiz = useCallback(async () => {
+    if (!quizId) {
+      setError(
+        'This assessment is not linked to a valid quiz ID.'
+      );
+      setLoadingQuiz(false);
+      return;
+    }
+
+    if (!userId) {
+      setError(
+        'Unable to identify the logged-in employee.'
+      );
+      setLoadingQuiz(false);
+      return;
+    }
+
+    try {
+      setLoadingQuiz(true);
+      setError('');
+      setMaxAttemptsReached(false);
+
+      resetAttemptState();
+
+      const data = await quizService.startQuiz(quizId);
+
+      if (!data?.attemptId || !Array.isArray(data?.questions)) {
+        throw new Error(
+          'The quiz server returned an invalid attempt.'
+        );
+      }
+
+      setAttempt(data);
+
+      const limitSeconds =
+        Number(data.timeLimitMinutes || 0) * 60;
+
+      setTimeLeftSeconds(limitSeconds);
+      attemptStartedAtRef.current = Date.now();
+    } catch (err) {
+      console.error('Start quiz error:', err);
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Unable to start this assessment.';
+      const attemptLimitError =
+        /maximum.{0,30}attempt|attempts?.{0,20}reached|no attempts remaining|cooldown|retry available|attempt limit/i.test(
+          `${message} ${JSON.stringify(err?.response?.data || {})}`
+        );
+      if (attemptLimitError) {
+        setMaxAttemptsReached(true);
+        const status = await loadCooldownStatus();
+        if (status?.cooldownActive) {
+          setError(status.message || 'You have reached the attempt limit. Please wait until the retry time.');
+        } else {
+          setError(message);
+        }
+      } else {
+        setError(message);
+      }
+    } finally {
+      setLoadingQuiz(false);
+    }
+  }, [quizId, userId, resetAttemptState, loadCooldownStatus]);
+
+  useEffect(() => {
+    if (previewMode || !maxAttemptsReached || cooldownIsActive) return undefined;
+    // Once the displayed cooldown expires, re-check server eligibility.
+    const timer = setInterval(() => {
+      loadCooldownStatus().then((status) => {
+        if (status && !status.cooldownActive) {
+          setMaxAttemptsReached(false);
+          setError('Cooldown ended. You can try starting the assessment again.');
+        }
+      });
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [previewMode, maxAttemptsReached, cooldownIsActive, loadCooldownStatus]);
+
+  useEffect(() => {
+    if (previewMode) {
+      loadQuizPreview();
+    } else {
+      loadCooldownStatus().then((status) => {
+        if (status?.cooldownActive) {
+          setMaxAttemptsReached(true);
+          setError(status.message || 'Maximum quiz attempts reached. Please wait until the retry time.');
+          setLoadingQuiz(false);
+        } else {
+          startQuiz();
+        }
+      });
+    }
+  }, [previewMode, loadQuizPreview, startQuiz, loadCooldownStatus]);
+
+  const submitCurrentAttempt = useCallback(
+    async (forced = false) => {
+      if (
+        submittedRef.current ||
+        submitting ||
+        !attempt?.attemptId
+      ) {
+        return;
+      }
+
+      submittedRef.current = true;
+      setSubmitting(true);
+      setError('');
+
+      const startedAt =
+        attemptStartedAtRef.current || Date.now();
+
+      const calculatedElapsed = Math.max(
+        0,
+        Math.floor((Date.now() - startedAt) / 1000)
+      );
+
+      const timeTaken = Math.max(
+        0,
+        forced
+          ? Math.max(
+              calculatedElapsed,
+              Number(
+                attempt.timeLimitMinutes || 0
+              ) * 60
+            )
+          : calculatedElapsed
+      );
+
+      try {
+        const serverResult =
+          await quizService.submitQuiz(
+            attempt.attemptId,
+            answersRef.current,
+            timeTaken
+          );
+
+        setResult(serverResult);
+        setSubmitted(true);
+
+        if (serverResult?.passed) {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+          });
+        }
+      } catch (err) {
+        console.error('Submit quiz error:', err);
+
+        submittedRef.current = false;
+
+        setError(
+          err?.message ||
+            'Unable to submit the assessment.'
+        );
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [attempt, submitting]
+  );
+
+  // Countdown timer. The final submission is still
+  // graded by the backend.
+  useEffect(() => {
+    if (
+      loadingQuiz ||
+      submitted ||
+      !attempt ||
+      !attemptStartedAtRef.current
+    ) {
+      return undefined;
+    }
 
     const timer = setInterval(() => {
-      setTimeLeftSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleSubmitQuiz();
-          return 0;
-        }
+      const elapsed = Math.floor(
+        (Date.now() -
+          attemptStartedAtRef.current) /
+          1000
+      );
 
-        return prev - 1;
-      });
+      setElapsedSeconds(elapsed);
+
+      const limit =
+        Number(attempt.timeLimitMinutes || 0) *
+        60;
+
+      if (limit > 0) {
+        const remaining = Math.max(
+          0,
+          limit - elapsed
+        );
+
+        setTimeLeftSeconds(remaining);
+
+        if (remaining === 0) {
+          clearInterval(timer);
+          submitCurrentAttempt(true);
+        }
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [submitted]);
+  }, [
+    loadingQuiz,
+    submitted,
+    attempt,
+    submitCurrentAttempt,
+  ]);
 
   const formatTimer = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
 
-    return `${mins.toString().padStart(2, '0')}:${secs
+    return `${mins
+      .toString()
+      .padStart(2, '0')}:${secs
       .toString()
       .padStart(2, '0')}`;
   };
 
-  const handleSelectOption = (questionId, optionIndex) => {
-    if (submitted) return;
+  const handleSelectOption = (
+    questionId,
+    optionValue
+  ) => {
+    if (submitted || submitting) return;
 
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: optionIndex
-    }));
+    setAnswers((prev) => {
+      const next = {
+        ...prev,
+        [questionId]: optionValue,
+      };
+
+      answersRef.current = next;
+      return next;
+    });
   };
 
   const toggleFlag = (questionId) => {
+    if (submitted) return;
+
     setFlagged((prev) => ({
       ...prev,
-      [questionId]: !prev[questionId]
+      [questionId]: !prev[questionId],
     }));
   };
 
-  const handleSubmitQuiz = () => {
-    let correctCount = 0;
+  const answeredCount =
+    Object.keys(answers).length;
 
-    quiz.questions.forEach((q) => {
-      if (answers[q.id] === q.correctIndex) {
-        correctCount++;
-      }
-    });
+  const isLastQuestion =
+    currentQIndex === questions.length - 1;
 
-    const calculatedScore = Math.round(
-      (correctCount / quiz.questions.length) * 100
+  const isPassed = Boolean(result?.passed);
+
+  const passingScore =
+    Number(
+      result?.passingScore ??
+        attempt?.passingScore ??
+        quiz?.passingScore ??
+        70
     );
 
-    setScore(calculatedScore);
-    setSubmitted(true);
+  const handleGenerateCertificate =
+    async () => {
+      if (!isPassed) return;
 
-    if (
-      calculatedScore >=
-      (quiz.passingScore || 80)
-    ) {
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-    }
-  };
+      setGeneratingCert(true);
 
-  const currentQ = quiz.questions[currentQIndex];
+      try {
+        const courseId =
+          quiz?.courseId ??
+          quiz?.courseDbId ??
+          quiz?.course?.id;
 
-  const isPassed =
-    score >= (quiz.passingScore || 80);
+        const score = Number(result?.score ?? 0);
+
+        const completionResult =
+          await completeCourse(
+            userId,
+            courseId,
+            score,
+            {
+              enrollmentId:
+                quiz?.enrollmentId,
+              courseCode:
+                quiz?.courseCode,
+            }
+          );
+
+        if (
+          !completionResult?.success ||
+          !completionResult?.certificate
+        ) {
+          throw new Error(
+            completionResult?.error ||
+              'Unable to generate the certificate. Please try again.'
+          );
+        }
+
+        onClose();
+
+        onPassCertificate(
+          completionResult.certificate
+        );
+      } catch (err) {
+        console.error(
+          'Certificate generation failed:',
+          err
+        );
+
+        alert(
+          err?.message ||
+            'Unable to generate the certificate. Please try again.'
+        );
+      } finally {
+        setGeneratingCert(false);
+      }
+    };
+
+  if (loadingQuiz) {
+    return (
+      <div className="modal-overlay">
+        <div
+          className="modal-content animate-fade-in"
+          style={{
+            maxWidth: '520px',
+            padding: '2.5rem',
+            textAlign: 'center',
+          }}
+        >
+          <Loader2
+            className="animate-spin"
+            style={{
+              width: 42,
+              height: 42,
+              margin: '0 auto 1rem',
+              color: '#0284c7',
+            }}
+          />
+
+          <h3
+            style={{
+              margin: 0,
+              color: '#0f172a',
+            }}
+          >
+            {previewMode ? 'Loading quiz preview...' : 'Starting assessment...'}
+          </h3>
+
+          <p
+            style={{
+              color: '#64748b',
+              marginTop: '0.5rem',
+            }}
+          >
+            {previewMode
+              ? 'Loading questions and answer keys without creating an attempt.'
+              : 'Verifying your eligibility and creating a secure quiz attempt.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !attempt && !submitted) {
+    return (
+      <div className="modal-overlay">
+        <div
+          className="modal-content animate-fade-in"
+          style={{
+            maxWidth: '560px',
+            padding: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              background: '#0f172a',
+              padding: '1.25rem 1.5rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              color: 'white',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#38bdf8',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                }}
+              >
+                Fairmacs Verified Assessment Engine
+              </div>
+
+              <h2
+                style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 800,
+                  margin: '0.1rem 0 0',
+                }}
+              >
+                {quiz?.title || 'Assessment'}
+              </h2>
+            </div>
+
+            <button
+              onClick={onClose}
+              style={{
+                background:
+                  'rgba(255,255,255,0.1)',
+                border: 'none',
+                padding: '0.4rem',
+                borderRadius: '50%',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+            >
+              <X
+                style={{
+                  width: 20,
+                  height: 20,
+                }}
+              />
+            </button>
+          </div>
+
+          <div
+            style={{
+              padding: '2rem',
+              textAlign: 'center',
+            }}
+          >
+            {cooldownIsActive ? (
+              <Lock style={{ width: 52, height: 52, color: '#e11d48', margin: '0 auto 1rem' }} />
+            ) : (
+              <AlertCircle
+              style={{
+                width: 52,
+                height: 52,
+                color: '#e11d48',
+                margin: '0 auto 1rem',
+              }}
+            />
+            )}
+
+            <h3
+              style={{
+                color: '#0f172a',
+                marginBottom: '0.5rem',
+              }}
+            >
+              {cooldownIsActive ? 'Assessment temporarily locked' : 'Assessment unavailable'}
+            </h3>
+
+            <p
+              style={{
+                color: '#64748b',
+                lineHeight: 1.5,
+                marginBottom: '1.5rem',
+              }}
+            >
+              {cooldownIsActive
+                ? 'Maximum quiz attempts reached. You can try again when the cooldown ends.'
+                : error}
+            </p>
+
+            {cooldownIsActive && (
+              <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 12, padding: '1rem', margin: '0 auto 1.5rem', maxWidth: 360 }}>
+                <div style={{ color: '#9f1239', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Retry available in</div>
+                <div aria-live="polite" style={{ color: '#be123c', fontSize: '1.8rem', fontWeight: 900, margin: '0.35rem 0' }}>{formatCooldown(cooldownSecondsRemaining)}</div>
+                {cooldownStatus?.retryAvailableAt && (
+                  <div style={{ color: '#881337', fontSize: '0.8rem' }}>Available at: {new Date(cooldownStatus.retryAvailableAt).toLocaleString()}</div>
+                )}
+              </div>
+            )}
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '0.75rem',
+              }}
+            >
+              <button
+                className="btn-secondary"
+                onClick={onClose}
+              >
+                Close
+              </button>
+
+              {!cooldownIsActive && !maxAttemptsReached && (
+                <button
+                  className="btn-primary"
+                  onClick={previewMode ? loadQuizPreview : startQuiz}
+                >
+                  Try Again
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (previewMode) {
+    const previewQuestions = previewData?.questions || [];
+    return (
+      <div className="modal-overlay">
+        <div
+          className="modal-content animate-fade-in"
+          style={{ maxWidth: '850px', padding: 0, overflow: 'hidden', maxHeight: '90vh', overflowY: 'auto' }}
+        >
+          <div style={{
+            background: '#0f172a', padding: '1.25rem 1.5rem',
+            display: 'flex', justifyContent: 'space-between',
+            alignItems: 'center', gap: '1rem', color: 'white',
+            position: 'sticky', top: 0, zIndex: 2
+          }}>
+            <div>
+              <div style={{
+                fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8',
+                textTransform: 'uppercase', letterSpacing: '1px'
+              }}>
+                HR/Admin · Read-only preview
+              </div>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0.25rem 0 0' }}>
+                {previewData?.title || quiz?.title || 'Quiz Preview'}
+              </h2>
+              <p style={{ margin: '0.35rem 0 0', color: '#cbd5e1', fontSize: '0.8rem' }}>
+                {previewQuestions.length} questions · No attempt or learner progress will be changed
+              </p>
+            </div>
+            <button type="button" aria-label="Close quiz preview" onClick={onClose} style={{
+              background: 'rgba(255,255,255,0.1)', border: 0, padding: '0.45rem',
+              borderRadius: '50%', color: 'white', cursor: 'pointer', flexShrink: 0
+            }}>
+              <X style={{ width: 20, height: 20 }} />
+            </button>
+          </div>
+
+          <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {previewData && (
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: '0.6rem',
+                color: '#334155', fontSize: '0.8rem'
+              }}>
+                <span style={{ background: '#f1f5f9', padding: '0.4rem 0.65rem', borderRadius: 7 }}>
+                  Passing score: {previewData.passingScore ?? '—'}%
+                </span>
+                <span style={{ background: '#f1f5f9', padding: '0.4rem 0.65rem', borderRadius: 7 }}>
+                  Time limit: {previewData.timeLimitMinutes ?? '—'} min
+                </span>
+                <span style={{ background: '#f1f5f9', padding: '0.4rem 0.65rem', borderRadius: 7 }}>
+                  Max attempts: {previewData.maxAttempts ?? '—'}
+                </span>
+              </div>
+            )}
+
+            {previewQuestions.map((question, index) => {
+              const options = question.options || {};
+              const optionEntries = Array.isArray(options)
+                ? options.map(option => [option.value, option.text])
+                : Object.entries(options);
+              const correctAnswer = String(question.correctAnswer ?? '').trim().toUpperCase();
+
+              return (
+                <section key={question.id ?? question.questionId ?? index} style={{
+                  border: '1px solid #e2e8f0', borderRadius: 12,
+                  padding: '1rem', background: 'white'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.8rem' }}>
+                    <strong style={{ color: '#0284c7', fontSize: '0.78rem' }}>
+                      QUESTION {index + 1}{question.questionId ? ` · ${question.questionId}` : ''}
+                    </strong>
+                    <span style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                      {question.questionType || 'Multiple choice'}
+                    </span>
+                  </div>
+                  <p style={{ color: '#0f172a', fontWeight: 700, lineHeight: 1.5, margin: '0 0 0.9rem' }}>
+                    {question.question || question.questionText || 'Question text unavailable'}
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {optionEntries.map(([key, value]) => {
+                      const optionKey = String(key ?? '').trim().toUpperCase();
+                      const isCorrect = optionKey === correctAnswer;
+                      return (
+                        <div key={optionKey} style={{
+                          display: 'flex', alignItems: 'center', gap: '0.65rem',
+                          padding: '0.7rem 0.8rem', borderRadius: 8,
+                          border: isCorrect ? '1px solid #86efac' : '1px solid #e2e8f0',
+                          background: isCorrect ? '#f0fdf4' : '#f8fafc',
+                          color: isCorrect ? '#166534' : '#334155'
+                        }}>
+                          <span style={{ fontWeight: 800, minWidth: 22 }}>{optionKey}.</span>
+                          <span style={{ flex: 1 }}>{value ?? '—'}</span>
+                          {isCorrect && <span style={{ fontSize: '0.75rem', fontWeight: 800, whiteSpace: 'nowrap' }}>✓ Correct answer</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {!correctAnswer && (
+                    <p style={{ margin: '0.7rem 0 0', color: '#b45309', fontSize: '0.8rem' }}>
+                      No correct answer is configured for this question.
+                    </p>
+                  )}
+                </section>
+              );
+            })}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '0.25rem' }}>
+              <button type="button" className="btn-primary" onClick={onClose}>Close Preview</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay">
@@ -124,10 +854,9 @@ export default function QuizModal({
         style={{
           maxWidth: '750px',
           padding: 0,
-          overflow: 'hidden'
+          overflow: 'hidden',
         }}
       >
-        {/* Top Header */}
         <div
           style={{
             background: '#0f172a',
@@ -135,7 +864,7 @@ export default function QuizModal({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            color: 'white'
+            color: 'white',
           }}
         >
           <div>
@@ -145,7 +874,7 @@ export default function QuizModal({
                 fontWeight: 700,
                 color: '#38bdf8',
                 textTransform: 'uppercase',
-                letterSpacing: '1px'
+                letterSpacing: '1px',
               }}
             >
               Fairmacs Verified Assessment Engine
@@ -155,10 +884,10 @@ export default function QuizModal({
               style={{
                 fontSize: '1.2rem',
                 fontWeight: 800,
-                marginTop: '0.1rem'
+                margin: '0.1rem 0 0',
               }}
             >
-              {quiz.title}
+              {quiz?.title || 'Assessment'}
             </h2>
           </div>
 
@@ -166,13 +895,14 @@ export default function QuizModal({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '1rem'
+              gap: '1rem',
             }}
           >
             {!submitted && (
               <div
                 style={{
-                  background: 'rgba(239, 68, 68, 0.15)',
+                  background:
+                    'rgba(239, 68, 68, 0.15)',
                   color: '#f87171',
                   padding: '0.35rem 0.85rem',
                   borderRadius: '20px',
@@ -182,16 +912,15 @@ export default function QuizModal({
                   alignItems: 'center',
                   gap: '0.4rem',
                   border:
-                    '1px solid rgba(239, 68, 68, 0.3)'
+                    '1px solid rgba(239, 68, 68, 0.3)',
                 }}
               >
                 <Clock
                   style={{
                     width: 15,
-                    height: 15
+                    height: 15,
                   }}
                 />
-
                 {formatTimer(timeLeftSeconds)}
               </div>
             )}
@@ -199,97 +928,134 @@ export default function QuizModal({
             <button
               onClick={onClose}
               style={{
-                background: 'rgba(255,255,255,0.1)',
+                background:
+                  'rgba(255,255,255,0.1)',
                 border: 'none',
                 padding: '0.4rem',
                 borderRadius: '50%',
                 color: 'white',
-                cursor: 'pointer'
+                cursor: 'pointer',
               }}
             >
               <X
                 style={{
                   width: 20,
-                  height: 20
+                  height: 20,
                 }}
               />
             </button>
           </div>
         </div>
 
-        {/* Modal Body */}
         <div style={{ padding: '1.75rem' }}>
+          {error && attempt && !submitted && (
+            <div
+              style={{
+                background: '#fff1f2',
+                color: '#be123c',
+                border: '1px solid #fecdd3',
+                borderRadius: '8px',
+                padding: '0.75rem 1rem',
+                marginBottom: '1rem',
+                fontSize: '0.85rem',
+              }}
+            >
+              {error}
+            </div>
+          )}
+
           {!submitted ? (
             <div
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1.5rem'
+                gap: '1.5rem',
               }}
             >
-              {/* Question Navigation */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'center'
+                  alignItems: 'center',
                 }}
               >
                 <div
                   style={{
                     fontSize: '0.88rem',
                     fontWeight: 700,
-                    color: '#0284c7'
+                    color: '#0284c7',
                   }}
                 >
                   Question {currentQIndex + 1} of{' '}
-                  {quiz.questions.length}
+                  {questions.length}
                 </div>
 
-                <button
-                  onClick={() =>
-                    toggleFlag(currentQ.id)
-                  }
+                <div
                   style={{
-                    background: flagged[currentQ.id]
-                      ? '#fef3c7'
-                      : '#f8fafc',
-                    color: flagged[currentQ.id]
-                      ? '#b45309'
-                      : '#64748b',
-                    border: flagged[currentQ.id]
-                      ? '1px solid #fcd34d'
-                      : '1px solid #cbd5e1',
-                    padding: '0.35rem 0.75rem',
-                    borderRadius: '6px',
-                    fontSize: '0.78rem',
-                    fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.35rem',
-                    cursor: 'pointer'
+                    gap: '0.75rem',
                   }}
                 >
-                  <Flag
+                  <span
                     style={{
-                      width: 14,
-                      height: 14
+                      fontSize: '0.78rem',
+                      color: '#64748b',
+                      fontWeight: 600,
                     }}
-                  />
+                  >
+                    {answeredCount}/{questions.length}{' '}
+                    answered
+                  </span>
 
-                  {flagged[currentQ.id]
-                    ? 'Flagged for Review'
-                    : 'Flag Question'}
-                </button>
+                  <button
+                    onClick={() =>
+                      toggleFlag(currentQ.id)
+                    }
+                    style={{
+                      background:
+                        flagged[currentQ.id]
+                          ? '#fef3c7'
+                          : '#f8fafc',
+                      color:
+                        flagged[currentQ.id]
+                          ? '#b45309'
+                          : '#64748b',
+                      border:
+                        flagged[currentQ.id]
+                          ? '1px solid #fcd34d'
+                          : '1px solid #cbd5e1',
+                      padding:
+                        '0.35rem 0.75rem',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Flag
+                      style={{
+                        width: 14,
+                        height: 14,
+                      }}
+                    />
+
+                    {flagged[currentQ.id]
+                      ? 'Flagged'
+                      : 'Flag'}
+                  </button>
+                </div>
               </div>
 
-              {/* Active Question */}
               <div
                 style={{
                   background: '#f8fafc',
                   padding: '1.5rem',
                   borderRadius: '12px',
-                  border: '1px solid #e2e8f0'
+                  border: '1px solid #e2e8f0',
                 }}
               >
                 <div
@@ -298,36 +1064,38 @@ export default function QuizModal({
                     fontWeight: 700,
                     color: '#0f172a',
                     marginBottom: '1.25rem',
-                    lineHeight: 1.5
+                    lineHeight: 1.5,
                   }}
                 >
-                  {currentQ.question}
+                  {currentQ?.question}
                 </div>
 
                 <div
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.65rem'
+                    gap: '0.65rem',
                   }}
                 >
-                  {currentQ.options.map(
-                    (opt, optIdx) => {
+                  {(currentQ?.options || []).map(
+                    (opt) => {
                       const isSelected =
-                        answers[currentQ.id] === optIdx;
+                        answers[currentQ.id] ===
+                        opt.value;
 
                       return (
                         <button
-                          key={optIdx}
+                          key={opt.value}
                           onClick={() =>
                             handleSelectOption(
                               currentQ.id,
-                              optIdx
+                              opt.value
                             )
                           }
                           style={{
                             textAlign: 'left',
-                            padding: '0.85rem 1.1rem',
+                            padding:
+                              '0.85rem 1.1rem',
                             borderRadius: '8px',
                             border: isSelected
                               ? '2px solid #0284c7'
@@ -347,7 +1115,7 @@ export default function QuizModal({
                             gap: '0.85rem',
                             cursor: 'pointer',
                             transition:
-                              'all 0.12s ease'
+                              'all 0.12s ease',
                           }}
                         >
                           <span
@@ -360,11 +1128,13 @@ export default function QuizModal({
                                 : '2px solid #cbd5e1',
                               background: 'white',
                               display: 'inline-block',
-                              flexShrink: 0
+                              flexShrink: 0,
                             }}
                           />
 
-                          <span>{opt}</span>
+                          <span>
+                            {opt.value}. {opt.text}
+                          </span>
                         </button>
                       );
                     }
@@ -372,13 +1142,12 @@ export default function QuizModal({
                 </div>
               </div>
 
-              {/* Bottom Pagination */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  paddingTop: '0.5rem'
+                  paddingTop: '0.5rem',
                 }}
               >
                 <button
@@ -388,70 +1157,92 @@ export default function QuizModal({
                       Math.max(0, prev - 1)
                     )
                   }
-                  disabled={currentQIndex === 0}
+                  disabled={
+                    currentQIndex === 0 ||
+                    submitting
+                  }
                   style={{
                     opacity:
-                      currentQIndex === 0 ? 0.5 : 1
+                      currentQIndex === 0 ? 0.5 : 1,
                   }}
                 >
                   <ChevronLeft
                     style={{
                       width: 16,
-                      height: 16
+                      height: 16,
                     }}
                   />
-
                   Previous
                 </button>
 
-                {currentQIndex <
-                quiz.questions.length - 1 ? (
+                {!isLastQuestion ? (
                   <button
                     className="btn-primary"
                     onClick={() =>
                       setCurrentQIndex((prev) =>
                         Math.min(
-                          quiz.questions.length - 1,
+                          questions.length - 1,
                           prev + 1
                         )
                       )
                     }
+                    disabled={submitting}
                   >
                     Next Question
-
                     <ChevronRight
                       style={{
                         width: 16,
-                        height: 16
+                        height: 16,
                       }}
                     />
                   </button>
                 ) : (
                   <button
                     className="btn-primary"
-                    onClick={handleSubmitQuiz}
+                    onClick={() =>
+                      submitCurrentAttempt(false)
+                    }
                     disabled={
-                      Object.keys(answers).length <
-                      quiz.questions.length
+                      submitting ||
+                      questions.length === 0
                     }
                     style={{
                       background:
                         'linear-gradient(135deg, #10b981, #059669)',
-                      padding: '0.65rem 1.5rem',
-                      fontSize: '0.92rem'
+                      padding:
+                        '0.65rem 1.5rem',
+                      fontSize: '0.92rem',
                     }}
                   >
-                    Submit Final Assessment
+                    {submitting ? (
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                        }}
+                      >
+                        <Loader2
+                          className="animate-spin"
+                          style={{
+                            width: 16,
+                            height: 16,
+                          }}
+                        />
+                        Submitting...
+                      </span>
+                    ) : (
+                      'Submit Final Assessment'
+                    )}
                   </button>
                 )}
               </div>
             </div>
           ) : (
-            /* Result Screen */
             <div
               style={{
                 textAlign: 'center',
-                padding: '1.5rem 1rem'
+                padding: '1.5rem 1rem',
               }}
             >
               {isPassed ? (
@@ -465,13 +1256,13 @@ export default function QuizModal({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    margin: '0 auto 1rem'
+                    margin: '0 auto 1rem',
                   }}
                 >
                   <CheckCircle
                     style={{
                       width: 44,
-                      height: 44
+                      height: 44,
                     }}
                   />
                 </div>
@@ -486,13 +1277,13 @@ export default function QuizModal({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    margin: '0 auto 1rem'
+                    margin: '0 auto 1rem',
                   }}
                 >
                   <AlertCircle
                     style={{
                       width: 44,
-                      height: 44
+                      height: 44,
                     }}
                   />
                 </div>
@@ -502,12 +1293,12 @@ export default function QuizModal({
                 style={{
                   fontSize: '1.5rem',
                   fontWeight: 800,
-                  color: '#0f172a'
+                  color: '#0f172a',
                 }}
               >
                 {isPassed
                   ? 'Congratulations! Assessment Passed!'
-                  : 'Retake Assessment Required'}
+                  : 'Assessment Not Passed'}
               </h3>
 
               <div
@@ -517,203 +1308,208 @@ export default function QuizModal({
                   color: isPassed
                     ? '#16a34a'
                     : '#e11d48',
-                  margin: '0.5rem 0'
+                  margin: '0.5rem 0',
                 }}
               >
-                {score}%
+                {Number(result?.score ?? 0)}%
               </div>
 
               <p
                 style={{
                   color: '#64748b',
                   fontSize: '0.9rem',
-                  maxWidth: '480px',
+                  maxWidth: '500px',
                   margin: '0 auto 1.5rem',
-                  lineHeight: 1.5
+                  lineHeight: 1.5,
                 }}
               >
                 {isPassed
-                  ? 'You have satisfied Fairmacs global operational compliance criteria for this training track.'
-                  : 'The minimum passing benchmark is 80%. Please review the learning materials and try again.'}
+                  ? `You passed the assessment. The required passing score is ${passingScore}%.`
+                  : `You need ${passingScore}% to pass this assessment.`}
               </p>
 
-              {/* Review Answers */}
               <div
                 style={{
-                  background: '#f8fafc',
-                  padding: '1rem',
-                  borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
-                  textAlign: 'left',
-                  marginBottom: '1.5rem',
-                  maxHeight: '200px',
-                  overflowY: 'auto'
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(4, 1fr)',
+                  gap: '0.75rem',
+                  maxWidth: '560px',
+                  margin:
+                    '0 auto 1.5rem',
                 }}
               >
                 <div
                   style={{
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    marginBottom: '0.5rem'
+                    background: '#f8fafc',
+                    border:
+                      '1px solid #e2e8f0',
+                    borderRadius: '10px',
+                    padding: '0.8rem',
                   }}
                 >
-                  Assessment Answer Key Review:
+                  <div
+                    style={{
+                      fontSize: '1.2rem',
+                      fontWeight: 800,
+                      color: '#0f172a',
+                    }}
+                  >
+                    {result?.totalQuestions ?? 0}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: '#64748b',
+                    }}
+                  >
+                    Questions
+                  </div>
                 </div>
 
-                {quiz.questions.map((q, idx) => {
-                  const userAns = answers[q.id];
+                <div
+                  style={{
+                    background: '#f0fdf4',
+                    border:
+                      '1px solid #bbf7d0',
+                    borderRadius: '10px',
+                    padding: '0.8rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '1.2rem',
+                      fontWeight: 800,
+                      color: '#16a34a',
+                    }}
+                  >
+                    {result?.correctAnswers ?? 0}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: '#64748b',
+                    }}
+                  >
+                    Correct
+                  </div>
+                </div>
 
-                  const isCorrect =
-                    userAns === q.correctIndex;
+                <div
+                  style={{
+                    background: '#fff1f2',
+                    border:
+                      '1px solid #fecdd3',
+                    borderRadius: '10px',
+                    padding: '0.8rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '1.2rem',
+                      fontWeight: 800,
+                      color: '#e11d48',
+                    }}
+                  >
+                    {result?.wrongAnswers ?? 0}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: '#64748b',
+                    }}
+                  >
+                    Wrong
+                  </div>
+                </div>
 
-                  return (
-                    <div
-                      key={q.id}
-                      style={{
-                        fontSize: '0.8rem',
-                        padding: '0.35rem 0',
-                        borderBottom:
-                          '1px solid #f1f5f9'
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          color: isCorrect
-                            ? '#16a34a'
-                            : '#e11d48'
-                        }}
-                      >
-                        Q{idx + 1}:{' '}
-                        {isCorrect
-                          ? '✓ Correct'
-                          : '✗ Incorrect'}{' '}
-                        —
-                      </span>{' '}
-
-                      <span
-                        style={{
-                          color: '#334155'
-                        }}
-                      >
-                        Selected:{' '}
-                        {q.options[userAns] ||
-                          'None'}
-                      </span>
-                    </div>
-                  );
-                })}
+                <div
+                  style={{
+                    background: '#eff6ff',
+                    border:
+                      '1px solid #bfdbfe',
+                    borderRadius: '10px',
+                    padding: '0.8rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '1.2rem',
+                      fontWeight: 800,
+                      color: '#2563eb',
+                    }}
+                  >
+                    {result?.remainingAttempts ?? 0}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '0.72rem',
+                      color: '#64748b',
+                    }}
+                  >
+                    Attempts Left
+                  </div>
+                </div>
               </div>
 
-              {/* Result Actions */}
               <div
                 style={{
                   display: 'flex',
                   justifyContent: 'center',
-                  gap: '1rem'
+                  gap: '1rem',
+                  flexWrap: 'wrap',
                 }}
               >
                 {isPassed ? (
                   <button
                     className="btn-primary"
-                    disabled={generatingCert}
-                    onClick={async () => {
-                      setGeneratingCert(true);
-
-                      try {
-                        const courseId =
-                          quiz.courseId;
-
-                        const userId =
-                          user?.id || 'EMP1001';
-
-                        const result =
-                          await completeCourse(
-                            userId,
-                            courseId,
-                            score,
-                            {
-                              enrollmentId:
-                                quiz.enrollmentId,
-
-                              courseCode:
-                                quiz.courseCode
-                            }
-                          );
-
-                        if (
-                          !result?.success ||
-                          !result?.certificate
-                        ) {
-                          throw new Error(
-                            result?.error ||
-                              'Unable to generate the certificate. Please try again.'
-                          );
-                        }
-
-                        const certInfo =
-                          result.certificate;
-
-                        onClose();
-
-                        onPassCertificate(
-                          certInfo
-                        );
-                      } catch (error) {
-                        console.error(
-                          'Certificate generation failed:',
-                          error
-                        );
-
-                        alert(
-                          error?.message ||
-                            'Unable to generate the certificate. Please try again.'
-                        );
-                      } finally {
-                        setGeneratingCert(false);
-                      }
-                    }}
+                    disabled={
+                      generatingCert ||
+                      isLoading
+                    }
+                    onClick={
+                      handleGenerateCertificate
+                    }
                     style={{
                       background:
                         'linear-gradient(135deg, #10b981, #059669)',
-                      padding: '0.75rem 1.5rem',
-                      fontSize: '0.95rem'
+                      padding:
+                        '0.75rem 1.5rem',
+                      fontSize: '0.95rem',
                     }}
                   >
-                    {generatingCert ? (
+                    {generatingCert ||
+                    isLoading ? (
                       <span
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.5rem'
+                          gap: '0.5rem',
                         }}
                       >
                         <Loader2
+                          className="animate-spin"
                           style={{
                             width: 20,
-                            height: 20
+                            height: 20,
                           }}
-                          className="animate-spin"
                         />
-
-                        Generating Credential…
+                        Generating Credential...
                       </span>
                     ) : (
                       <span
                         style={{
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '0.5rem'
+                          gap: '0.5rem',
                         }}
                       >
                         <Award
                           style={{
                             width: 20,
-                            height: 20
+                            height: 20,
                           }}
                         />
-
                         View & Download Certificate
                       </span>
                     )}
@@ -721,29 +1517,39 @@ export default function QuizModal({
                 ) : (
                   <button
                     className="btn-secondary"
-                    onClick={() => {
-                      setSubmitted(false);
-                      setAnswers({});
-                      setCurrentQIndex(0);
-                      setTimeLeftSeconds(
-                        (quiz.timeLimitMinutes || 15) *
-                          60
-                      );
-                    }}
+                    onClick={startQuiz}
+                    disabled={
+                      loadingQuiz ||
+                      submitting ||
+                      Number(
+                        result?.remainingAttempts ?? 0
+                      ) <= 0
+                    }
                     style={{
-                      padding: '0.75rem 1.5rem'
+                      padding:
+                        '0.75rem 1.5rem',
                     }}
                   >
                     <RotateCcw
                       style={{
                         width: 16,
-                        height: 16
+                        height: 16,
                       }}
                     />
-
-                    Retake Assessment
+                    {Number(
+                      result?.remainingAttempts ?? 0
+                    ) > 0
+                      ? 'Retake Assessment'
+                      : 'No Attempts Remaining'}
                   </button>
                 )}
+
+                <button
+                  className="btn-secondary"
+                  onClick={onClose}
+                >
+                  Close
+                </button>
               </div>
             </div>
           )}

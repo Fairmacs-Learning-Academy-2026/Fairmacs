@@ -24,7 +24,10 @@ import Overview from './components/Overview';
 import MyLearning from './components/MyLearning';
 import TrainerDashboard from './components/TrainerDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
+import ManagerAllCourses from './components/ManagerAllCourses';
 import HrAdminDashboard from './components/HrAdminDashboard';
+import DepartmentDetails from './components/DepartmentDetails';
+import DepartmentCourseEmployees from './components/DepartmentCourseEmployees';
 import CourseCatalog from './components/CourseCatalog';
 import CourseViewer from './components/CourseViewer';
 import CourseDetailsModal from './components/CourseDetailsModal';
@@ -36,6 +39,9 @@ import TrainingCalendar from './components/TrainingCalendar';
 import ReportsView from './components/ReportsView';
 import Login from './components/Login';
 import Unauthorized from './components/Unauthorized';
+import Drafts from './components/Drafts';
+import CourseBuilderModal from './components/CourseBuilderModal';
+
 
 import ProtectedRoute from './routes/ProtectedRoute';
 import RoleRoute from './routes/RoleRoute';
@@ -54,7 +60,9 @@ const tabToPath = {
   paths: '/learning-paths',
   calendar: '/training-calendar',
   reports: '/reports',
-  certificates: '/certificates'
+  certificates: '/certificates',
+  drafts: '/drafts',
+  allCourses: '/manager/all-courses',
 };
 
 
@@ -62,6 +70,7 @@ const pathToTab = {
   '/dashboard': 'dashboard',
   '/trainer': 'dashboard',
   '/manager': 'dashboard',
+  '/manager/all-courses': 'allCourses',
   '/admin': 'dashboard',
 
   '/courses': 'catalog',
@@ -69,7 +78,8 @@ const pathToTab = {
   '/learning-paths': 'paths',
   '/training-calendar': 'calendar',
   '/reports': 'reports',
-  '/certificates': 'certificates'
+  '/certificates': 'certificates',
+  '/drafts': 'drafts',
 };
 
 
@@ -114,13 +124,49 @@ function MainApp() {
   const location = useLocation();
 
   const [activeTab, setActiveTab] =
-    useState('dashboard');
+    useState(() => pathToTab[window.location.pathname] || 'dashboard');
 
   const [selectedCourse, setSelectedCourse] =
     useState(null);
 
+  const [courseRouteLoading, setCourseRouteLoading] = useState(false);
+
   const [selectedCourseDetails, setSelectedCourseDetails] =
     useState(null);
+
+  // Restore the selected course from its URL on refresh/deep link.
+  useEffect(() => {
+    const match = location.pathname.match(/^\/courses\/([^/]+)\/learn\/?$/);
+    if (match) setActiveTab('catalog');
+    if (!match) {
+      if (selectedCourse) setSelectedCourse(null);
+      setCourseRouteLoading(false);
+      return;
+    }
+
+    const routeCourseId = decodeURIComponent(match[1]);
+    if (selectedCourse && String(selectedCourse.id || selectedCourse.courseId) === routeCourseId) return;
+
+    let cancelled = false;
+    setCourseRouteLoading(true);
+    courseService.getCourseById(routeCourseId)
+      .then(fullCourse => {
+        if (cancelled) return;
+        if (!fullCourse) throw new Error('Course not found');
+        setSelectedCourse(fullCourse);
+        setSelectedCourseDetails(null);
+      })
+      .catch(error => {
+        if (!cancelled) {
+          console.error('Restore course from URL failed:', error);
+          setSelectedCourse(null);
+        }
+      })
+      .finally(() => { if (!cancelled) setCourseRouteLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [location.pathname]);
+
 
   const [activeQuiz, setActiveQuiz] =
     useState(null);
@@ -132,6 +178,9 @@ function MainApp() {
     useState(false);
 
   const [certVerificationData, setCertVerificationData] =
+    useState(null);
+
+  const [selectedDraftId, setSelectedDraftId] =
     useState(null);
 
 
@@ -227,6 +276,7 @@ function MainApp() {
       setSelectedCourse(
         fullCourse
       );
+      navigate(`/courses/${encodeURIComponent(fullCourse.id || fullCourse.courseId || courseCode)}/learn`);
 
     } catch (error) {
 
@@ -243,13 +293,49 @@ function MainApp() {
   };
 
 
-  const handleOpenCourseDetails = (
+  const handleOpenCourseDetails = async (
     course
   ) => {
 
-    setSelectedCourseDetails(
-      course
-    );
+    if (!course) return;
+
+    try {
+      /*
+       * Course catalog and My Learning use the lightweight
+       * CourseDTO summary. Fetch the detail DTO before opening
+       * the overview modal so modules and lessons are available.
+       */
+      const courseCode =
+        course.id ||
+        course.courseId;
+
+      const fullCourse =
+        await courseService.getCourseById(
+          courseCode
+        );
+
+      if (!fullCourse) {
+        throw new Error(
+          'Unable to load course details.'
+        );
+      }
+
+      setSelectedCourseDetails(
+        fullCourse
+      );
+
+    } catch (error) {
+
+      console.error(
+        'Open course details error:',
+        error
+      );
+
+      alert(
+        error.message ||
+        'Unable to load course details.'
+      );
+    }
   };
 
 
@@ -286,6 +372,7 @@ function MainApp() {
         setSelectedCourse(
           fullCourse
         );
+        navigate(`/courses/${encodeURIComponent(fullCourse.id || fullCourse.courseId || courseCode)}/learn`);
 
         setSelectedCourseDetails(
           null
@@ -331,6 +418,7 @@ function MainApp() {
       setSelectedCourse(
         fullCourse
       );
+      navigate(`/courses/${encodeURIComponent(fullCourse.id || fullCourse.courseId || courseCode)}/learn`);
 
       setSelectedCourseDetails(
         null
@@ -413,8 +501,26 @@ function MainApp() {
   const renderContent = () => {
 
     /* -----------------------------------------
+       HR DEPARTMENT / COURSE DETAIL PAGES
+       These pages are rendered in their own full-page layout.
+    ------------------------------------------ */
+
+    if (location.pathname.startsWith('/hr/departments/')) {
+
+      if (location.pathname.includes('/courses/')) {
+        return <DepartmentCourseEmployees />;
+      }
+
+      return <DepartmentDetails />;
+    }
+
+    /* -----------------------------------------
        COURSE VIEWER
     ------------------------------------------ */
+
+    if (courseRouteLoading && !selectedCourse) {
+      return <div style={{ padding: '3rem', textAlign: 'center' }}>Loading course…</div>;
+    }
 
     if (selectedCourse) {
 
@@ -422,9 +528,10 @@ function MainApp() {
         <CourseViewer
           course={selectedCourse}
 
-          onBack={() =>
-            setSelectedCourse(null)
-          }
+          onBack={() => {
+            setSelectedCourse(null);
+            navigate('/courses');
+          }}
 
           onStartQuiz={
             handleStartQuiz
@@ -433,6 +540,10 @@ function MainApp() {
       );
     }
 
+
+    if (activeTab === 'allCourses') {
+      return <ManagerAllCourses />;
+    }
 
     /* -----------------------------------------
        COURSE CATALOG
@@ -500,24 +611,24 @@ function MainApp() {
         />
       );
     }
+
     /* -----------------------------------------
-   CERTIFICATES
------------------------------------------- */
+      CERTIFICATES
+    ------------------------------------------ */
 
-if (
-  activeTab === 'certificates'
-) {
+    if (
+      activeTab === 'certificates'
+    ) {
 
-  return (
-    <CertificatesPage
+      return (
+        <CertificatesPage
 
-      onViewCertificate={
-        handlePassCertificate
-      }
-
-    />
-  );
-}
+          onViewCertificate={
+            handlePassCertificate
+          }
+        />
+      );
+    }
 
     /* -----------------------------------------
        MY LEARNING
@@ -546,6 +657,39 @@ if (
       );
     }
 
+    /* -----------------------------------------
+       DRAFTS
+    ------------------------------------------ */
+
+    if (activeTab === 'drafts') {
+      return (
+    <>
+      <Drafts
+        onOpenDraft={(draft) => {
+          const draftId = draft.courseId || draft.id;
+
+          if (!draftId) {
+            alert('This draft has no course ID.');
+            return;
+          }
+
+          setSelectedDraftId(String(draftId));
+        }}
+      />
+
+      {selectedDraftId && (
+        <CourseBuilderModal
+          key={selectedDraftId}
+          courseId={selectedDraftId}
+          onClose={() => setSelectedDraftId(null)}
+          onPublish={() => {
+            setSelectedDraftId(null);
+          }}
+        />
+      )}
+      </>
+      );
+    }
 
     /* -----------------------------------------
        ROLE DASHBOARD
@@ -622,6 +766,14 @@ if (
   /* =========================================================
      MAIN LAYOUT
   ========================================================== */
+
+  /*
+   * Department detail pages are intentionally rendered outside the
+   * global LMS header/sidebar shell. The page owns its complete layout.
+   */
+  if (location.pathname.startsWith('/hr/departments/')) {
+    return renderContent();
+  }
 
   return (
     <div className="app-container">
@@ -881,6 +1033,15 @@ export default function App() {
           ================================================= */}
 
           <Route
+            path="/manager/all-courses"
+            element={
+              <RoleRoute allowedRoles={['MANAGER']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
             path="/admin"
             element={
 
@@ -924,6 +1085,15 @@ export default function App() {
               COURSE CATALOG
               All authenticated roles
           ================================================= */}
+
+          <Route
+            path="/courses/:courseId/learn"
+            element={
+              <ProtectedRoute>
+                <MainApp />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/courses"
@@ -1013,6 +1183,52 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {/* =================================================
+              DRAFTS
+          ===================================================*/}
+
+          <Route
+            path="/drafts"
+            element={
+              <RoleRoute allowedRoles={['TRAINER', 'HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+          {/* =================================================
+              HR DEPARTMENT DETAILS
+          ================================================= */}
+
+          <Route
+            path="/hr/departments/:departmentId"
+            element={
+              <RoleRoute
+                allowedRoles={[
+                  'HR_ADMIN'
+                ]}
+              >
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          {/* =================================================
+              HR DEPARTMENT COURSE EMPLOYEES
+          ================================================= */}
+
+          <Route
+            path="/hr/departments/:departmentId/courses/:courseId"
+            element={
+              <RoleRoute
+                allowedRoles={[
+                  'HR_ADMIN'
+                ]}
+              >
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
 
           {/* =================================================
               UNKNOWN ROUTES

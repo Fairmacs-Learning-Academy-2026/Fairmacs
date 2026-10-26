@@ -17,6 +17,7 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+.trae/
 *.suo
 *.ntvs*
 *.njsproj
@@ -33,3 +34,15 @@ target/
 # Local configuration overrides (passwords and secrets)
 **/application-local.properties
 *local.properties
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Database backups, dumps, and uploads
+backups/
+*.dump
+*.sql
+*.bak
+backend/uploads/
+uploads/

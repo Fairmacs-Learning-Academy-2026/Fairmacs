@@ -4,11 +4,13 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
 }
 
 .app-main-layout {
   display: flex;
   flex: 1;
+  min-width: 0; /* FIX: lets flex children shrink */
 }
 
 /* Sidebar Styles */
@@ -58,6 +60,7 @@
 /* Main Content Area */
 .main-content {
   flex: 1;
+  min-width: 0; /* FIX: the actual overflow fix */
   padding: 2rem;
   max-width: 1400px;
   margin: 0 auto;
@@ -72,8 +75,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   padding: 0 2rem;
-  sticky: top;
+  position: sticky; /* FIX: was "sticky: top;" */
+  top: 0;
   z-index: 100;
 }
 
@@ -84,6 +89,7 @@
   font-weight: 800;
   font-size: 1.25rem;
   color: var(--primary-navy);
+  flex-shrink: 0;
 }
 
 .brand-badge {
@@ -94,6 +100,32 @@
   border-radius: 20px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Header shrink rules */
+.header-greeting {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.header-greeting > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-actions {
+  flex-shrink: 0;
+}
+
+.header-profile-text {
+  white-space: nowrap;
+}
+
+.header-menu {
+  max-width: calc(100vw - 2rem);
 }
 
 /* Role Switcher Pill */
@@ -125,7 +157,7 @@
 /* Card UI Elements */
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); /* FIX */
   gap: 1.5rem;
   margin-top: 1.5rem;
 }
@@ -139,6 +171,7 @@
   display: flex;
   align-items: center;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .stat-icon {
@@ -149,6 +182,7 @@
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
 .stat-val {
@@ -170,7 +204,7 @@
   border: 1px solid var(--border-slate);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
-  transition: all 0.25 ease;
+  transition: all 0.25s ease; /* FIX: was "0.25 ease" */
   display: flex;
   flex-direction: column;
 }
@@ -306,4 +340,94 @@
   box-shadow: var(--shadow-lg);
   position: relative;
   padding: 2rem;
+}
+
+/* =========================================================
+   TRAINER DASHBOARD LAYOUT
+========================================================= */
+
+.trainer-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.trainer-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 1.5rem;
+}
+
+.trainer-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 1.5rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.table-scroll table {
+  min-width: 640px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* =========================================================
+   RESPONSIVE BREAKPOINTS
+========================================================= */
+
+@media (max-width: 1200px) {
+  .trainer-main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
+  .header-greeting {
+    display: none;
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-main-layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0.75rem 1rem;
+    border-right: none;
+    border-bottom: 1px solid #142c4c;
+  }
+
+  .sidebar-nav-list {
+    flex-direction: row;
+    margin-top: 0;
+  }
+
+  .sidebar-nav-item {
+    white-space: nowrap;
+  }
+
+  .main-content {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .header {
+    padding: 0 1rem;
+  }
+
+  .header-profile-text {
+    display: none;
+  }
 }

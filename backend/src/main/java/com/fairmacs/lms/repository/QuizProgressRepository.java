@@ -10,25 +10,33 @@ import java.util.Optional;
 @Repository
 public interface QuizProgressRepository extends JpaRepository<QuizProgress, Long> {
 
-    Optional<QuizProgress> findByQuizIdAndUserId(
-            Long quizId,
-            Long userId
-    );
+    Optional<QuizProgress> findByQuiz_IdAndUser_Id(Long quizId, Long userId);
 
-    List<QuizProgress> findByUserId(Long userId);
+    boolean existsByQuiz_IdAndUser_IdAndPassedTrue(Long quizId, Long userId);
 
-    List<QuizProgress> findByQuizId(Long quizId);
+    List<QuizProgress> findByUser_Id(Long userId);
 
-    boolean existsByQuizIdAndUserId(
-            Long quizId,
-            Long userId
-    );
+    List<QuizProgress> findByQuiz_Id(Long quizId);
 
-    /**
-     * Checks whether the employee has passed a specific quiz.
-     */
-    boolean existsByQuizIdAndUserIdAndPassedTrue(
-            Long quizId,
-            Long userId
-    );
+    boolean existsByQuiz_IdAndUser_Id(Long quizId, Long userId);
+
+    default Optional<QuizProgress> findByQuizIdAndUserId(Long quizId, Long userId) {
+        return findByQuiz_IdAndUser_Id(quizId, userId);
+    }
+
+    default List<QuizProgress> findByUserId(Long userId) {
+        return findByUser_Id(userId);
+    }
+
+    default List<QuizProgress> findByQuizId(Long quizId) {
+        return findByQuiz_Id(quizId);
+    }
+
+    default boolean existsByQuizIdAndUserId(Long quizId, Long userId) {
+        return existsByQuiz_IdAndUser_Id(quizId, userId);
+    }
+
+    default boolean existsByQuizIdAndUserIdAndPassedTrue(Long quizId, Long userId) {
+        return existsByQuiz_IdAndUser_IdAndPassedTrue(quizId, userId);
+    }
 }

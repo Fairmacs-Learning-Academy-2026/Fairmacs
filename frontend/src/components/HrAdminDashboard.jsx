@@ -1,683 +1,555 @@
-import React, { useState, useEffect } from 'react';
-import { Building2, Users, Award, ShieldCheck, Download, History, PlusCircle, UserCheck, BookOpen, Send, BarChart2, Bell, Settings, ArrowRight, X, Plus, Search, FileCheck, AlertCircle, Calendar } from 'lucide-react';
-import { MOCK_HR_METRICS, MOCK_AUDIT_LOGS, COURSES, MOCK_USERS_DATABASE, MOCK_DEPARTMENTS_DATA } from '../data/mockData';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  Building2, Users, Award, ShieldCheck, Download, History, UserCheck,
+  BookOpen, BarChart2, X, Plus, Search, FileCheck, AlertCircle, Calendar,
+  RefreshCw, Pencil, ClipboardList
+} from 'lucide-react';
 import EmployeeManagement from './EmployeeManagement';
 import DepartmentManagement from './DepartmentManagement';
 import LearningPaths from './LearningPaths';
 import TrainingAssignmentModal from './TrainingAssignmentModal';
+import CourseBuilderModal from './CourseBuilderModal';
 import { useAuth } from '../context/AuthContext';
 import { useEnrollmentStore } from '../stores/enrollmentStore';
+import { getZohoConnectUrl } from '../services/zohoService';
+
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+
+const EMPTY_METRICS = {
+  totalEmployees: 0,
+  activeEmployees: 0,
+  activeLearners: 0,
+  overallCompletionRate: 0,
+  avgTrainingHours: 0,
+  certificatesIssued: 0,
+  mandatoryComplianceRate: 0,
+  departmentStats: []
+};
+
+function getToken() {
+  return localStorage.getItem('fairmacs_token') || localStorage.getItem('fairmacs_lms_token');
+}
+
+function normalizeDepartmentStats(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item, index) => {
+    const total = Number(item.total ?? item.totalEmployees ?? item.employeeCount ?? 0);
+    const completed = Number(item.completed ?? item.completedEmployees ?? 0);
+    const rate = Number(item.rate ?? item.completionRate ?? (total ? (completed / total) * 100 : 0));
+    return {
+      ...item,
+      department: item.department ?? item.departmentName ?? `Department ${index + 1}`,
+      total,
+      completed,
+      rate: Math.max(0, Math.min(100, Number.isFinite(rate) ? rate : 0))
+    };
+  });
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) =>
+    row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')
+  ).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+const panelStyle = {
+  background: '#fff',
+  padding: '1.5rem',
+  borderRadius: '12px',
+  border: '1px solid #e2e8f0'
+};
+
+const buttonStyle = {
+  border: '1px solid #cbd5e1',
+  borderRadius: '8px',
+  padding: '0.6rem 0.85rem',
+  background: '#fff',
+  color: '#334155',
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.45rem',
+  fontWeight: 700
+};
 
 export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
   const { user } = useAuth();
-  const { verifyCertificate, verifiedCertificate, verifiedCertificateError, fetchRecentCertificates, recentCertificates } = useEnrollmentStore();
-  const [activeHrSubTab, setActiveHrSubTab] = useState('overview');
-  // 'overview' | 'employees' | 'departments' | 'courses' | 'paths' | 'assignments' | 'reports' | 'announcements' | 'settings' | 'certificates'
-
+  const {
+    verifyCertificate,
+    verifiedCertificateError,
+    fetchRecentCertificates,
+    recentCertificates
+  } = useEnrollmentStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeHrSubTab = searchParams.get('tab') || 'overview';
   const [selectedDeptForDrilldown, setSelectedDeptForDrilldown] = useState(null);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [showCourseBuilderModal, setShowCourseBuilderModal] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState('');
   const [certInput, setCertInput] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [metrics, setMetrics] = useState(EMPTY_METRICS);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [metricsError, setMetricsError] = useState('');
+  const [courses, setCourses] = useState([]);
+  const [coursesLoading, setCoursesLoading] = useState(false);
+  const [coursesError, setCoursesError] = useState('');
+  const [courseSearch, setCourseSearch] = useState('');
 
-  useEffect(() => {
-    if (activeHrSubTab === 'certificates') {
-      fetchRecentCertificates(10);
-    }
-  }, [activeHrSubTab, fetchRecentCertificates]);
+  const handleHrTabChange = (tab) => setSearchParams({ tab });
 
-  const handleVerifyCertificate = async (e) => {
-    e?.preventDefault?.();
-    const input = certInput.trim();
-    if (!input) return;
-    setVerifying(true);
-    const result = await verifyCertificate(input);
-    setVerifying(false);
-    if (result?.certificate) {
-      const today = new Date();
-      const verificationData = {
-        verifiedBy: user?.id,
-        verifiedByName: user?.name || user?.employeeName || 'HR Admin',
-        verifiedByRole: user?.role,
-        verifiedByRoleLabel: 'HR Admin',
-        verifiedAt: today.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-      };
-      onOpenVerifiedCertificate?.(result.certificate, verificationData);
+  const handleConnectZoho = async () => {
+    try {
+      const authorizationUrl = await getZohoConnectUrl();
+      window.location.assign(authorizationUrl);
+    } catch (error) {
+      alert(error.message || 'Unable to connect to Zoho WorkDrive.');
     }
   };
 
-  const openRecentAsVerified = (cert) => {
-    const today = new Date();
-    const verificationData = {
+  const loadHrMetrics = useCallback(async () => {
+    setMetricsLoading(true);
+    setMetricsError('');
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/hr/dashboard/metrics`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Accept: 'application/json'
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Could not load HR dashboard metrics (${response.status}).`);
+      }
+      const data = await response.json();
+      setMetrics({
+        totalEmployees: Number(data.totalEmployees ?? 0),
+        activeEmployees: Number(data.activeEmployees ?? 0),
+        activeLearners: Number(data.activeLearners ?? 0),
+        overallCompletionRate: Number(data.overallCompletionRate ?? 0),
+        avgTrainingHours: Number(data.avgTrainingHours ?? 0),
+        certificatesIssued: Number(data.certificatesIssued ?? 0),
+        mandatoryComplianceRate: Number(data.mandatoryComplianceRate ?? 0),
+        departmentStats: normalizeDepartmentStats(data.departmentStats)
+      });
+    } catch (error) {
+      setMetricsError(error.message || 'Unable to load live HR metrics.');
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, []);
+
+  const loadCourses = useCallback(async () => {
+    setCoursesLoading(true);
+    setCoursesError('');
+    try {
+      const token = getToken();
+      const response = await fetch(`${API_BASE_URL}/courses`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Accept: 'application/json'
+        }
+      });
+      if (!response.ok) throw new Error(`Could not load courses (${response.status}).`);
+      const payload = await response.json();
+      const items = Array.isArray(payload) ? payload : (payload.content ?? payload.courses ?? payload.data ?? []);
+      setCourses(Array.isArray(items) ? items : []);
+    } catch (error) {
+      setCoursesError(error.message || 'Unable to load courses.');
+    } finally {
+      setCoursesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHrMetrics();
+  }, [loadHrMetrics]);
+
+  useEffect(() => {
+    if (activeHrSubTab === 'courses') loadCourses();
+    if (activeHrSubTab === 'certificates') fetchRecentCertificates(10);
+  }, [activeHrSubTab, loadCourses, fetchRecentCertificates]);
+
+  const handleVerifyCertificate = async (event) => {
+    event?.preventDefault?.();
+    const input = certInput.trim();
+    if (!input || verifying) return;
+    setVerifying(true);
+    try {
+      const result = await verifyCertificate(input);
+      if (result?.certificate) {
+        onOpenVerifiedCertificate?.(result.certificate, {
+          verifiedBy: user?.id,
+          verifiedByName: user?.name || user?.employeeName || 'HR Admin',
+          verifiedByRole: user?.role,
+          verifiedByRoleLabel: 'HR Admin',
+          verifiedAt: new Date().toLocaleDateString('en-IN', {
+            day: '2-digit', month: 'short', year: 'numeric'
+          })
+        });
+      }
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const openRecentAsVerified = (certificate) => {
+    onOpenVerifiedCertificate?.(certificate, {
       verifiedBy: user?.id,
       verifiedByName: user?.name || user?.employeeName || 'HR Admin',
       verifiedByRole: user?.role,
       verifiedByRoleLabel: 'HR Admin',
-      verifiedAt: today.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-    };
-    onOpenVerifiedCertificate?.(cert, verificationData);
+      verifiedAt: new Date().toLocaleDateString('en-IN', {
+        day: '2-digit', month: 'short', year: 'numeric'
+      })
+    });
   };
 
-  const [metrics, setMetrics] = useState({
-    totalEmployees: 0,
-    activeEmployees: 0,
-    activeLearners: 0,
-    overallCompletionRate: 0,
-    avgTrainingHours: 0,
-    certificatesIssued: 0,
-    mandatoryComplianceRate: 0,
-    departmentStats: []
+  const exportMetrics = () => {
+    const rows = [
+      ['Department', 'Employees Completed', 'Total Employees', 'Completion Rate (%)'],
+      ...metrics.departmentStats.map((dept) => [
+        dept.department, dept.completed, dept.total, Math.round(dept.rate)
+      ]),
+      [],
+      ['HR Metric', 'Value'],
+      ['Total Employees', metrics.totalEmployees],
+      ['Active Employees', metrics.activeEmployees],
+      ['Active Learners', metrics.activeLearners],
+      ['Overall Completion Rate (%)', metrics.overallCompletionRate],
+      ['Average Training Hours', metrics.avgTrainingHours],
+      ['Certificates Issued', metrics.certificatesIssued],
+      ['Mandatory Compliance Rate (%)', metrics.mandatoryComplianceRate]
+    ];
+    downloadCsv('fairmacs-hr-dashboard-report.csv', rows);
+  };
+
+  const tabs = [
+    { id: 'overview', label: 'HR Overview' },
+    { id: 'employees', label: 'Employees' },
+    { id: 'departments', label: 'Departments' },
+    { id: 'courses', label: 'Courses' },
+    { id: 'paths', label: 'Learning Paths' },
+    { id: 'assignments', label: 'Training Assignments' },
+    { id: 'reports', label: 'Reports & Analytics' },
+    { id: 'certificates', label: 'Certificates' },
+    { id: 'announcements', label: 'Announcements' },
+    { id: 'settings', label: 'System Settings' }
+  ];
+
+  const statCards = [
+    { label: 'Total Employees', value: metrics.totalEmployees, icon: Users, bg: '#e0f2fe', color: '#0284c7' },
+    { label: 'Active Learners', value: metrics.activeLearners, icon: UserCheck, bg: '#f3e8ff', color: '#9333ea' },
+    { label: 'Completion Rate', value: `${metrics.overallCompletionRate}%`, icon: BarChart2, bg: '#dcfce7', color: '#16a34a' },
+    { label: 'Training Hours', value: `${metrics.avgTrainingHours} h`, icon: Building2, bg: '#fef3c7', color: '#d97706' },
+    { label: 'Certificates', value: metrics.certificatesIssued, icon: Award, bg: '#e0e7ff', color: '#4f46e5' },
+    { label: 'Mandatory Compliance', value: `${metrics.mandatoryComplianceRate}%`, icon: ShieldCheck, bg: '#ffe4e6', color: '#e11d48' }
+  ];
+
+  const visibleCourses = courses.filter((course) => {
+    const title = course.title ?? course.courseTitle ?? '';
+    const id = course.courseId ?? course.id ?? '';
+    const category = course.category ?? '';
+    const query = courseSearch.toLowerCase();
+    return `${title} ${id} ${category}`.toLowerCase().includes(query);
   });
 
-  const [metricsLoading, setMetricsLoading] = useState(true);
-  const [metricsError, setMetricsError] = useState('');
-
-  useEffect(() => {
-    const loadHrMetrics = async () => {
-      try {
-        setMetricsLoading(true);
-        setMetricsError('');
-
-        const token =
-          localStorage.getItem('fairmacs_lms_token') ||
-          localStorage.getItem('fairmacs_token');
-
-        const response = await fetch(
-          'http://localhost:8080/api/hr/dashboard/metrics',
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to load HR metrics (${response.status})`);
-        }
-
-        const data = await response.json();
-
-        setMetrics({
-          totalEmployees: data.totalEmployees ?? 0,
-          activeEmployees: data.activeEmployees ?? 0,
-          activeLearners: data.activeLearners ?? 0,
-          overallCompletionRate: data.overallCompletionRate ?? 0,
-          avgTrainingHours: data.avgTrainingHours ?? 0,
-          certificatesIssued: data.certificatesIssued ?? 0,
-          mandatoryComplianceRate: data.mandatoryComplianceRate ?? 0,
-          departmentStats: data.departmentStats ?? []
-        });
-      } catch (error) {
-        console.error('HR metrics loading error:', error);
-        setMetricsError('Unable to load live HR metrics.');
-      } finally {
-        setMetricsLoading(false);
-      }
-    };
-
-    loadHrMetrics();
-  }, []);
-  const [announcements, setAnnouncements] = useState([
-    { id: 1, title: 'Annual Mandatory Cybersecurity Certification Deadline', target: 'All Employees', date: '20 Sep 2026' },
-    { id: 2, title: 'New Incoterms 2020 Refresher Module Launched', target: 'Operations & Sales', date: '15 Sep 2026' }
-  ]);
-  const [newAnnouncement, setNewAnnouncement] = useState('');
-
-  const handleAddAnnouncement = () => {
-    if (!newAnnouncement.trim()) return;
-    setAnnouncements([
-      { id: Date.now(), title: newAnnouncement, target: 'All Employees', date: '21 Sep 2026' },
-      ...announcements
-    ]);
-    setNewAnnouncement('');
-  };
-
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-      {/* HR Executive Banner */}
-      <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)', padding: '2rem', borderRadius: '16px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <section style={{
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+        padding: '2rem', borderRadius: '16px', color: '#fff',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        gap: '1rem', flexWrap: 'wrap'
+      }}>
         <div>
           <div style={{ fontSize: '0.8rem', color: '#c084fc', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
             HR & Enterprise Administration Hub
           </div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '0.2rem' }}>Fairmacs HR Management Portal</h1>
-          <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginTop: '0.4rem' }}>
-            Workforce compliance health, employee provisioning, department rules, course assignments, and analytics.
+          <p style={{ color: '#cbd5e1', fontSize: '0.9rem', marginTop: '0.4rem', maxWidth: 760 }}>
+            Workforce compliance, employee administration, department training, course assignments and analytics.
           </p>
         </div>
-
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <button className="btn-primary" onClick={() => setShowCourseBuilderModal(true)} style={{ background: 'linear-gradient(135deg, #9333ea, #7e22ce)' }}>
+            <Plus size={16} /> Create Course
+          </button>
           <button className="btn-primary" onClick={() => setShowAssignmentModal(true)} style={{ background: 'linear-gradient(135deg, #9333ea, #7e22ce)' }}>
-            <Plus style={{ width: 16, height: 16 }} /> Create Assignment
+            <Plus size={16} /> Create Assignment
           </button>
-          <button className="btn-secondary" onClick={() => alert('Downloading enterprise compliance PDF report...')} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.2)' }}>
-            <Download style={{ width: 16, height: 16 }} /> Audit Report (PDF)
+          <button onClick={exportMetrics} style={{ ...buttonStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', borderColor: 'rgba(255,255,255,0.25)' }}>
+            <Download size={16} /> Export HR Report
           </button>
-        </div>
-      </div>
-
-      {metricsLoading && (
-        <div
-          style={{
-            padding: '0.75rem 1rem',
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            color: '#64748b',
-            fontSize: '0.85rem'
-          }}
-        >
-          Loading live HR metrics...
-        </div>
-      )}
-
-      {metricsError && (
-        <div
-          style={{
-            padding: '0.75rem 1rem',
-            background: '#fff1f2',
-            border: '1px solid #fecdd3',
-            borderRadius: '10px',
-            color: '#be123c',
-            fontSize: '0.85rem',
-            fontWeight: 600
-          }}
-        >
-          {metricsError}
-        </div>
-      )}
-
-      {/* HR KPIs Bar */}
-      <div className="card-grid" style={{ gridTemplateColumns: 'repeat(6, 1fr)', marginTop: 0, gap: '0.85rem' }}>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}>
-            <Users style={{ width: 18, height: 18 }} />
-          </div>
-          <div>
-            <div className="stat-val" style={{ fontSize: '1.25rem' }}>{metrics.totalEmployees}</div>
-            <div className="stat-label">Total Employees</div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#f3e8ff', color: '#9333ea' }}>
-            <UserCheck style={{ width: 18, height: 18 }} />
-          </div>
-          <div>
-            <div className="stat-val" style={{ fontSize: '1.25rem' }}>{metrics.activeLearners}</div>
-            <div className="stat-label">Active Learners</div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
-            <BarChart2 style={{ width: 18, height: 18 }} />
-          </div>
-          <div>
-            <div className="stat-val" style={{ fontSize: '1.25rem' }}>{metrics.overallCompletionRate}%</div>
-            <div className="stat-label">Completion Rate</div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
-            <Building2 style={{ width: 18, height: 18 }} />
-          </div>
-          <div>
-            <div className="stat-val" style={{ fontSize: '1.25rem' }}>{metrics.avgTrainingHours} h</div>
-            <div className="stat-label">Training Hours</div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#e0e7ff', color: '#4f46e5' }}>
-            <Award style={{ width: 18, height: 18 }} />
-          </div>
-          <div>
-            <div className="stat-val" style={{ fontSize: '1.25rem' }}>{metrics.certificatesIssued}</div>
-            <div className="stat-label">Certificates</div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#ffe4e6', color: '#e11d48' }}>
-            <ShieldCheck style={{ width: 18, height: 18 }} />
-          </div>
-          <div>
-            <div className="stat-val" style={{ fontSize: '1.25rem' }}>{metrics.mandatoryComplianceRate}%</div>
-            <div className="stat-label">Mandatory Compliance</div>
-          </div>
-        </div>
-      </div>
-
-      {/* HR Navigation Sub-Tabs */}
-      <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', overflowX: 'auto' }}>
-        {[
-          { id: 'overview', label: 'HR Overview' },
-          { id: 'employees', label: 'Employees' },
-          { id: 'departments', label: 'Departments' },
-          { id: 'courses', label: 'Courses' },
-          { id: 'paths', label: 'Learning Paths' },
-          { id: 'assignments', label: 'Training Assignments' },
-          { id: 'reports', label: 'Reports & Analytics' },
-          { id: 'certificates', label: 'Certificates' },
-          { id: 'announcements', label: 'Announcements' },
-          { id: 'settings', label: 'System Settings' }
-        ].map((tab) => (
           <button
-            key={tab.id}
-            onClick={() => setActiveHrSubTab(tab.id)}
-            style={{
-              padding: '0.55rem 1.1rem',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: 700,
-              border: 'none',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              background: activeHrSubTab === tab.id ? '#9333ea' : 'transparent',
-              color: activeHrSubTab === tab.id ? 'white' : '#64748b',
-              transition: 'all 0.12s ease'
-            }}
+            type="button"
+            onClick={handleConnectZoho}
+            style={{ ...buttonStyle, background: 'rgba(255,255,255,0.1)', color: '#fff', borderColor: 'rgba(255,255,255,0.25)' }}
           >
-            {tab.label}
+            Connect Zoho WorkDrive
           </button>
+        </div>
+      </section>
+
+      {metricsLoading && <div style={{ ...panelStyle, padding: '0.8rem 1rem', color: '#64748b' }}>Loading live HR metrics…</div>}
+      {metricsError && (
+        <div role="alert" style={{ padding: '0.85rem 1rem', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 10, color: '#be123c', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
+          <span><AlertCircle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />{metricsError}</span>
+          <button onClick={loadHrMetrics} style={buttonStyle}><RefreshCw size={14} /> Retry</button>
+        </div>
+      )}
+
+      <div className="card-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))', marginTop: 0, gap: '0.85rem' }}>
+        {statCards.map(({ label, value, icon: Icon, bg, color }) => (
+          <div className="stat-card" key={label}>
+            <div className="stat-icon" style={{ background: bg, color }}><Icon size={18} /></div>
+            <div>
+              <div className="stat-val" style={{ fontSize: '1.25rem' }}>{value}</div>
+              <div className="stat-label">{label}</div>
+            </div>
+          </div>
         ))}
       </div>
 
-      {/* Tab Panels */}
+      <nav aria-label="HR dashboard sections" style={{ display: 'flex', gap: '0.4rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.5rem', overflowX: 'auto' }}>
+        {tabs.map((tab) => (
+          <button key={tab.id} onClick={() => handleHrTabChange(tab.id)} style={{
+            padding: '0.55rem 1.1rem', borderRadius: 8, fontSize: '0.85rem',
+            fontWeight: 700, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+            background: activeHrSubTab === tab.id ? '#9333ea' : 'transparent',
+            color: activeHrSubTab === tab.id ? '#fff' : '#64748b'
+          }}>{tab.label}</button>
+        ))}
+      </nav>
+
       {activeHrSubTab === 'employees' && <EmployeeManagement />}
       {activeHrSubTab === 'departments' && <DepartmentManagement />}
       {activeHrSubTab === 'paths' && <LearningPaths />}
 
       {activeHrSubTab === 'courses' && (
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>Enterprise Course Catalog Governance</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-            {COURSES.map(c => (
-              <div key={c.id} style={{ border: '1px solid #e2e8f0', padding: '1rem', borderRadius: '10px' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a' }}>{c.title}</div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>ID: {c.id} • Category: {c.category}</div>
-                <div style={{ fontSize: '0.78rem', color: '#16a34a', fontWeight: 700, marginTop: '0.5rem' }}>Active in Enterprise Catalog</div>
-              </div>
-            ))}
+        <section style={panelStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Course Catalog</h2>
+              <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: 4 }}>Courses returned by the LMS API.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input value={courseSearch} onChange={(event) => setCourseSearch(event.target.value)} placeholder="Search courses…" aria-label="Search courses" style={{ padding: '0.6rem 0.75rem', borderRadius: 8, border: '1px solid #cbd5e1' }} />
+              <button onClick={() => { setEditingCourseId(''); setShowCourseBuilderModal(true); }} className="btn-primary" style={{ background: 'linear-gradient(135deg, #9333ea, #7e22ce)', border: 'none', borderRadius: 8, padding: '0.6rem 0.85rem', color: '#fff', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer' }}><Plus size={15} /> Create Course</button>
+              <button onClick={loadCourses} style={buttonStyle}><RefreshCw size={15} /> Refresh</button>
+            </div>
           </div>
-        </div>
+          {coursesLoading ? <p style={{ color: '#64748b' }}>Loading courses…</p> :
+            coursesError ? <div role="alert" style={{ color: '#be123c' }}>{coursesError} <button onClick={loadCourses} style={buttonStyle}>Retry</button></div> :
+              visibleCourses.length ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.85rem' }}>
+                  {visibleCourses.map((course, index) => (
+                    <article key={course.id ?? course.courseId ?? index} style={{ border: '1px solid #e2e8f0', padding: '1rem', borderRadius: 10 }}>
+                      <div style={{ fontWeight: 800, color: '#0f172a' }}>{course.title ?? course.courseTitle ?? 'Untitled course'}</div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 5 }}>
+                        ID: {course.courseId ?? course.id ?? '—'}{(course.category) ? ` • ${course.category}` : ''}
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: 8 }}>
+                        Status: {course.active === false || course.isActive === false ? 'Inactive' : 'Available'}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0' }}>
+                        <button
+                          type="button"
+                          onClick={() => setShowAssignmentModal(true)}
+                          style={{ ...buttonStyle, padding: '0.5rem 0.65rem', fontSize: '0.78rem' }}
+                          aria-label={`Manage assignments for ${course.title ?? course.courseTitle ?? 'course'}`}
+                        ><ClipboardList size={14} /> Manage Assignments</button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const id = course.courseId ?? course.id ?? course.dbId ?? course.courseDbId;
+                            if (id == null || String(id).trim() === '') {
+                              alert('This course does not include a course ID that can be used to edit its content.');
+                              return;
+                            }
+                            setEditingCourseId(String(id));
+                            setShowCourseBuilderModal(true);
+                          }}
+                          style={{ ...buttonStyle, padding: '0.5rem 0.65rem', fontSize: '0.78rem', background: '#f5f3ff', borderColor: '#ddd6fe', color: '#6d28d9' }}
+                          aria-label={`Edit content for ${course.title ?? course.courseTitle ?? 'course'}`}
+                        ><Pencil size={14} /> Edit Content</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748b' }}><BookOpen size={28} style={{ margin: '0 auto 0.5rem' }} />No courses found.</div>
+          }
+        </section>
       )}
 
       {activeHrSubTab === 'assignments' && (
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>Bulk Training Assignment Tool</h2>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <select style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}>
-              <option>Select Target Department (Documentation)</option>
-              <option>Accounts</option>
-              <option>Operations</option>
-              <option>Sales & BD</option>
-              <option>HR</option>
-              <option>IT</option>
-            </select>
-            <select style={{ padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem' }}>
-              <option>Select Course (Customs Clearance & Documentation SOP)</option>
-              <option>Freight Forwarding Fundamentals</option>
-              <option>Air Freight Operations & AWB Management</option>
-              <option>Cybersecurity Awareness</option>
-            </select>
-            <button className="btn-primary" onClick={() => alert('Assigned mandatory track to all employees in target department!')}>
-              Assign Mandatory Track
-            </button>
-          </div>
-        </div>
+        <section style={panelStyle}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.5rem' }}>Training Assignments</h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1rem' }}>
+            Create and manage assignments through the existing assignment workflow. No simulated assignment action is shown here.
+          </p>
+          <button className="btn-primary" onClick={() => setShowAssignmentModal(true)} style={{ background: 'linear-gradient(135deg, #9333ea, #7e22ce)' }}><Plus size={16} /> Create Assignment</button>
+        </section>
       )}
 
       {activeHrSubTab === 'reports' && (
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>Enterprise L&D Compliance Analytics</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {metrics.departmentStats.map((dept) => (
-              <div key={dept.department}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-                  <span>{dept.department}</span>
-                  <span>{dept.completed} / {dept.total} Employees ({dept.rate}%)</span>
-                </div>
-                <div className="progress-bar-bg" style={{ height: 10, marginTop: '0.4rem' }}>
-                  <div
-                    className="progress-bar-fill"
-                    style={{
-                      width: `${dept.rate}%`,
-                      background: dept.rate > 90 ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #9333ea, #c084fc)'
-                    }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+        <section style={panelStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Training Compliance Analytics</h2>
+              <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: 4 }}>Based on the live HR metrics response.</p>
+            </div>
+            <button onClick={exportMetrics} style={buttonStyle}><Download size={15} /> Export CSV</button>
           </div>
-        </div>
+          {metrics.departmentStats.length ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {metrics.departmentStats.map((dept) => (
+                <button key={dept.department} onClick={() => setSelectedDeptForDrilldown(dept)} className="hover-highlight" style={{ textAlign: 'left', border: 0, background: 'transparent', padding: '0.4rem', borderRadius: 8, cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
+                    <span style={{ color: '#0f172a', fontWeight: 800 }}>{dept.department}</span>
+                    <span>{dept.completed} / {dept.total} completed ({Math.round(dept.rate)}%)</span>
+                  </div>
+                  <div className="progress-bar-bg" style={{ height: 10, marginTop: 7 }}>
+                    <div className="progress-bar-fill" style={{ width: `${dept.rate}%`, background: dept.rate >= 90 ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #9333ea, #c084fc)' }} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : <p style={{ color: '#64748b' }}>Department-level metrics are not available in the API response.</p>}
+        </section>
       )}
 
       {activeHrSubTab === 'certificates' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', gap: '1.5rem' }}>
-          {/* Left: Certificate Verification */}
-          <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-sm)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+          <section style={panelStyle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1rem' }}>
-              <div style={{ background: '#f3e8ff', width: 42, height: 42, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShieldCheck style={{ width: 22, height: 22, color: '#9333ea' }} />
-              </div>
-              <div>
-                <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Verify Credential</h2>
-                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>Validate any employee certificate using its unique ID.</div>
-              </div>
+              <div style={{ background: '#f3e8ff', width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center' }}><ShieldCheck size={22} color="#9333ea" /></div>
+              <div><h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>Verify Certificate</h2><p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>Validate a credential using its certificate ID.</p></div>
             </div>
             <form onSubmit={handleVerifyCertificate} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <input
-                type="text"
-                placeholder="Enter Certificate ID — e.g. FM-CERT-2026-0123"
-                value={certInput}
-                onChange={(e) => setCertInput(e.target.value)}
-                style={{ padding: '0.75rem 0.9rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
-              />
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={verifying || !certInput.trim()}
-                style={{ background: verifying ? '#64748b' : 'linear-gradient(135deg, #9333ea, #7e22ce)', padding: '0.7rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-              >
-                <Search style={{ width: 16, height: 16 }} />
-                {verifying ? 'Validating in Registry…' : 'Verify & View Certificate'}
+              <input type="text" placeholder="Enter certificate ID" value={certInput} onChange={(event) => setCertInput(event.target.value)} style={{ padding: '0.75rem 0.9rem', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: '0.9rem' }} />
+              <button type="submit" className="btn-primary" disabled={verifying || !certInput.trim()} style={{ background: '#9333ea', padding: '0.7rem 1rem' }}>
+                <Search size={16} /> {verifying ? 'Verifying…' : 'Verify & View Certificate'}
               </button>
             </form>
-            {verifiedCertificateError && (
-              <div style={{ marginTop: '0.85rem', padding: '0.7rem 0.85rem', background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <AlertCircle style={{ width: 15, height: 15 }} />
-                {verifiedCertificateError}
-              </div>
-            )}
-            <div style={{ marginTop: '1.25rem', padding: '0.9rem 1rem', background: '#f8fafc', borderRadius: '10px', fontSize: '0.78rem', color: '#475569', lineHeight: 1.5 }}>
-              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>💡 Tips for HR Admins</div>
-              Credential IDs follow the format <span style={{ fontFamily: 'monospace', background: '#eef2ff', padding: '1px 5px', borderRadius: 4, color: '#4338ca' }}>FM-CERT-{new Date().getFullYear()}-XXXX</span>. Upon verification, the full certificate (including the employee's name, department, course, and score) will open with a tamper-proof "Verified Credential" banner.
-            </div>
-          </div>
-
-          {/* Right: Recently Issued Certificates */}
-          <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                <div style={{ background: '#ecfdf5', width: 38, height: 38, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FileCheck style={{ width: 19, height: 19, color: '#059669' }} />
-                </div>
-                <div>
-                  <h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>Recently Issued Credentials</h2>
-                  <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Click a row to open the verified certificate.</div>
-                </div>
-              </div>
-              <button
-                onClick={() => fetchRecentCertificates(10)}
-                style={{ fontSize: '0.78rem', padding: '0.35rem 0.7rem', borderRadius: '6px', border: '1px solid #c4b5fd', background: '#f5f3ff', color: '#6d28d9', cursor: 'pointer', fontWeight: 600 }}
-              >
-                ↻ Refresh
-              </button>
+            {verifiedCertificateError && <div role="alert" style={{ marginTop: 12, padding: '0.7rem 0.85rem', background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', borderRadius: 8, fontSize: '0.82rem' }}><AlertCircle size={15} style={{ verticalAlign: 'middle', marginRight: 5 }} />{verifiedCertificateError}</div>}
+          </section>
+          <section style={{ ...panelStyle, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <div><h2 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>Recently Issued Certificates</h2><p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 3 }}>Select a certificate to open its verification view.</p></div>
+              <button onClick={() => fetchRecentCertificates(10)} style={buttonStyle}><RefreshCw size={14} /> Refresh</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', overflowY: 'auto', maxHeight: 520 }}>
-              {recentCertificates && recentCertificates.length > 0 ? (
-                recentCertificates.map((cert, idx) => (
-                  <div
-                    key={cert.certificateId || cert.id || idx}
-                    onClick={() => openRecentAsVerified(cert)}
-                    className="hover-highlight"
-                    style={{ padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', cursor: 'pointer', transition: 'all 0.15s ease', display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '0.85rem', alignItems: 'center' }}
-                  >
-                    <div style={{ width: 36, height: 36, borderRadius: '8px', background: '#dbeafe', color: '#1d4ed8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Award style={{ width: 17, height: 17 }} />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>{cert.courseTitle || cert.courseName || 'Completed Course'}</div>
-                      <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
-                        <span style={{ fontWeight: 600, color: '#334155' }}>{cert.userName || cert.employeeName || 'Employee'}</span>
-                        {cert.department && <span> • {cert.department}</span>}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 700, color: '#4338ca', background: '#eef2ff', padding: '2px 7px', borderRadius: 5 }}>
-                        {cert.certificateId}
-                      </div>
-                      {cert.issuedAt && (
-                        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3 }}>
-                          <Calendar style={{ width: 11, height: 11 }} />
-                          {new Date(cert.issuedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
-                  <FileCheck style={{ width: 36, height: 36, margin: '0 auto 0.75rem', opacity: 0.4 }} />
-                  <div style={{ fontWeight: 600, color: '#64748b' }}>No certificates issued yet</div>
-                  <div style={{ marginTop: 4 }}>Recently earned credentials will appear here.</div>
-                </div>
-              )}
+              {recentCertificates?.length ? recentCertificates.map((cert, index) => (
+                <button key={cert.certificateId ?? cert.id ?? index} onClick={() => openRecentAsVerified(cert)} className="hover-highlight" style={{ textAlign: 'left', padding: '0.85rem', borderRadius: 10, border: '1px solid #e2e8f0', background: '#fff', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '0.75rem', alignItems: 'center', cursor: 'pointer' }}>
+                  <span style={{ width: 36, height: 36, borderRadius: 8, background: '#dbeafe', color: '#1d4ed8', display: 'grid', placeItems: 'center' }}><Award size={17} /></span>
+                  <span>
+                    <span style={{ display: 'block', fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>{cert.courseTitle || cert.courseName || 'Completed Course'}</span>
+                    <span style={{ display: 'block', fontSize: '0.76rem', color: '#64748b', marginTop: 3 }}>{cert.userName || cert.employeeName || 'Employee'}{cert.department ? ` • ${cert.department}` : ''}</span>
+                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#4338ca', marginTop: 4 }}>{cert.certificateId || cert.id || 'Certificate ID unavailable'}{cert.issuedAt ? ` • ${new Date(cert.issuedAt).toLocaleDateString('en-IN')}` : ''}</span>
+                  </span>
+                </button>
+              )) : <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748b' }}><FileCheck size={30} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} /><strong style={{ display: 'block' }}>No certificates found</strong><span style={{ fontSize: '0.82rem' }}>Issued credentials will appear here when available.</span></div>}
             </div>
-          </div>
+          </section>
         </div>
       )}
 
       {activeHrSubTab === 'announcements' && (
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>Broadcast LMS Announcements</h2>
-          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            <input
-              type="text"
-              placeholder="Type corporate LMS announcement message..."
-              value={newAnnouncement}
-              onChange={(e) => setNewAnnouncement(e.target.value)}
-              style={{ flex: 1, padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem' }}
-            />
-            <button className="btn-primary" onClick={handleAddAnnouncement} style={{ background: '#9333ea' }}>
-              Broadcast Announcement
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {announcements.map(ann => (
-              <div key={ann.id} style={{ background: '#f8fafc', padding: '1rem', borderRadius: '8px', borderLeft: '4px solid #9333ea' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a' }}>{ann.title}</div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>Target: {ann.target} • Published: {ann.date}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <section style={panelStyle}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Announcements</h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Announcement publishing is not connected to a confirmed backend endpoint yet. No announcements are fabricated or stored only in component state.</p>
+        </section>
       )}
 
       {activeHrSubTab === 'settings' && (
-        <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '1rem' }}>Enterprise LMS System Settings</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '500px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.9rem', color: '#334155', fontWeight: 600 }}>
-              <input type="checkbox" defaultChecked /> Enable Automatic Department Learning Path Auto-Assignment
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.9rem', color: '#334155', fontWeight: 600 }}>
-              <input type="checkbox" defaultChecked /> Allow Manager Nudges for Direct Reports
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.9rem', color: '#334155', fontWeight: 600 }}>
-              <input type="checkbox" defaultChecked /> Enforce 80% Minimum Assessment Passing Score
-            </label>
-          </div>
-        </div>
+        <section style={panelStyle}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>System Settings</h2>
+          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>These settings need a persistent backend configuration endpoint before they can be safely changed. The previous local-only toggles have been removed to avoid implying that settings are saved.</p>
+        </section>
       )}
 
       {activeHrSubTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-          {/* Department Breakdown */}
-          <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>
-                Departmental Training Compliance
-              </h2>
-              <span style={{ fontSize: '0.75rem', color: '#9333ea', fontWeight: 700 }}>Click department for drilldown 🔍</span>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+          <section style={panelStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+              <div><h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>Departmental Training Compliance</h2><p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 4 }}>Live figures from HR dashboard metrics.</p></div>
+              <button onClick={loadHrMetrics} style={buttonStyle}><RefreshCw size={14} /> Refresh</button>
             </div>
+            {metrics.departmentStats.length ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {metrics.departmentStats.map((dept) => (
+                  <button key={dept.department} onClick={() => setSelectedDeptForDrilldown(dept)} className="hover-highlight" style={{ cursor: 'pointer', textAlign: 'left', padding: '0.5rem', border: 0, background: 'transparent', borderRadius: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.85rem', color: '#334155' }}>
+                      <strong style={{ color: '#0f172a' }}>{dept.department}</strong><span>{dept.completed}/{dept.total} ({Math.round(dept.rate)}%)</span>
+                    </div>
+                    <div className="progress-bar-bg" style={{ height: 10, marginTop: 7 }}><div className="progress-bar-fill" style={{ width: `${dept.rate}%`, background: dept.rate >= 90 ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #9333ea, #c084fc)' }} /></div>
+                  </button>
+                ))}
+              </div>
+            ) : <p style={{ color: '#64748b', fontSize: '0.88rem' }}>No department breakdown returned by the backend.</p>}
+          </section>
+          <section style={panelStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}><History size={20} color="#64748b" /><h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a' }}>System Audit Trail</h2></div>
+            <p style={{ color: '#64748b', fontSize: '0.9rem', lineHeight: 1.6 }}>A live audit-log endpoint has not been confirmed for this dashboard. Mock audit records have been removed; the panel will display real events once the backend endpoint is available.</p>
+          </section>
+        </div>
+      )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {metrics.departmentStats.map((dept) => (
-                <div
-                  key={dept.department}
-                  onClick={() => setSelectedDeptForDrilldown(dept)}
-                  style={{ cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', transition: 'background 0.15s ease' }}
-                  className="hover-highlight"
-                  title="Click to view detailed department drilldown"
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>
-                    <span style={{ color: '#0f172a', fontWeight: 800 }}>{dept.department}</span>
-                    <span>{dept.completed} / {dept.total} Employees ({dept.rate}%)</span>
-                  </div>
-                  <div className="progress-bar-bg" style={{ height: 10, marginTop: '0.4rem' }}>
-                    <div
-                      className="progress-bar-fill"
-                      style={{
-                        width: `${dept.rate}%`,
-                        background: dept.rate > 90 ? 'linear-gradient(90deg, #10b981, #34d399)' : 'linear-gradient(90deg, #9333ea, #c084fc)'
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
+      {selectedDeptForDrilldown && (
+        <div className="modal-overlay" role="presentation" onClick={(event) => { if (event.target === event.currentTarget) setSelectedDeptForDrilldown(null); }}>
+          <div className="modal-content animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="dept-drilldown-title" style={{ maxWidth: 600, padding: 0, overflow: 'hidden' }}>
+            <div style={{ background: '#0f172a', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', gap: '1rem' }}>
+              <div><div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: 1 }}>Department Analytics</div><h2 id="dept-drilldown-title" style={{ fontSize: '1.2rem', fontWeight: 800, marginTop: 4 }}>{selectedDeptForDrilldown.department}</h2></div>
+              <button aria-label="Close department details" onClick={() => setSelectedDeptForDrilldown(null)} style={{ background: 'rgba(255,255,255,0.1)', border: 0, padding: '0.4rem', borderRadius: '50%', color: '#fff', cursor: 'pointer' }}><X size={20} /></button>
             </div>
-          </div>
-
-          {/* Audit Trail */}
-          <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', border: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-              <History style={{ width: 20, height: 20, color: '#64748b' }} />
-              <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a' }}>Real-time System Audit Trail</h2>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {MOCK_AUDIT_LOGS.map((log) => (
-                <div key={log.id} style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '8px', borderLeft: '4px solid #9333ea' }}>
-                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>{log.action}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b', marginTop: '0.2rem' }}>
-                    <span>{log.user}</span>
-                    <span>{log.timestamp} • IP: {log.ip}</span>
-                  </div>
-                </div>
-              ))}
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(115px, 1fr))', gap: '0.75rem' }}>
+                {[
+                  { label: 'Employees', value: selectedDeptForDrilldown.total },
+                  { label: 'Completed', value: selectedDeptForDrilldown.completed },
+                  { label: 'Completion', value: `${Math.round(selectedDeptForDrilldown.rate)}%` }
+                ].map((item) => <div key={item.label} style={{ background: '#f8fafc', padding: '0.85rem', borderRadius: 8, border: '1px solid #e2e8f0' }}><div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>{item.label}</div><div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginTop: 4 }}>{item.value}</div></div>)}
+              </div>
+              <p style={{ color: '#64748b', fontSize: '0.88rem', lineHeight: 1.6, marginTop: '1rem' }}>Employee-level roster and overdue details are not included in the current department metrics response, so they are not estimated or filled with mock data.</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
+                <button onClick={() => setSelectedDeptForDrilldown(null)} style={buttonStyle}>Close</button>
+                <button className="btn-primary" onClick={() => { setSelectedDeptForDrilldown(null); setShowAssignmentModal(true); }} style={{ background: '#9333ea' }}><Plus size={15} /> Assign Department Training</button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Training Assignment Modal */}
-      {showAssignmentModal && (
-        <TrainingAssignmentModal
-          onClose={() => setShowAssignmentModal(false)}
-          onAssignSuccess={() => setActiveHrSubTab('overview')}
+      {showCourseBuilderModal && (
+        <CourseBuilderModal
+          key={editingCourseId || 'new-course'}
+          courseId={editingCourseId || ''}
+          onClose={() => { setShowCourseBuilderModal(false); setEditingCourseId(''); }}
+          onPublish={() => {
+            setShowCourseBuilderModal(false);
+            setEditingCourseId('');
+            handleHrTabChange('courses');
+            loadCourses();
+            loadHrMetrics();
+          }}
         />
       )}
 
-      {/* Department Analytics Drilldown Modal */}
-      {selectedDeptForDrilldown && (
-        <div className="modal-overlay">
-          <div className="modal-content animate-fade-in" style={{ maxWidth: '680px', padding: 0, overflow: 'hidden' }}>
-            <div style={{ background: '#0f172a', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'white' }}>
-              <div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                  Department Analytics & Workforce Compliance
-                </div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{selectedDeptForDrilldown.department} Department Drilldown</h2>
-              </div>
-              <button onClick={() => setSelectedDeptForDrilldown(null)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', padding: '0.4rem', borderRadius: '50%', color: 'white', cursor: 'pointer' }}>
-                <X style={{ width: 20, height: 20 }} />
-              </button>
-            </div>
-
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-              {/* Top Stats Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
-                {(() => {
-                  const deptEmployees = MOCK_USERS_DATABASE.filter(u => u.department === selectedDeptForDrilldown.department);
-                  const overdueCount = deptEmployees.filter(emp => emp.id === 'EMP1003' || emp.id === 'EMP1004').length;
-                  return (
-                    <>
-                      <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 700 }}>Headcount</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.1rem' }}>{deptEmployees.length} Employees</div>
-                      </div>
-                      <div style={{ background: '#f0f9ff', padding: '0.75rem', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#0369a1', fontWeight: 700 }}>Active Courses</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#0284c7', marginTop: '0.1rem' }}>{selectedDeptForDrilldown.activeCoursesCount || 8} Courses</div>
-                      </div>
-                      <div style={{ background: '#f0fdf4', padding: '0.75rem', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 700 }}>Completion Rate</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#16a34a', marginTop: '0.1rem' }}>{selectedDeptForDrilldown.rate || selectedDeptForDrilldown.completionRate}%</div>
-                      </div>
-                      <div style={{ background: '#fff1f2', padding: '0.75rem', borderRadius: '8px', border: '1px solid #fecdd3' }}>
-                        <div style={{ fontSize: '0.72rem', color: '#be123c', fontWeight: 700 }}>Overdue / Warning</div>
-                        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#e11d48', marginTop: '0.1rem' }}>{overdueCount} Employees</div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-
-              {/* Employee Roster List */}
-              <div>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.75rem' }}>
-                  Department Employee Compliance Roster
-                </h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#64748b', textAlign: 'left' }}>
-                      <th style={{ padding: '0.5rem 0.75rem' }}>ID & Name</th>
-                      <th style={{ padding: '0.5rem 0.75rem' }}>Designation</th>
-                      <th style={{ padding: '0.5rem 0.75rem' }}>Assigned</th>
-                      <th style={{ padding: '0.5rem 0.75rem' }}>Completed</th>
-                      <th style={{ padding: '0.5rem 0.75rem' }}>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {MOCK_USERS_DATABASE.filter(u => u.department === selectedDeptForDrilldown.department).map(emp => {
-                      const isOverdue = emp.id === 'EMP1003' || emp.id === 'EMP1004';
-                      const assignedCount = 4;
-                      const completedCount = isOverdue ? 1 : 3;
-                      return (
-                        <tr key={emp.id} style={{ borderBottom: '1px solid #f1f5f9', background: isOverdue ? '#fff1f2' : 'white' }}>
-                          <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: '#0f172a' }}>
-                            {emp.name} <span style={{ color: '#64748b', fontWeight: 500 }}>({emp.id})</span>
-                          </td>
-                          <td style={{ padding: '0.65rem 0.75rem', color: '#475569' }}>{emp.designation}</td>
-                          <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700 }}>{assignedCount}</td>
-                          <td style={{ padding: '0.65rem 0.75rem', fontWeight: 700, color: '#16a34a' }}>{completedCount}</td>
-                          <td style={{ padding: '0.65rem 0.75rem' }}>
-                            <span style={{ background: isOverdue ? '#ffe4e6' : '#dcfce7', color: isOverdue ? '#be123c' : '#166534', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700 }}>
-                              {isOverdue ? 'Action Overdue' : 'Compliant'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Modal Action Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
-                <button className="btn-secondary" onClick={() => setSelectedDeptForDrilldown(null)}>
-                  Close
-                </button>
-                <button
-                  className="btn-primary"
-                  style={{ background: '#9333ea' }}
-                  onClick={() => {
-                    setSelectedDeptForDrilldown(null);
-                    setShowAssignmentModal(true);
-                  }}
-                >
-                  Assign Department Training
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {showAssignmentModal && (
+        <TrainingAssignmentModal
+          onClose={() => setShowAssignmentModal(false)}
+          onAssignSuccess={() => { setShowAssignmentModal(false); handleHrTabChange('overview'); loadHrMetrics(); }}
+        />
       )}
     </div>
   );

@@ -1,708 +1,344 @@
 import { create } from 'zustand';
 
-import { MOCK_USER_PROGRESS } from '../data/mockData';
-
 import { enrollmentService } from '../services/enrollmentService';
 
+function normalizeCertificate(cert) {
+  if (!cert) return null;
 
+  return {
+    id: cert.certificateId,
+    certificateId: cert.certificateId,
+    userId: cert.userId,
+    employeeId: cert.employeeId,
+    userName: cert.userName,
+    department: cert.department,
+    designation: cert.designation,
+    courseId: cert.courseId,
+    courseTitle: cert.courseTitle,
+    courseCategory: cert.courseCategory,
+    score: cert.score,
+    pdfUrl: cert.pdfUrl,
+    issuedAt: cert.issuedAt,
+    issuedDate: cert.issuedAt
+      ? new Date(cert.issuedAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+      : '',
+  };
+}
+
+function upsertEnrollment(enrollments, course) {
+  if (!course) return enrollments;
+
+  const key = course.enrollmentDbId || course.dbId || course.id;
+  const index = enrollments.findIndex(
+    (item) =>
+      (item.enrollmentDbId || item.dbId || item.id) === key
+  );
+
+  if (index === -1) {
+    return [...enrollments, course];
+  }
+
+  const next = [...enrollments];
+  next[index] = { ...next[index], ...course };
+  return next;
+}
 
 export const useEnrollmentStore = create((set, get) => ({
-
-  // State
-
-  enrollments: MOCK_USER_PROGRESS,
+  // Backend is the single source of truth.
+  enrollments: [],
 
   certificates: [],
-
   recentCertificates: [],
 
   verifiedCertificate: null,
-
   verifiedCertificateError: null,
 
   isLoading: false,
+  error: null,
 
+  // ---------------------------------------------------------
+  // LOAD CURRENT USER ENROLLMENTS
+  // ---------------------------------------------------------
+  fetchEnrollments: async () => {
+    set({ isLoading: true, error: null });
 
+    try {
+      const enrollments =
+        await enrollmentService.getUserEnrollments();
 
-  // Actions
+      set({
+        enrollments,
+        isLoading: false,
+      });
 
-  setEnrollments: (enrollments) => set({ enrollments }),
+      return enrollments;
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: error.message || 'Unable to load enrollments.',
+      });
 
-
-
-  enrollInCourse: (userId, courseId) => {
-
-    set((state) => ({
-
-      enrollments: {
-
-        ...state.enrollments,
-
-        [userId]: {
-
-          ...state.enrollments[userId],
-
-          [courseId]: {
-
-            status: 'NOT STARTED',
-
-            progressPercent: 0,
-
-            completedLessons: [],
-
-            lastAccessed: new Date().toISOString().split('T')[0]
-
-          }
-
-        }
-
-      }
-
-    }));
-
+      throw error;
+    }
   },
 
+  setEnrollments: (enrollments) =>
+    set({
+      enrollments: Array.isArray(enrollments)
+        ? enrollments
+        : [],
+    }),
 
+  // ---------------------------------------------------------
+  // ENROLL IN COURSE
+  // ---------------------------------------------------------
+  enrollInCourse: async ({ courseId, courseCode } = {}) => {
+    set({ isLoading: true, error: null });
 
+    try {
+      const enrolledCourse =
+        await enrollmentService.enrollInCourse({
+          courseId,
+          courseCode,
+        });
+
+      set((state) => ({
+        enrollments: upsertEnrollment(
+          state.enrollments,
+          enrolledCourse
+        ),
+        isLoading: false,
+      }));
+
+      return enrolledCourse;
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: error.message || 'Unable to enroll in course.',
+      });
+
+      throw error;
+    }
+  },
+
+  // ---------------------------------------------------------
+  // LOCAL COMPATIBILITY HELPERS
+  // ---------------------------------------------------------
+  // These no longer create fake backend records. They only
+  // update already-loaded backend data in the client cache.
   updateProgress: (userId, courseId, progressData) => {
-
     set((state) => ({
-
-      enrollments: {
-
-        ...state.enrollments,
-
-        [userId]: {
-
-          ...state.enrollments[userId],
-
-          [courseId]: {
-
-            ...state.enrollments[userId]?.[courseId],
-
-            ...progressData
-
-          }
-
-        }
-
-      }
-
+      enrollments: state.enrollments.map((course) =>
+        course.id === courseId || course.dbId === courseId
+          ? { ...course, ...progressData }
+          : course
+      ),
     }));
-
   },
-
-
 
   completeLesson: (userId, courseId, lessonId) => {
-
-    set((state) => {
-
-      const userEnrollment = state.enrollments[userId]?.[courseId] || {};
-
-      const completedLessons = userEnrollment.completedLessons || [];
-
-      const newCompletedLessons = completedLessons.includes(lessonId)
-
-        ? completedLessons
-
-        : [...completedLessons, lessonId];
-
-
-
-      return {
-
-        enrollments: {
-
-          ...state.enrollments,
-
-          [userId]: {
-
-            ...state.enrollments[userId],
-
-            [courseId]: {
-
-              ...userEnrollment,
-
-              completedLessons: newCompletedLessons,
-
-              status: 'IN PROGRESS',
-
-              lastAccessed: new Date().toISOString().split('T')[0]
-
+    set((state) => ({
+      enrollments: state.enrollments.map((course) =>
+        course.id === courseId || course.dbId === courseId
+          ? {
+              ...course,
+              progressPercent: Math.min(
+                100,
+                Number(course.progressPercent || 0)
+              ),
             }
-
-          }
-
-        }
-
-      };
-
-    });
-
+          : course
+      ),
+    }));
   },
 
-
-
+  // ---------------------------------------------------------
+  // COMPLETE COURSE / GENERATE CERTIFICATE
+  // ---------------------------------------------------------
   completeCourse: async (
     userId,
     courseId,
     score,
-    {
-      enrollmentId,
-      courseCode
-    } = {}
+    { enrollmentId, courseCode } = {}
   ) => {
-
-    set({
-      isLoading: true,
-      verifiedCertificateError: null
-    });
-
-    try {
-
-      const result = await enrollmentService.completeCourse({
-        enrollmentId,
-        courseId,
-        courseCode,
-        score
-      });
-
-      if (result && !result.error && result.certificateId) {
-
-        const cert = result;
-
-        const certId = cert.certificateId;
-
-        const formattedIssueDate = cert.issuedAt
-
-          ? new Date(cert.issuedAt).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            })
-
-          : new Date().toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            });
-
-
-
-        set((state) => ({
-
-          enrollments: {
-
-            ...state.enrollments,
-
-            [userId]: {
-
-              ...state.enrollments[userId],
-
-              [courseId]: {
-
-                ...state.enrollments[userId]?.[courseId],
-
-                status: 'Completed',
-
-                progressPercent: 100,
-
-                score,
-
-                certId,
-
-                completedDate: new Date().toISOString().split('T')[0]
-
-              }
-
-            }
-
-          },
-
-
-
-          certificates: [
-
-            ...state.certificates.filter(
-              (c) => c.id !== certId
-            ),
-
-            {
-
-              id: certId,
-
-              certificateId: certId,
-
-              userId,
-
-              courseId,
-
-              issuedDate: formattedIssueDate,
-
-              score,
-
-              courseTitle: cert.courseTitle,
-
-              userName: cert.userName,
-
-              employeeId: cert.employeeId,
-
-              department: cert.department,
-
-              designation: cert.designation,
-
-              courseCategory: cert.courseCategory,
-
-              issuedAt: cert.issuedAt
-
-            }
-
-          ],
-
-          isLoading: false
-
-        }));
-
-
-
-        return {
-
-          success: true,
-
-          certificate: {
-
-            courseTitle: cert.courseTitle,
-
-            score,
-
-            certId,
-
-            issueDate: formattedIssueDate,
-
-            userName: cert.userName,
-
-            employeeId: cert.employeeId,
-
-            department: cert.department,
-
-            designation: cert.designation
-
-          }
-
-        };
-
-      }
-
-
-
-      set({
-
-        isLoading: false,
-
-        verifiedCertificateError:
-          result?.error || 'Unable to complete course.'
-
-      });
-
-
-
-      return {
-
-        success: false,
-
-        error:
-          result?.error ||
-          'Unable to complete course.'
-
-      };
-
-
-
-    } catch (error) {
-
-      console.error(
-        'completeCourse store error:',
-        error
-      );
-
-
-
-      set({
-
-        isLoading: false,
-
-        verifiedCertificateError:
-          error.message ||
-          'Unable to complete course.'
-
-      });
-
-
-
-      return {
-
-        success: false,
-
-        error:
-          error.message ||
-          'Unable to complete course.'
-
-      };
-
-    }
-
-  },
-
-
-
-  verifyCertificate: async (certificateId) => {
-
     set({
       isLoading: true,
       verifiedCertificateError: null,
-      verifiedCertificate: null
     });
 
     try {
+      const cert =
+        await enrollmentService.completeCourse({
+          enrollmentId,
+          courseId,
+          courseCode,
+          score,
+        });
 
-      const result =
+      const normalized = normalizeCertificate(cert);
+
+      if (!normalized) {
+        throw new Error(
+          'Course completion succeeded but no certificate was returned.'
+        );
+      }
+
+      set((state) => ({
+        certificates: [
+          ...state.certificates.filter(
+            (item) =>
+              item.certificateId !==
+              normalized.certificateId
+          ),
+          normalized,
+        ],
+        enrollments: state.enrollments.map((course) =>
+          (course.enrollmentDbId === enrollmentId ||
+            course.dbId === courseId ||
+            course.id === courseCode ||
+            course.id === courseId)
+            ? {
+                ...course,
+                enrollmentStatus: 'COMPLETED',
+                progressPercent: 100,
+              }
+            : course
+        ),
+        isLoading: false,
+      }));
+
+      return {
+        success: true,
+        certificate: normalized,
+      };
+    } catch (error) {
+      const message =
+        error.message ||
+        'Unable to complete course.';
+
+      set({
+        isLoading: false,
+        verifiedCertificateError: message,
+      });
+
+      return {
+        success: false,
+        error: message,
+      };
+    }
+  },
+
+  // ---------------------------------------------------------
+  // VERIFY CERTIFICATE
+  // ---------------------------------------------------------
+  verifyCertificate: async (certificateId) => {
+    set({
+      isLoading: true,
+      verifiedCertificateError: null,
+      verifiedCertificate: null,
+    });
+
+    try {
+      const cert =
         await enrollmentService.verifyCertificate(
           certificateId
         );
 
-      if (result.success && result.certificate) {
-
-        const cert = result.certificate;
-
-        const formatted = cert.issuedAt
-
-          ? new Date(cert.issuedAt).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            })
-
-          : '';
-
-
-
-        const normalized = {
-
-          id: cert.certificateId,
-
-          certificateId: cert.certificateId,
-
-          userId: cert.userId,
-
-          employeeId: cert.employeeId,
-
-          userName: cert.userName,
-
-          department: cert.department,
-
-          designation: cert.designation,
-
-          courseId: cert.courseId,
-
-          courseTitle: cert.courseTitle,
-
-          courseCategory: cert.courseCategory,
-
-          score: cert.score,
-
-          pdfUrl: cert.pdfUrl,
-
-          issuedAt: cert.issuedAt,
-
-          issuedDate: formatted
-
-        };
-
-
-
-        set({
-          verifiedCertificate: normalized,
-          isLoading: false
-        });
-
-        return {
-          success: true,
-          certificate: normalized
-        };
-
-      }
-
-
+      const normalized = normalizeCertificate(cert);
 
       set({
-
-        verifiedCertificateError:
-          result.error || 'Certificate not found',
-
-        isLoading: false
-
+        verifiedCertificate: normalized,
+        isLoading: false,
       });
 
-
-
       return {
-        success: false,
-        error: result.error
+        success: true,
+        certificate: normalized,
       };
-
     } catch (error) {
-
-      console.error(
-        'verifyCertificate store error:',
-        error
-      );
-
-      const msg =
-        error.message || 'Verification error';
-
-
+      const message =
+        error.message || 'Certificate verification failed.';
 
       set({
-
-        verifiedCertificateError: msg,
-
-        isLoading: false
-
+        verifiedCertificateError: message,
+        isLoading: false,
       });
-
-
 
       return {
         success: false,
-        error: msg
+        error: message,
       };
-
     }
-
   },
-
-
 
   clearVerifiedCertificate: () =>
-
     set({
       verifiedCertificate: null,
-      verifiedCertificateError: null
+      verifiedCertificateError: null,
     }),
 
-
-
+  // ---------------------------------------------------------
+  // CERTIFICATES
+  // ---------------------------------------------------------
   fetchUserCertificates: async (userId) => {
+    const certificates =
+      await enrollmentService.getUserCertificates(userId);
 
-    try {
+    const normalized = certificates
+      .map(normalizeCertificate)
+      .filter(Boolean);
 
-      const certs =
-        await enrollmentService.getUserCertificates(
-          userId
-        );
-
-      if (Array.isArray(certs) && certs.length) {
-
-        const normalized = certs.map((cert) => ({
-
-          id: cert.certificateId,
-
-          certificateId: cert.certificateId,
-
-          userId: cert.userId,
-
-          employeeId: cert.employeeId,
-
-          userName: cert.userName,
-
-          department: cert.department,
-
-          designation: cert.designation,
-
-          courseId: cert.courseId,
-
-          courseTitle: cert.courseTitle,
-
-          courseCategory: cert.courseCategory,
-
-          score: cert.score,
-
-          pdfUrl: cert.pdfUrl,
-
-          issuedAt: cert.issuedAt,
-
-          issuedDate: cert.issuedAt
-
-            ? new Date(cert.issuedAt).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              })
-
-            : ''
-
-        }));
-
-
-
-        set({
-          certificates: normalized
-        });
-
-        return normalized;
-
-      }
-
-
-
-      return get().certificates;
-
-    } catch (error) {
-
-      console.error(
-        'fetchUserCertificates store error:',
-        error
-      );
-
-      return get().certificates;
-
-    }
-
+    set({ certificates: normalized });
+    return normalized;
   },
-
-
 
   fetchRecentCertificates: async (limit = 5) => {
+    const certificates =
+      await enrollmentService.getRecentCertificates(limit);
 
-    try {
+    const normalized = certificates
+      .map(normalizeCertificate)
+      .filter(Boolean);
 
-      const certs =
-        await enrollmentService.getRecentCertificates(
-          limit
-        );
-
-      if (Array.isArray(certs) && certs.length) {
-
-        const normalized = certs.map((cert) => ({
-
-          id: cert.certificateId,
-
-          certificateId: cert.certificateId,
-
-          userId: cert.userId,
-
-          employeeId: cert.employeeId,
-
-          userName: cert.userName,
-
-          department: cert.department,
-
-          designation: cert.designation,
-
-          courseId: cert.courseId,
-
-          courseTitle: cert.courseTitle,
-
-          courseCategory: cert.courseCategory,
-
-          score: cert.score,
-
-          issuedAt: cert.issuedAt,
-
-          issuedDate: cert.issuedAt
-
-            ? new Date(cert.issuedAt).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-              })
-
-            : ''
-
-        }));
-
-
-
-        set({
-          recentCertificates: normalized
-        });
-
-        return normalized;
-
-      }
-
-
-
-      return [];
-
-    } catch (error) {
-
-      console.error(
-        'fetchRecentCertificates store error:',
-        error
-      );
-
-      return [];
-
-    }
-
+    set({ recentCertificates: normalized });
+    return normalized;
   },
 
-
-
-  // Computed
-
-  getUserProgress: (userId) => {
-
-    return get().enrollments[userId] || {};
-
+  // ---------------------------------------------------------
+  // COMPATIBILITY / SELECTORS
+  // ---------------------------------------------------------
+  getUserProgress: () => {
+    return get().enrollments;
   },
-
-
 
   getCourseProgress: (userId, courseId) => {
-
-    return get().enrollments[userId]?.[courseId];
-
-  },
-
-
-
-  getUserCertificates: (userId) => {
-
-    const all = get().certificates;
-
-    if (!userId) return all;
-
-    return all.filter(
-      cert => cert.userId === userId || cert.id
+    return get().enrollments.find(
+      (course) =>
+        course.id === courseId ||
+        course.dbId === courseId
     );
-
   },
 
+  getUserCertificates: (userId) =>
+    get().certificates,
 
+  getCompletionRate: () => {
+    const enrollments = get().enrollments;
 
-  getCompletionRate: (userId) => {
+    if (!enrollments.length) return 0;
 
-    const userEnrollments =
-      get().enrollments[userId] || {};
+    const completed = enrollments.filter(
+      (course) =>
+        String(course.enrollmentStatus || '').toUpperCase() ===
+        'COMPLETED'
+    ).length;
 
-    const totalCourses =
-      Object.keys(userEnrollments).length;
-
-    const completedCourses =
-      Object.values(userEnrollments)
-        .filter(
-          e =>
-            e.status === 'Completed' ||
-            e.status === 'COMPLETED'
-        ).length;
-
-    return totalCourses > 0
-      ? (completedCourses / totalCourses) * 100
-      : 0;
-
-  }
-
+    return Math.round(
+      (completed / enrollments.length) * 100
+    );
+  },
 }));

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
+/** Repository for Quiz entities. Keep this public interface in QuizRepository.java. */
 public interface QuizRepository extends JpaRepository<Quiz, Long> {
 
     Optional<Quiz> findByQuizId(String quizId);
@@ -18,4 +19,6 @@ public interface QuizRepository extends JpaRepository<Quiz, Long> {
     Optional<Quiz> findByModuleId(Long moduleId);
 
     boolean existsByQuizId(String quizId);
+
+    boolean existsByCourse_Id(Long courseId);
 }

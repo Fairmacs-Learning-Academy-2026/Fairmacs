@@ -9,6 +9,7 @@ import com.fairmacs.lms.entity.UserStatus;
 import com.fairmacs.lms.repository.CertificateRepository;
 import com.fairmacs.lms.repository.EnrollmentRepository;
 import com.fairmacs.lms.repository.UserRepository;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -124,13 +126,43 @@ public class HrAdminService {
                 "EMPLOYEE"
         ).toUpperCase();
 
-        user.setRole(
-                Role.valueOf(roleValue)
-        );
+        Role selectedRole;
+
+        try {
+            selectedRole = Role.valueOf(roleValue);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException(
+                    "Invalid role. Allowed roles: EMPLOYEE, TRAINER, MANAGER, HR_ADMIN."
+            );
+        }
+
+        user.setRole(selectedRole);
 
         user.setRoleLabel(
                 roleLabel(user.getRole())
         );
+
+        if (selectedRole == Role.TRAINER) {
+            user.setLevel(null);
+        } else {
+            String level = text(request.get("level"));
+
+            if (level == null || level.isBlank()) {
+                throw new IllegalArgumentException(
+                        "Level is required for Employee, Manager and HR/Admin."
+                );
+            }
+
+            level = level.trim().toUpperCase();
+
+            if (!Set.of("L0", "L1", "L2", "L3", "L4").contains(level)) {
+                throw new IllegalArgumentException(
+                        "Invalid level. Allowed levels: L0, L1, L2, L3, L4."
+                );
+            }
+
+            user.setLevel(level);
+        }
 
         user.setDesignation(
                 defaultText(
@@ -162,7 +194,7 @@ public class HrAdminService {
 
         String statusValue = defaultText(
                 request.get("status"),
-                "Active"
+                "ACTIVE"
         );
 
         user.setStatus(
@@ -182,11 +214,81 @@ public class HrAdminService {
     }
 
     // =========================================================
-    // ENABLE / DISABLE EMPLOYEE
+// CHANGE EMPLOYEE LIFECYCLE STATUS
+// =========================================================
+
+public Map<String, Object> changeEmployeeStatus(
+        String employeeId,
+        String status
+) {
+    User user = userRepository
+            .findByEmployeeId(employeeId)
+            .orElseThrow(() ->
+                    new IllegalArgumentException(
+                            "Employee not found."
+                    )
+            );
+
+    if (status == null || status.isBlank()) {
+        throw new IllegalArgumentException(
+                "Employee status is required."
+        );
+    }
+
+    UserStatus newStatus;
+
+    try {
+        newStatus = UserStatus.valueOf(
+                status.trim().toUpperCase()
+        );
+    } catch (IllegalArgumentException ex) {
+        throw new IllegalArgumentException(
+                "Invalid employee status. " +
+                "Allowed values: ACTIVE, INACTIVE, ON_LEAVE, TERMINATED."
+        );
+    }
+
+    /*
+     * Prevent unnecessary updates.
+     */
+    if (user.getStatus() == newStatus) {
+        Map<String, Object> response = new LinkedHashMap<>();
+
+        response.put("success", true);
+        response.put("message", "Employee status is already " +
+                formatStatus(newStatus));
+        response.put("employeeId", user.getEmployeeId());
+        response.put("statusCode", newStatus.name());
+        response.put("status", formatStatus(newStatus));
+
+        return response;
+    }
+
+    user.setStatus(newStatus);
+
+    User savedUser = userRepository.save(user);
+
+    Map<String, Object> response = new LinkedHashMap<>();
+
+    response.put("success", true);
+    response.put("message",
+            "Employee status changed successfully.");
+    response.put("employeeId", savedUser.getEmployeeId());
+    response.put("name", savedUser.getName());
+    response.put("statusCode", savedUser.getStatus().name());
+    response.put("status",
+            formatStatus(savedUser.getStatus()));
+
+    return response;
+}
+
+    // =========================================================
+    // RESET EMPLOYEE PASSWORD
     // =========================================================
 
-    public Map<String, Object> toggleEmployeeStatus(
-            String employeeId
+    public Map<String, Object> resetEmployeePassword(
+            String employeeId,
+            String newPassword
     ) {
 
         User user = userRepository
@@ -197,57 +299,39 @@ public class HrAdminService {
                         )
                 );
 
-        if (user.getStatus() == UserStatus.ACTIVE) {
-            user.setStatus(UserStatus.DISABLED);
-        } else {
-            user.setStatus(UserStatus.ACTIVE);
-        }
+        String password =
+                (newPassword == null || newPassword.isBlank())
+                        ? "Reset@123"
+                        : newPassword;
 
-        User saved = userRepository.save(user);
+        // Store only the BCrypt-hashed password
+        user.setPassword(
+                passwordEncoder.encode(password)
+        );
 
-        return toEmployeeResponse(saved);
+        userRepository.save(user);
+
+        Map<String, Object> response =
+                new LinkedHashMap<>();
+
+        response.put(
+                "success",
+                true
+        );
+
+        response.put(
+                "employeeId",
+                user.getEmployeeId()
+        );
+
+        // Never return plaintext password
+        response.put(
+                "temporaryPasswordSet",
+                true
+        );
+
+        return response;
     }
-
-    // =========================================================
-    // RESET EMPLOYEE PASSWORD
-    // =========================================================
-
-    public Map<String, Object> resetEmployeePassword(
-        String employeeId,
-        String newPassword
-) {
-
-    User user = userRepository
-            .findByEmployeeId(employeeId)
-            .orElseThrow(
-                    () -> new IllegalArgumentException(
-                            "Employee not found."
-                    )
-            );
-
-    String password =
-            (newPassword == null || newPassword.isBlank())
-                    ? "Reset@123"
-                    : newPassword;
-
-    // Store only the BCrypt-hashed password in the database
-    user.setPassword(
-            passwordEncoder.encode(password)
-    );
-
-    userRepository.save(user);
-
-    Map<String, Object> response =
-            new LinkedHashMap<>();
-
-    response.put("success", true);
-    response.put("employeeId", user.getEmployeeId());
-
-    // Do not return the plaintext password
-    response.put("temporaryPasswordSet", true);
-
-    return response;
-}
 
     // =========================================================
     // HR DASHBOARD METRICS
@@ -256,9 +340,11 @@ public class HrAdminService {
     @Transactional(readOnly = true)
     public Map<String, Object> getDashboardMetrics() {
 
-        List<User> users = userRepository.findAll();
+        List<User> users =
+                userRepository.findAll();
 
-        List<User> employees = users;
+        List<User> employees =
+                users;
 
         List<Enrollment> enrollments =
                 enrollmentRepository.findAll();
@@ -267,27 +353,36 @@ public class HrAdminService {
         // Total Employees
         // -----------------------------------------------------
 
-        long totalEmployees = employees.size();
+        long totalEmployees =
+                employees.size();
 
         // -----------------------------------------------------
         // Active Employees
         // -----------------------------------------------------
 
-        long activeEmployees = employees.stream()
-                .filter(user -> user.getStatus() == UserStatus.ACTIVE)
-                .count();
+        long activeEmployees =
+                employees.stream()
+                        .filter(user ->
+                                user.getStatus()
+                                        == UserStatus.ACTIVE
+                        )
+                        .count();
 
         // -----------------------------------------------------
         // Active Learners
         // -----------------------------------------------------
 
-        long activeLearners = enrollments.stream()
-                .filter(e ->
-                        e.getStatus() == EnrollmentStatus.IN_PROGRESS
-                )
-                .map(e -> e.getUser().getId())
-                .distinct()
-                .count();
+        long activeLearners =
+                enrollments.stream()
+                        .filter(e ->
+                                e.getStatus()
+                                        == EnrollmentStatus.IN_PROGRESS
+                        )
+                        .map(e ->
+                                e.getUser().getId()
+                        )
+                        .distinct()
+                        .count();
 
         // -----------------------------------------------------
         // Overall Completion Rate
@@ -297,17 +392,30 @@ public class HrAdminService {
 
         if (!enrollments.isEmpty()) {
 
-            double totalProgress = enrollments.stream()
-                    .map(Enrollment::getProgressPercent)
-                    .filter(value -> value != null)
-                    .mapToDouble(Integer::doubleValue)
-                    .sum();
+            double totalProgress =
+                    enrollments.stream()
+                            .map(
+                                    Enrollment::getProgressPercent
+                            )
+                            .filter(
+                                    value -> value != null
+                            )
+                            .mapToDouble(
+                                    Integer::doubleValue
+                            )
+                            .sum();
 
-            long progressCount = enrollments.stream()
-                    .filter(e -> e.getProgressPercent() != null)
-                    .count();
+            long progressCount =
+                    enrollments.stream()
+                            .filter(
+                                    e ->
+                                            e.getProgressPercent()
+                                                    != null
+                            )
+                            .count();
 
             if (progressCount > 0) {
+
                 overallCompletionRate =
                         totalProgress / progressCount;
             }
@@ -319,17 +427,28 @@ public class HrAdminService {
 
         double avgTrainingHours = 0;
 
-        List<Double> trainingHours = enrollments.stream()
-                .filter(e -> e.getCourse() != null)
-                .map(e -> e.getCourse().getDurationHours())
-                .filter(value -> value != null)
-                .toList();
+        List<Double> trainingHours =
+                enrollments.stream()
+                        .filter(
+                                e -> e.getCourse() != null
+                        )
+                        .map(
+                                e ->
+                                        e.getCourse()
+                                                .getDurationHours()
+                        )
+                        .filter(
+                                value -> value != null
+                        )
+                        .toList();
 
         if (!trainingHours.isEmpty()) {
 
             avgTrainingHours =
                     trainingHours.stream()
-                            .mapToDouble(Double::doubleValue)
+                            .mapToDouble(
+                                    Double::doubleValue
+                            )
                             .average()
                             .orElse(0);
         }
@@ -347,17 +466,19 @@ public class HrAdminService {
 
         List<Enrollment> mandatoryEnrollments =
                 enrollments.stream()
-                        .filter(e ->
-                                e.getEnrollmentType()
-                                        == EnrollmentType.MANDATORY
+                        .filter(
+                                e ->
+                                        e.getEnrollmentType()
+                                                == EnrollmentType.MANDATORY
                         )
                         .toList();
 
         long mandatoryCompleted =
                 mandatoryEnrollments.stream()
-                        .filter(e ->
-                                e.getStatus()
-                                        == EnrollmentStatus.COMPLETED
+                        .filter(
+                                e ->
+                                        e.getStatus()
+                                                == EnrollmentStatus.COMPLETED
                         )
                         .count();
 
@@ -375,7 +496,10 @@ public class HrAdminService {
         // -----------------------------------------------------
 
         List<Map<String, Object>> departmentStats =
-                buildDepartmentStats(employees, enrollments);
+                buildDepartmentStats(
+                        employees,
+                        enrollments
+                );
 
         // -----------------------------------------------------
         // Response
@@ -438,20 +562,24 @@ public class HrAdminService {
 
         return employees.stream()
                 .map(User::getDepartment)
-                .filter(department ->
-                        department != null &&
-                        !department.isBlank()
+                .filter(
+                        department ->
+                                department != null
+                                        && !department.isBlank()
                 )
                 .distinct()
-                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .sorted(
+                        String.CASE_INSENSITIVE_ORDER
+                )
                 .map(department -> {
 
                     List<User> departmentEmployees =
                             employees.stream()
-                                    .filter(user ->
-                                            department.equalsIgnoreCase(
-                                                    user.getDepartment()
-                                            )
+                                    .filter(
+                                            user ->
+                                                    department.equalsIgnoreCase(
+                                                            user.getDepartment()
+                                                    )
                                     )
                                     .toList();
 
@@ -460,20 +588,24 @@ public class HrAdminService {
 
                     long completed = 0;
 
-                    for (User employee : departmentEmployees) {
+                    for (User employee :
+                            departmentEmployees) {
 
                         List<Enrollment> mandatory =
                                 enrollments.stream()
-                                        .filter(e ->
-                                                e.getUser() != null &&
-                                                employee.getId()
-                                                        .equals(
-                                                                e.getUser().getId()
-                                                        )
+                                        .filter(
+                                                e ->
+                                                        e.getUser() != null
+                                                                && employee.getId()
+                                                                        .equals(
+                                                                                e.getUser()
+                                                                                        .getId()
+                                                                        )
                                         )
-                                        .filter(e ->
-                                                e.getEnrollmentType()
-                                                        == EnrollmentType.MANDATORY
+                                        .filter(
+                                                e ->
+                                                        e.getEnrollmentType()
+                                                                == EnrollmentType.MANDATORY
                                         )
                                         .toList();
 
@@ -481,9 +613,10 @@ public class HrAdminService {
 
                             boolean allCompleted =
                                     mandatory.stream()
-                                            .allMatch(e ->
-                                                    e.getStatus()
-                                                            == EnrollmentStatus.COMPLETED
+                                            .allMatch(
+                                                    e ->
+                                                            e.getStatus()
+                                                                    == EnrollmentStatus.COMPLETED
                                             );
 
                             if (allCompleted) {
@@ -492,9 +625,11 @@ public class HrAdminService {
                         }
                     }
 
-                    double rate = total == 0
-                            ? 0
-                            : (completed * 100.0) / total;
+                    double rate =
+                            total == 0
+                                    ? 0
+                                    : (completed * 100.0)
+                                            / total;
 
                     Map<String, Object> stat =
                             new LinkedHashMap<>();
@@ -520,7 +655,6 @@ public class HrAdminService {
                     );
 
                     return stat;
-
                 })
                 .toList();
     }
@@ -554,6 +688,11 @@ public class HrAdminService {
         response.put(
                 "name",
                 user.getName()
+        );
+
+        response.put(
+                "level",
+                user.getLevel()
         );
 
         response.put(
@@ -593,11 +732,17 @@ public class HrAdminService {
                 user.getJoiningDate()
         );
 
+        // Return the actual lifecycle status
         response.put(
                 "status",
-                user.getStatus() == UserStatus.ACTIVE
-                        ? "Active"
-                        : "Disabled"
+                formatStatus(user.getStatus())
+        );
+
+        response.put(
+                "statusCode",
+                user.getStatus() != null
+                        ? user.getStatus().name()
+                        : UserStatus.ACTIVE.name()
         );
 
         response.put(
@@ -609,18 +754,68 @@ public class HrAdminService {
     }
 
     // =========================================================
-    // STATUS
+    // STATUS PARSER
     // =========================================================
 
     private UserStatus parseStatus(
             String value
     ) {
 
-        if ("DISABLED".equalsIgnoreCase(value)) {
-            return UserStatus.DISABLED;
+        if (value == null || value.isBlank()) {
+            return UserStatus.ACTIVE;
         }
 
-        return UserStatus.ACTIVE;
+        String normalized =
+                value.trim()
+                        .toUpperCase()
+                        .replace('-', '_')
+                        .replace(' ', '_');
+
+        // Backward compatibility with the old status
+        if ("DISABLED".equals(normalized)) {
+            return UserStatus.INACTIVE;
+        }
+
+        try {
+
+            return UserStatus.valueOf(
+                    normalized
+            );
+
+        } catch (IllegalArgumentException exception) {
+
+            throw new IllegalArgumentException(
+                    "Invalid employee status. Allowed values: ACTIVE, INACTIVE, ON_LEAVE, TERMINATED."
+            );
+        }
+    }
+
+    // =========================================================
+    // STATUS DISPLAY
+    // =========================================================
+
+    private String formatStatus(
+            UserStatus status
+    ) {
+
+        if (status == null) {
+            return "Active";
+        }
+
+        return switch (status) {
+
+            case ACTIVE ->
+                    "Active";
+
+            case INACTIVE ->
+                    "Inactive";
+
+            case ON_LEAVE ->
+                    "On Leave";
+
+            case TERMINATED ->
+                    "Terminated";
+        };
     }
 
     // =========================================================
@@ -693,13 +888,18 @@ public class HrAdminService {
         String valueText =
                 text(value);
 
-        return valueText == null ||
-                valueText.isBlank()
+        return valueText == null
+                || valueText.isBlank()
                 ? fallback
                 : valueText;
     }
 
-    private double round(double value) {
-        return Math.round(value * 100.0) / 100.0;
+    private double round(
+            double value
+    ) {
+
+        return Math.round(
+                value * 100.0
+        ) / 100.0;
     }
 }

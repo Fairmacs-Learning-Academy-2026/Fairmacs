@@ -1,0 +1,54 @@
+# ============================================================
+# Fairmacs LMS - Example Backend Configuration
+# Copy this file to application.properties or application-local.properties
+# and supply your actual environment values.
+# NEVER commit real credentials, passwords, or secrets to Git.
+# ============================================================
+
+# Server Configuration
+server.port=8080
+spring.application.name=fairmacs-lms
+
+# Zoho WorkDrive Integration (OAuth 2.0)
+zoho.client-id=${ZOHO_CLIENT_ID:your_zoho_client_id}
+zoho.client-secret=${ZOHO_CLIENT_SECRET:your_zoho_client_secret}
+zoho.redirect-uri=${ZOHO_REDIRECT_URI:http://localhost:8080/api/integrations/zoho/callback}
+zoho.accounts-url=https://accounts.zoho.com
+zoho.api-base-url=https://www.zohoapis.com/workdrive
+zoho.download-base-url=https://download.zoho.com
+zoho.course-documents-folder-id=${ZOHO_COURSE_DOCUMENTS_FOLDER_ID:your_zoho_folder_id}
+
+# Zoho Token Encryption (AES-256 Key in Base64)
+# ZOHO_TOKEN_ENCRYPTION_KEY=base64_encoded_32_byte_aes_key
+
+# PostgreSQL / Supabase Database Configuration
+spring.datasource.url=${SUPABASE_DB_URL:jdbc:postgresql://your-db-host:5432/postgres}
+spring.datasource.username=${SUPABASE_DB_USERNAME:postgres}
+spring.datasource.password=${SUPABASE_DB_PASSWORD:your_db_password}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA / Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.format_sql=false
+
+# JWT Configuration
+jwt.secret=${JWT_SECRET:your_jwt_secret_key_minimum_256_bits_length}
+jwt.expiration=86400000
+
+# File Upload Configuration
+spring.servlet.multipart.enabled=true
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=10MB
+
+# CORS Configuration
+cors.allowed-origins=http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175
+cors.allowed-methods=GET,POST,PUT,DELETE,OPTIONS
+cors.allowed-headers=*
+cors.allow-credentials=true
+
+# Logging
+logging.level.org.springframework.web=INFO
+logging.level.org.hibernate=INFO
+logging.level.com.fairmacs.lms=INFO

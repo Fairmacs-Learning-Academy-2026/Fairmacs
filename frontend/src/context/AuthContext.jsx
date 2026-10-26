@@ -7,7 +7,7 @@ import React, {
 } from 'react';
 
 import { MOCK_USERS_DATABASE } from '../data/mockData';
-import { authService } from '../services/authService';
+import authService from '../services/authService.js';
 import hrAdminService from '../services/hrAdminService';
 
 const AuthContext = createContext(null);
@@ -61,6 +61,13 @@ function normalizeEmployee(employee) {
       employee.roleLabel || 'Employee',
     status:
       employee.status || 'Active',
+    statusCode:
+      employee.statusCode ||
+      (
+        employee.status || 'ACTIVE'
+      )
+        .toUpperCase()
+        .replace(/\s+/g, '_'),
     designation:
       employee.designation || 'Executive',
     department:
@@ -69,7 +76,6 @@ function normalizeEmployee(employee) {
 }
 
 export function AuthProvider({ children }) {
-
   const [usersList, setUsersList] = useState(() => {
     try {
       const savedUsers =
@@ -138,10 +144,6 @@ export function AuthProvider({ children }) {
   const [employeesLoading, setEmployeesLoading] =
     useState(false);
 
-  /*
-   * Keep localStorage as a temporary frontend cache.
-   * MySQL/backend is now the source of truth for HR employees.
-   */
   useEffect(() => {
     localStorage.setItem(
       'fairmacs_lms_users',
@@ -157,11 +159,7 @@ export function AuthProvider({ children }) {
     }
   }, [user, token]);
 
-  /*
-   * Load employees from Spring Boot / MySQL
-   */
   const loadEmployees = useCallback(async () => {
-
     if (
       !token ||
       user?.role !== 'HR_ADMIN'
@@ -175,7 +173,6 @@ export function AuthProvider({ children }) {
     setEmployeesLoading(true);
 
     try {
-
       const employees =
         await hrAdminService.getEmployees();
 
@@ -197,7 +194,6 @@ export function AuthProvider({ children }) {
       };
 
     } catch (error) {
-
       console.error(
         'Unable to load employees from backend:',
         error
@@ -213,39 +209,25 @@ export function AuthProvider({ children }) {
     } finally {
       setEmployeesLoading(false);
     }
-
   }, [token, user?.role]);
 
-  /*
-   * Automatically load real employees
-   * whenever HR Admin logs in.
-   */
   useEffect(() => {
-
     if (
       user?.role === 'HR_ADMIN' &&
       token
     ) {
       loadEmployees();
     }
-
   }, [
     user?.role,
     token,
     loadEmployees
   ]);
 
-  /*
-   * LOGIN
-   *
-   * Backend is the ONLY authentication source.
-   * No local/mock login and no fake JWT fallback.
-   */
   const login = async (
     loginId,
     password
   ) => {
-
     if (!loginId || !password) {
       return {
         success: false,
@@ -261,16 +243,12 @@ export function AuthProvider({ children }) {
       password.trim();
 
     try {
-
       const res =
         await authService.login(
           cleanId,
           cleanPass
         );
 
-      /*
-       * Backend rejected the credentials.
-       */
       if (!res?.success) {
         return {
           success: false,
@@ -281,9 +259,6 @@ export function AuthProvider({ children }) {
         };
       }
 
-      /*
-       * Backend must provide both a user and a real JWT.
-       */
       if (
         !res.token ||
         !res.user
@@ -322,7 +297,6 @@ export function AuthProvider({ children }) {
                 'EMPLOYEE',
 
               roleLabel: (() => {
-
                 const r =
                   (
                     backendUser.role ||
@@ -339,7 +313,6 @@ export function AuthProvider({ children }) {
                   r.charAt(0) +
                   r.slice(1).toLowerCase()
                 );
-
               })(),
 
               department:
@@ -370,9 +343,6 @@ export function AuthProvider({ children }) {
         };
       }
 
-      /*
-       * Only now create the authenticated frontend session.
-       */
       setUser(normalizedUser);
       setToken(backendToken);
 
@@ -382,14 +352,6 @@ export function AuthProvider({ children }) {
       };
 
     } catch (error) {
-
-      /*
-       * Backend unavailable / network error.
-       *
-       * IMPORTANT:
-       * Never fall back to mock users.
-       * Never generate a fake JWT.
-       */
       console.error(
         'Backend login failed:',
         error
@@ -404,90 +366,76 @@ export function AuthProvider({ children }) {
     }
   };
 
-  /*
-   * LOGOUT
-   */
   const logout = () => {
     setUser(null);
     setToken(null);
   };
 
-  /*
-   * CHANGE PASSWORD
-   *
-   * Existing frontend behaviour is preserved here.
-   */
   const changePassword = async (
-  currentPassword,
-  newPassword
-) => {
-  if (!user) {
-    return {
-      success: false,
-      message: 'No user session.'
-    };
-  }
-
-  try {
-    const result = await authService.changePassword(
-      currentPassword,
-      newPassword
-    );
-
-    if (!result?.success) {
+    currentPassword,
+    newPassword
+  ) => {
+    if (!user) {
       return {
         success: false,
-        message:
-          result?.error ||
-          result?.message ||
-          'Unable to change password.'
+        message: 'No user session.'
       };
     }
 
-    return {
-      success: true,
-      message:
-        result?.message ||
-        'Password updated successfully!'
-    };
+    try {
+      const result =
+        await authService.changePassword(
+          currentPassword,
+          newPassword
+        );
 
-  } catch (error) {
-    console.error(
-      'Change password failed:',
-      error
-    );
+      if (!result?.success) {
+        return {
+          success: false,
+          message:
+            result?.error ||
+            result?.message ||
+            'Unable to change password.'
+        };
+      }
 
-    return {
-      success: false,
-      message:
-        error?.message ||
-        'Unable to change password.'
-    };
-  }
-};
+      return {
+        success: true,
+        message:
+          result?.message ||
+          'Password updated successfully!'
+      };
 
-  /*
-   * CREATE EMPLOYEE
-   *
-   * Now creates the employee in MySQL
-   * through Spring Boot.
-   */
+    } catch (error) {
+      console.error(
+        'Change password failed:',
+        error
+      );
+
+      return {
+        success: false,
+        message:
+          error?.message ||
+          'Unable to change password.'
+      };
+    }
+  };
+
   const createEmployee = async (
     newEmpData
   ) => {
-
     try {
-
       const employee =
         await hrAdminService.createEmployee(
           newEmpData
         );
 
       const normalizedEmployee =
-        normalizeEmployee(employee);
+        normalizeEmployee(
+          employee
+        );
 
       setUsersList(prev => {
-
         const withoutDuplicate =
           prev.filter(
             u =>
@@ -508,7 +456,6 @@ export function AuthProvider({ children }) {
       };
 
     } catch (error) {
-
       console.error(
         'Create employee failed:',
         error
@@ -523,45 +470,26 @@ export function AuthProvider({ children }) {
     }
   };
 
-  /*
-   * ENABLE / DISABLE EMPLOYEE
-   */
-  const toggleUserStatus = async (
-    empId
+  const importEmployees = async (
+    file
   ) => {
-
     try {
-
-      const updatedEmployee =
-        await hrAdminService
-          .toggleEmployeeStatus(
-            empId
-          );
-
-      const normalizedEmployee =
-        normalizeEmployee(
-          updatedEmployee
+      const result =
+        await hrAdminService.importEmployees(
+          file
         );
 
-      setUsersList(prev =>
-        prev.map(u =>
-          u.id ===
-          normalizedEmployee.id
-            ? normalizedEmployee
-            : u
-        )
-      );
+      if (
+        result?.success
+      ) {
+        await loadEmployees();
+      }
 
-      return {
-        success: true,
-        employee:
-          normalizedEmployee
-      };
+      return result;
 
     } catch (error) {
-
       console.error(
-        'Toggle employee status failed:',
+        'Import employees failed:',
         error
       );
 
@@ -569,40 +497,85 @@ export function AuthProvider({ children }) {
         success: false,
         message:
           error.message ||
-          'Unable to update employee status.'
+          'Unable to import employees.'
       };
     }
   };
 
-  /*
-   * RESET EMPLOYEE PASSWORD
-   *
-   * Backend now returns only a flag.
-   * Never return or store the plaintext password.
-   */
+  const changeEmployeeStatus = async (
+  empId,
+  newStatus
+) => {
+  try {
+    const updatedEmployee =
+      await hrAdminService.changeEmployeeStatus(
+        empId,
+        newStatus
+      );
+
+    const normalizedEmployee =
+      normalizeEmployee(
+        updatedEmployee
+      );
+
+    setUsersList(prev =>
+      prev.map(employee => {
+        if (employee.id !== empId) {
+          return employee;
+        }
+
+        return {
+          ...employee,
+          ...normalizedEmployee,
+          id: employee.id,
+          employeeId:
+            employee.employeeId ||
+            normalizedEmployee.employeeId ||
+            employee.id,
+        };
+      })
+    );
+
+    return {
+      success: true,
+      employee: normalizedEmployee
+    };
+
+  } catch (error) {
+    console.error(
+      'Change employee status failed:',
+      error
+    );
+
+    return {
+      success: false,
+      message:
+        error.message ||
+        'Unable to update employee status.'
+    };
+  }
+};
+
   const resetUserPassword = async (
     empId,
     newPass = 'Reset@123'
   ) => {
-
     try {
-
       const result =
-        await hrAdminService
-          .resetEmployeePassword(
-            empId,
-            newPass
-          );
+        await hrAdminService.resetEmployeePassword(
+          empId,
+          newPass
+        );
 
       return {
         success:
           result?.success === true,
+
         temporaryPasswordSet:
           result?.temporaryPasswordSet === true
       };
 
     } catch (error) {
-
       console.error(
         'Reset password failed:',
         error
@@ -626,16 +599,15 @@ export function AuthProvider({ children }) {
         token,
 
         usersList,
-
         employeesLoading,
 
         login,
         logout,
-
         changePassword,
 
         createEmployee,
-        toggleUserStatus,
+        importEmployees,
+        changeEmployeeStatus,
         resetUserPassword,
 
         loadEmployees
@@ -647,7 +619,6 @@ export function AuthProvider({ children }) {
 }
 
 export function useAuth() {
-
   const context =
     useContext(AuthContext);
 

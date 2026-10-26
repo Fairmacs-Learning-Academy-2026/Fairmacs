@@ -1,3 +1,4 @@
+
 package com.fairmacs.lms.entity;
 
 import jakarta.persistence.*;
@@ -15,6 +16,11 @@ public class Department {
 
     @Column(unique = true, nullable = false)
     private String name;
+
+    // Parent department relationship
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_department_id")
+    private Department parentDepartment;
 
     @Column
     private String headId;
@@ -37,27 +43,75 @@ public class Department {
 
     public Department() {}
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public String getHeadId() { return headId; }
-    public void setHeadId(String headId) { this.headId = headId; }
+    public String getName() {
+        return name;
+    }
 
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    public Integer getEmployeeCount() { return employeeCount; }
-    public void setEmployeeCount(Integer employeeCount) { this.employeeCount = employeeCount; }
+    public Department getParentDepartment() {
+        return parentDepartment;
+    }
 
-    public Integer getActiveCoursesCount() { return activeCoursesCount; }
-    public void setActiveCoursesCount(Integer activeCoursesCount) { this.activeCoursesCount = activeCoursesCount; }
+    public void setParentDepartment(Department parentDepartment) {
+        this.parentDepartment = parentDepartment;
+    }
 
-    public Double getCompletionRate() { return completionRate; }
-    public void setCompletionRate(Double completionRate) { this.completionRate = completionRate; }
+    public String getHeadId() {
+        return headId;
+    }
 
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setHeadId(String headId) {
+        this.headId = headId;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public Integer getEmployeeCount() {
+        return employeeCount;
+    }
+
+    public void setEmployeeCount(Integer employeeCount) {
+        this.employeeCount = employeeCount;
+    }
+
+    public Integer getActiveCoursesCount() {
+        return activeCoursesCount;
+    }
+
+    public void setActiveCoursesCount(Integer activeCoursesCount) {
+        this.activeCoursesCount = activeCoursesCount;
+    }
+
+    public Double getCompletionRate() {
+        return completionRate;
+    }
+
+    public void setCompletionRate(Double completionRate) {
+        this.completionRate = completionRate;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }

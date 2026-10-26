@@ -13,14 +13,13 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "users")
-@NoArgsConstructor
-@AllArgsConstructor
 public class User {
+
+    public User() {
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,6 +47,9 @@ public class User {
     private String designation;
 
     private String department;
+
+    @Column(name = "level", nullable = true)
+    private String level;
 
     private String branch;
 
@@ -91,6 +93,9 @@ public class User {
 
     public String getDesignation() { return designation; }
     public void setDesignation(String designation) { this.designation = designation; }
+
+    public String getLevel() { return level; }
+    public void setLevel(String level) { this.level = level; }
 
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }

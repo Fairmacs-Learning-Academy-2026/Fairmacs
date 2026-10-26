@@ -2,6 +2,7 @@ package com.fairmacs.lms.repository;
 
 import com.fairmacs.lms.entity.QuizAttempt;
 import org.springframework.data.jpa.repository.JpaRepository;
+import com.fairmacs.lms.entity.QuizAttempt;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,4 +26,11 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
     );
 
     long countByQuizIdAndUserId(Long quizId, Long userId);
+    
+    boolean existsByQuizId(Long quizId);
+
+    Optional<QuizAttempt>findTopByQuiz_IdAndUser_IdAndCompletedAtIsNotNullOrderByCompletedAtDesc(
+            Long quizId,
+            Long userId
+    );
 }

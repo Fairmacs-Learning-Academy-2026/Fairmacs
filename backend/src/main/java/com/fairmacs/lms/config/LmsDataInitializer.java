@@ -119,8 +119,8 @@ public class LmsDataInitializer implements CommandLineRunner {
                         "IMP-FND-001-M01-L01",
                         "Introduction to Import",
                         "VIDEO",
-                        "https://example.com/videos/import-introduction.mp4",
-                        "05:00",
+                        "https://www.youtube.com/watch?v=CgrKk5MiTvQ&t=106s",
+                        "10:11",
                         1,
                         module1
                 )
@@ -131,7 +131,7 @@ public class LmsDataInitializer implements CommandLineRunner {
                         "IMP-FND-001-M01-L02",
                         "Import Process Overview",
                         "VIDEO",
-                        "https://example.com/videos/import-process.mp4",
+                        "https://www.youtube.com/watch?v=CgrKk5MiTvQ&t=106s",
                         "07:00",
                         2,
                         module1
@@ -143,8 +143,8 @@ public class LmsDataInitializer implements CommandLineRunner {
                         "IMP-FND-001-M01-L03",
                         "Key Import Concepts",
                         "PDF",
-                        "https://example.com/documents/import-concepts.pdf",
-                        null,
+                        "https://www.youtube.com/watch?v=CgrKk5MiTvQ&t=106s",
+                        "10:11",
                         3,
                         module1
                 )
@@ -170,7 +170,7 @@ public class LmsDataInitializer implements CommandLineRunner {
                         "IMP-FND-001-M02-L01",
                         "Import Documents",
                         "VIDEO",
-                        "https://example.com/videos/import-documents.mp4",
+                        "https://www.youtube.com/watch?v=CgrKk5MiTvQ&t=106s",
                         "06:00",
                         1,
                         module2
@@ -182,7 +182,7 @@ public class LmsDataInitializer implements CommandLineRunner {
                         "IMP-FND-001-M02-L02",
                         "Bill of Entry",
                         "PDF",
-                        "https://example.com/documents/bill-of-entry.pdf",
+                        "https://www.youtube.com/watch?v=CgrKk5MiTvQ&t=106s",
                         null,
                         2,
                         module2

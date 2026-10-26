@@ -26,13 +26,24 @@ public class SecurityContextUtil {
     }
 
     public Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getDetails() instanceof JwtAuthenticationFilter.CurrentJwtClaims) {
-            return ((JwtAuthenticationFilter.CurrentJwtClaims) authentication.getDetails()).getUserId();
-        }
-        User user = getCurrentUser();
-        return user != null ? user.getId() : null;
+    Authentication authentication =
+            SecurityContextHolder.getContext().getAuthentication();
+
+    if (authentication != null
+            && authentication.getDetails()
+                    instanceof JwtAuthenticationFilter.CurrentJwtClaims) {
+
+        Long userId =
+                ((JwtAuthenticationFilter.CurrentJwtClaims)
+                        authentication.getDetails()).getUserId();
+
+        System.out.println("DEBUG authenticated user ID: " + userId);
+        return userId;
     }
+
+    User user = getCurrentUser();
+    return user != null ? user.getId() : null;
+}
 
     public String getCurrentUserRole() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

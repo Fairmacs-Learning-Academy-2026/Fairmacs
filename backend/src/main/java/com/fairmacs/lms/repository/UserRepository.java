@@ -21,13 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * Case-insensitive login using either:
      * - Corporate Email
      * - Employee ID
-     *
-     * Examples:
-     * EMP1001
-     * emp1001
-     * Emp1001
-     *
-     * will all find the same employee.
      */
     @Query("""
         SELECT u
@@ -39,6 +32,21 @@ public interface UserRepository extends JpaRepository<User, Long> {
             @Param("loginId") String loginId
     );
 
+    /*
+     * Find employees by department.
+     * Case-insensitive so:
+     *
+     * Operations
+     * operations
+     * OPERATIONS
+     *
+     * are treated as the same department.
+     */
+    List<User> findByDepartmentIgnoreCase(String department);
+
+    /*
+     * Existing method retained for compatibility.
+     */
     List<User> findByDepartment(String department);
 
     List<User> findByRole(Role role);
@@ -49,6 +57,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     );
 
     List<User> findByDepartmentAndRole(
+            String department,
+            Role role
+    );
+
+    List<User> findByDepartmentIgnoreCaseAndRole(
             String department,
             Role role
     );

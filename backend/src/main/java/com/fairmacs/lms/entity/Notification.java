@@ -10,7 +10,6 @@ public class Notification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     /*
      * User who should receive this notification.
      */

@@ -4,5 +4,6 @@ public enum EnrollmentStatus {
     NOT_STARTED,
     IN_PROGRESS,
     COMPLETED,
-    OVERDUE
+    OVERDUE,
+    REVOKED
 }

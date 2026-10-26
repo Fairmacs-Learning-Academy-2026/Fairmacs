@@ -12,12 +12,13 @@ function authHeaders() {
   const token = getAuthToken();
 
   return {
+    Accept: 'application/json',
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
-async function safeParseJson(response) {
+async function parseResponse(response) {
   const text = await response.text();
 
   if (!text) {
@@ -31,56 +32,81 @@ async function safeParseJson(response) {
   }
 }
 
-function extractData(payload, fallback = null) {
-  if (payload && typeof payload === 'object' && 'data' in payload) {
+function unwrap(payload) {
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    Object.prototype.hasOwnProperty.call(payload, 'data')
+  ) {
     return payload.data;
   }
 
-  return payload ?? fallback;
+  return payload;
+}
+
+function getErrorMessage(payload, fallback) {
+  if (payload && typeof payload === 'object') {
+    return payload.message || payload.error || fallback;
+  }
+
+  return fallback;
+}
+
+async function request(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...authHeaders(),
+      ...(options.headers || {}),
+    },
+  });
+
+  const payload = await parseResponse(response);
+
+  if (!response.ok) {
+    throw new Error(
+      getErrorMessage(
+        payload,
+        `Request failed (${response.status})`
+      )
+    );
+  }
+
+  return unwrap(payload);
 }
 
 export const enrollmentService = {
   // ---------------------------------------------------------
-  // ENROLL IN COURSE
+  // EMPLOYEE SELF-ENROLLMENT
   // ---------------------------------------------------------
-  enrollInCourse: async (courseId) => {
-    const response = await fetch(`${API_BASE_URL}/enrollments`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify({
-        courseId,
-      }),
-    });
+  enrollInCourse: async (input = {}) => {
+    const { courseId, courseCode } =
+      input !== null && typeof input === 'object'
+        ? input
+        : { courseId: input, courseCode: null };
 
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
-      throw new Error(
-        payload?.message || 'Failed to enroll in course'
-      );
+    if (!courseId && !courseCode) {
+      throw new Error('Course ID or course code is required.');
     }
 
-    return extractData(payload, { success: true });
+    return request(`${API_BASE_URL}/enrollments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        courseId: courseId || null,
+        courseCode: courseCode || null,
+      }),
+    });
   },
 
   // ---------------------------------------------------------
-  // GET CURRENT USER ENROLLMENTS
+  // CURRENT USER ENROLLMENTS
   // ---------------------------------------------------------
   getUserEnrollments: async () => {
-    const response = await fetch(`${API_BASE_URL}/enrollments/me`, {
+    const data = await request(`${API_BASE_URL}/enrollments/me`, {
       method: 'GET',
-      headers: authHeaders(),
     });
 
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
-      throw new Error(
-        payload?.message || 'Failed to fetch enrollments'
-      );
-    }
-
-    return extractData(payload, []);
+    return Array.isArray(data) ? data : [];
   },
 
   // ---------------------------------------------------------
@@ -93,11 +119,10 @@ export const enrollmentService = {
     watchedSeconds = 0,
     lastPositionSeconds = 0
   ) => {
-    const response = await fetch(
+    return request(
       `${API_BASE_URL}/progress/${enrollmentId}/${lessonId}`,
       {
         method: 'POST',
-        headers: authHeaders(),
         body: JSON.stringify({
           completionPercent,
           watchedSeconds,
@@ -105,164 +130,137 @@ export const enrollmentService = {
         }),
       }
     );
-
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
-      throw new Error(
-        payload?.message || 'Failed to update lesson progress'
-      );
-    }
-
-    return extractData(payload, { success: true });
   },
 
   // ---------------------------------------------------------
   // GET ALL LESSON PROGRESS FOR AN ENROLLMENT
   // ---------------------------------------------------------
   getEnrollmentProgress: async (enrollmentId) => {
-    const response = await fetch(
+    const data = await request(
       `${API_BASE_URL}/progress/${enrollmentId}`,
-      {
-        method: 'GET',
-        headers: authHeaders(),
-      }
+      { method: 'GET' }
     );
 
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
-      throw new Error(
-        payload?.message || 'Failed to fetch course progress'
-      );
-    }
-
-    return extractData(payload, []);
+    return Array.isArray(data) ? data : [];
   },
 
   // ---------------------------------------------------------
   // GET SINGLE LESSON PROGRESS
   // ---------------------------------------------------------
   getLessonProgress: async (enrollmentId, lessonId) => {
-    const response = await fetch(
+    return request(
       `${API_BASE_URL}/progress/${enrollmentId}/${lessonId}`,
-      {
-        method: 'GET',
-        headers: authHeaders(),
-      }
+      { method: 'GET' }
     );
-
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
-      throw new Error(
-        payload?.message || 'Failed to fetch lesson progress'
-      );
-    }
-
-    return extractData(payload, null);
   },
 
   // ---------------------------------------------------------
   // COMPLETE COURSE / GENERATE CERTIFICATE
+  // ---------------------------------------------------------
+  // NOTE:
+  // The current backend exposes certificate generation through
+  // POST /api/certificates/generate. Do not change this to a
+  // different endpoint unless the backend controller changes.
   // ---------------------------------------------------------
   completeCourse: async ({
     enrollmentId,
     courseId,
     courseCode,
     score,
-  }) => {
-    const response = await fetch(
-      `${API_BASE_URL}/certificates/generate`,
-      {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({
-          enrollmentId,
-          courseId,
-          courseCode,
-          score,
-        }),
-      }
-    );
-
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
+  } = {}) => {
+    if (!enrollmentId && !courseId && !courseCode) {
       throw new Error(
-        payload?.message || 'Failed to complete course'
+        'Enrollment ID, course ID, or course code is required.'
       );
     }
 
-    return extractData(payload, null);
+    return request(`${API_BASE_URL}/certificates/generate`, {
+      method: 'POST',
+      body: JSON.stringify({
+        enrollmentId: enrollmentId || null,
+        courseId: courseId || null,
+        courseCode: courseCode || null,
+        score,
+      }),
+    });
   },
 
   // ---------------------------------------------------------
   // VERIFY CERTIFICATE
   // ---------------------------------------------------------
   verifyCertificate: async (certificateId) => {
-    const response = await fetch(
-      `${API_BASE_URL}/certificates/verify/${certificateId}`,
-      {
-        method: 'GET',
-        headers: authHeaders(),
-      }
-    );
-
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
-      throw new Error(
-        payload?.message || 'Failed to verify certificate'
-      );
+    if (!certificateId) {
+      throw new Error('Certificate ID is required.');
     }
 
-    return extractData(payload, null);
+    return request(
+      `${API_BASE_URL}/certificates/verify/${encodeURIComponent(
+        certificateId
+      )}`,
+      { method: 'GET' }
+    );
   },
 
   // ---------------------------------------------------------
   // GET USER CERTIFICATES
   // ---------------------------------------------------------
   getUserCertificates: async (userId) => {
-    const response = await fetch(
-      `${API_BASE_URL}/certificates/user/${userId}`,
-      {
-        method: 'GET',
-        headers: authHeaders(),
-      }
-    );
-
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
-      throw new Error(
-        payload?.message || 'Failed to fetch certificates'
-      );
+    if (!userId) {
+      throw new Error('User ID is required.');
     }
 
-    return extractData(payload, []);
+    const data = await request(
+      `${API_BASE_URL}/certificates/user/${encodeURIComponent(userId)}`,
+      { method: 'GET' }
+    );
+
+    return Array.isArray(data) ? data : [];
   },
 
+
+  // ---------------------------------------------------------
+// HR: ASSIGN COURSE TO DEPARTMENT
+// ---------------------------------------------------------
+  assignCourseToDepartment: async ({
+    department,
+    courseId,
+    courseCode,
+    dueDate,
+    trainingType = 'MANDATORY',
+  } = {}) => {
+    if (!department) {
+      throw new Error('Department is required.');
+    }
+
+    if (!courseId && !courseCode) {
+      throw new Error('Course ID or course code is required.');
+    }
+
+      return request(
+      `${API_BASE_URL}/enrollments/assign-department`,
+        {
+        method: 'POST',
+        body: JSON.stringify({
+          department,
+          courseId: courseId || null,
+          courseCode: courseCode || null,
+          dueDate: dueDate || null,
+          trainingType,
+        }),
+      }
+    );
+  },
   // ---------------------------------------------------------
   // GET RECENT CERTIFICATES
   // ---------------------------------------------------------
   getRecentCertificates: async (limit = 10) => {
-    const response = await fetch(
-      `${API_BASE_URL}/certificates/recent?limit=${limit}`,
-      {
-        method: 'GET',
-        headers: authHeaders(),
-      }
+    const safeLimit = Math.max(1, Number(limit) || 10);
+
+    const data = await request(
+      `${API_BASE_URL}/certificates/recent?limit=${safeLimit}`,
+      { method: 'GET' }
     );
 
-    const payload = await safeParseJson(response);
-
-    if (!response.ok) {
-      throw new Error(
-        payload?.message || 'Failed to fetch recent certificates'
-      );
-    }
-
-    return extractData(payload, []);
+    return Array.isArray(data) ? data : [];
   },
 };

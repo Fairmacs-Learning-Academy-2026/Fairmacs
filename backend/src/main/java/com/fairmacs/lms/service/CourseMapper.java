@@ -7,21 +7,29 @@ import com.fairmacs.lms.entity.Course;
 import com.fairmacs.lms.entity.Enrollment;
 import com.fairmacs.lms.entity.Lesson;
 import com.fairmacs.lms.entity.Module;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fairmacs.lms.entity.Quiz;
+import com.fairmacs.lms.entity.QuizType;
+import com.fairmacs.lms.repository.QuizRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
 @Component
 public class CourseMapper {
 
     private final ObjectMapper objectMapper;
+    private final QuizRepository quizRepository;
 
-    public CourseMapper(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
-    }
+    public CourseMapper(
+        ObjectMapper objectMapper,
+        QuizRepository quizRepository) {
+
+    this.objectMapper = objectMapper;
+    this.quizRepository = quizRepository;
+}
 
     public CourseDTO toSummary(
             Course course,
@@ -156,6 +164,8 @@ public class CourseMapper {
 
         CourseDTO.ModuleDTO dto =
                 new CourseDTO.ModuleDTO();
+        
+        dto.setDbId(module.getId());
 
         dto.setId(
                 module.getModuleId()
@@ -225,53 +235,41 @@ public class CourseMapper {
                 lesson.getContentUrl()
         );
 
+        dto.setWorkdriveFileId(
+                lesson.getWorkdriveFileId()
+        );
+
         return dto;
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> parseQuiz(
-            Course course) {
+    private Map<String, Object> parseQuiz(Course course) {
+        List<Quiz> finalQuizzes =
+                quizRepository.findByCourseIdAndType(
+                        course.getId(),
+                        QuizType.FINAL
+                );
 
-        if (course.getQuizJson() == null ||
-                course.getQuizJson().isBlank()) {
-
-            return Map.of(
-                    "id",
-                    "q-" + course.getCourseId(),
-
-                    "title",
-                    course.getTitle() +
-                            " Assessment",
-
-                    "timeLimitMinutes",
-                    10,
-
-                    "questions",
-                    java.util.List.of()
-            );
+        if (finalQuizzes == null || finalQuizzes.isEmpty()) {
+            return null;
         }
 
-        try {
+        Quiz quiz = finalQuizzes.get(0);
+        Map<String, Object> quizData = new java.util.HashMap<>();
 
-            return objectMapper.readValue(
-                    course.getQuizJson(),
-                    new TypeReference<Map<String, Object>>() {
-                    }
-            );
+        quizData.put("id", quiz.getId());
+        quizData.put("quizId", quiz.getQuizId());
+        quizData.put("type", quiz.getType().name());
+        quizData.put("title", quiz.getTitle());
 
-        } catch (Exception e) {
-
-            return Map.of(
-                    "id",
-                    "q-" + course.getCourseId(),
-
-                    "title",
-                    course.getTitle() +
-                            " Assessment",
-
-                    "questions",
-                    java.util.List.of()
-            );
+        if (quiz.getPassingScore() != null) {
+            quizData.put("passingScore", quiz.getPassingScore());
         }
+
+        if (quiz.getTimeLimitMinutes() != null) {
+            quizData.put("timeLimitMinutes", quiz.getTimeLimitMinutes());
+        }
+
+        return quizData;
     }
 }

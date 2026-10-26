@@ -32,218 +32,328 @@ import java.util.stream.Collectors;
 @Service
 public class CatalogService {
 
-        private final CategoryRepository categoryRepository;
-        private final CourseRepository courseRepository;
-        private final EnrollmentRepository enrollmentRepository;
-        private final LearningPathRepository learningPathRepository;
-        private final CertificateRepository certificateRepository;
-        private final CourseMapper courseMapper;
-        private final RecommendationService recommendationService;
-        private final SecurityContextUtil securityContextUtil;
+    private static final Map<String, Integer> LEVEL_RANK = Map.of(
+            "L0", 0,
+            "L1", 1,
+            "L2", 2,
+            "L3", 3,
+            "L4", 4
+    );
 
-        public CatalogService(CategoryRepository categoryRepository,
-                        CourseRepository courseRepository,
-                        EnrollmentRepository enrollmentRepository,
-                        LearningPathRepository learningPathRepository,
-                        CertificateRepository certificateRepository,
-                        CourseMapper courseMapper,
-                        RecommendationService recommendationService,
-                        SecurityContextUtil securityContextUtil) {
-                this.categoryRepository = categoryRepository;
-                this.courseRepository = courseRepository;
-                this.enrollmentRepository = enrollmentRepository;
-                this.learningPathRepository = learningPathRepository;
-                this.certificateRepository = certificateRepository;
-                this.courseMapper = courseMapper;
-                this.recommendationService = recommendationService;
-                this.securityContextUtil = securityContextUtil;
+    private final CategoryRepository categoryRepository;
+    private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final LearningPathRepository learningPathRepository;
+    private final CertificateRepository certificateRepository;
+    private final CourseMapper courseMapper;
+    private final RecommendationService recommendationService;
+    private final SecurityContextUtil securityContextUtil;
+
+    public CatalogService(
+            CategoryRepository categoryRepository,
+            CourseRepository courseRepository,
+            EnrollmentRepository enrollmentRepository,
+            LearningPathRepository learningPathRepository,
+            CertificateRepository certificateRepository,
+            CourseMapper courseMapper,
+            RecommendationService recommendationService,
+            SecurityContextUtil securityContextUtil) {
+        this.categoryRepository = categoryRepository;
+        this.courseRepository = courseRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.learningPathRepository = learningPathRepository;
+        this.certificateRepository = certificateRepository;
+        this.courseMapper = courseMapper;
+        this.recommendationService = recommendationService;
+        this.securityContextUtil = securityContextUtil;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CategoryDTO> listCategories() {
+        Map<String, Long> counts = courseRepository.findActiveWithCategory().stream()
+                .filter(c -> c.getCatalogCategory() != null)
+                .collect(Collectors.groupingBy(
+                        c -> c.getCatalogCategory().getSlug(),
+                        Collectors.counting()));
+
+        return categoryRepository.findAllByOrderBySortOrderAsc().stream()
+                .map(cat -> courseMapper.toCategory(
+                        cat,
+                        counts.getOrDefault(cat.getSlug(), 0L).intValue()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CourseDTO> listCourses(String search, String categorySlug) {
+        User user = securityContextUtil.getCurrentUser();
+
+        List<Enrollment> enrollments = user == null
+                ? List.of()
+                : enrollmentRepository.findByUserIdWithCourse(user.getId()).stream()
+                        .filter(e -> e.getStatus() != EnrollmentStatus.REVOKED)
+                        .toList();
+
+        Map<Long, Enrollment> byCourse = enrollments.stream()
+                .collect(Collectors.toMap(
+                        e -> e.getCourse().getId(),
+                        Function.identity(),
+                        (a, b) -> a));
+
+        Set<Long> enrolledIds = new HashSet<>(byCourse.keySet());
+
+        Set<Long> recommendedIds = user == null
+                ? Set.of()
+                : recommendationService.recommendFor(user, enrolledIds).stream()
+                        .map(Course::getId)
+                        .collect(Collectors.toSet());
+
+        String slug = (categorySlug == null
+                || categorySlug.isBlank()
+                || "all".equalsIgnoreCase(categorySlug))
+                ? null
+                : categorySlug;
+
+        return courseRepository.searchCatalog(search, slug).stream()
+                // Existing enrollments remain visible so employees can continue training.
+                .filter(course -> isCourseVisibleToUser(user, course, byCourse.containsKey(course.getId())))
+                .sorted(Comparator.comparing((Course c) -> !Boolean.TRUE.equals(c.getFoundation()))
+                        .thenComparing(Course::getTitle))
+                .map(course -> {
+                    Enrollment enrollment = byCourse.get(course.getId());
+                    boolean mandatory = (enrollment != null
+                            && enrollment.getEnrollmentType() == EnrollmentType.MANDATORY)
+                            || Boolean.TRUE.equals(course.getFoundation());
+                    boolean recommended = recommendedIds.contains(course.getId());
+                    String type = mandatory ? "MANDATORY"
+                            : (recommended ? "RECOMMENDED" : "OPTIONAL");
+                    return courseMapper.toSummary(course, enrollment, type);
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public CourseDTO getCourse(String courseCode) {
+        User user = securityContextUtil.getCurrentUser();
+
+        Course course = courseRepository.findDetailByCourseId(courseCode)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Course", "courseId", courseCode));
+
+        Enrollment currentEnrollment = user == null ? null
+                : enrollmentRepository.findByUserIdAndCourseId(user.getId(), course.getId())
+                        .filter(e -> e.getStatus() != EnrollmentStatus.REVOKED)
+                        .orElse(null);
+        boolean alreadyEnrolled = currentEnrollment != null;
+
+        if (!isCourseVisibleToUser(user, course, alreadyEnrolled)) {
+            throw new SecurityException(
+                    "This course is not available for your employee level.");
         }
 
-        @Transactional(readOnly = true)
-        public List<CategoryDTO> listCategories() {
-                Map<String, Long> counts = courseRepository.findActiveWithCategory().stream()
-                                .filter(c -> c.getCatalogCategory() != null)
-                                .collect(Collectors.groupingBy(c -> c.getCatalogCategory().getSlug(),
-                                                Collectors.counting()));
-                return categoryRepository.findAllByOrderBySortOrderAsc().stream()
-                                .map(cat -> courseMapper.toCategory(cat,
-                                                counts.getOrDefault(cat.getSlug(), 0L).intValue()))
-                                .collect(Collectors.toList());
+        Enrollment enrollment = currentEnrollment;
+
+        String type = assignmentType(course, enrollment, user);
+        return courseMapper.toDetail(course, enrollment, type);
+    }
+
+    /**
+     * Employees see courses matching their exact level by default.
+     * Explicit enrollment/assignment is the exception and keeps that course visible.
+     * HR Admin and Trainers can see courses across levels.
+     */
+    private boolean isCourseVisibleToUser(User user, Course course, boolean explicitlyAssigned) {
+        if (user == null) {
+            return true;
         }
 
-        @Transactional(readOnly = true)
-        public List<CourseDTO> listCourses(String search, String categorySlug) {
-                User user = securityContextUtil.getCurrentUser();
-                List<Enrollment> enrollments = user == null ? List.of()
-                                : enrollmentRepository.findByUserIdWithCourse(user.getId());
-                Map<Long, Enrollment> byCourse = enrollments.stream()
-                                .collect(Collectors.toMap(e -> e.getCourse().getId(), Function.identity(),
-                                                (a, b) -> a));
-                Set<Long> enrolledIds = new HashSet<>(byCourse.keySet());
-                Set<Long> recommendedIds = user == null ? Set.of()
-                                : recommendationService.recommendFor(user, enrolledIds).stream()
-                                                .map(Course::getId)
-                                                .collect(Collectors.toSet());
-
-                String slug = (categorySlug == null || categorySlug.isBlank() || "all".equalsIgnoreCase(categorySlug))
-                                ? null
-                                : categorySlug;
-                return courseRepository.searchCatalog(search, slug).stream()
-                                .sorted(Comparator.comparing((Course c) -> !Boolean.TRUE.equals(c.getFoundation()))
-                                                .thenComparing(Course::getTitle))
-                                .map(course -> {
-                                        Enrollment enrollment = byCourse.get(course.getId());
-                                        boolean mandatory = (enrollment != null
-                                                        && enrollment.getEnrollmentType() == EnrollmentType.MANDATORY)
-                                                        || Boolean.TRUE.equals(course.getFoundation());
-                                        boolean recommended = recommendedIds.contains(course.getId());
-                                        String type = mandatory ? "MANDATORY"
-                                                        : (recommended ? "RECOMMENDED" : "OPTIONAL");
-                                        return courseMapper.toSummary(course, enrollment, type);
-                                })
-                                .collect(Collectors.toList());
+        if (user.getRole() != null
+                && (user.getRole().name().equals("HR_ADMIN")
+                || user.getRole().name().equals("TRAINER"))) {
+            return true;
         }
 
-        @Transactional(readOnly = true)
-        public CourseDTO getCourse(String courseCode) {
-                User user = securityContextUtil.getCurrentUser();
-                Course course = courseRepository.findDetailByCourseId(courseCode)
-                                .orElseThrow(() -> new ResourceNotFoundException("Course", "courseId", courseCode));
-                Enrollment enrollment = null;
-                if (user != null) {
-                        enrollment = enrollmentRepository.findByUserIdAndCourseId(user.getId(), course.getId())
-                                        .orElse(null);
-                }
-                String type = assignmentType(course, enrollment, user);
-                return courseMapper.toDetail(course, enrollment, type);
+        if (explicitlyAssigned) {
+            return true;
         }
 
-        @Transactional(readOnly = true)
-        public List<LearningPathDTO> listLearningPaths() {
-                User user = securityContextUtil.getCurrentUser();
-                Map<Long, Enrollment> byCourse = Map.of();
-                if (user != null) {
-                        byCourse = enrollmentRepository.findByUserIdWithCourse(user.getId()).stream()
-                                        .collect(Collectors.toMap(e -> e.getCourse().getId(), Function.identity(),
-                                                        (a, b) -> a));
-                }
-                Map<Long, Enrollment> enrollments = byCourse;
-                return learningPathRepository.findAllWithItems().stream()
-                                .map(path -> toPathDto(path, enrollments, user)).toList();
+        String employeeLevel = normalizeLevel(user.getLevel());
+        String courseLevel = normalizeLevel(course.getLevel());
+
+        // Unconfigured or invalid levels are not available by default to employees.
+        return employeeLevel != null && courseLevel != null
+                && employeeLevel.equals(courseLevel);
+    }
+
+    private String normalizeLevel(String level) {
+        if (level == null || level.isBlank()) {
+            return null;
         }
 
-        @Transactional(readOnly = true)
-        public LearningDashboardDTO getDashboard() {
-                User user = securityContextUtil.getCurrentUser();
-                if (user == null) {
-                        throw new ResourceNotFoundException("User", "session", "current");
-                }
+        String normalized = level.trim().toUpperCase();
+        return LEVEL_RANK.containsKey(normalized) ? normalized : null;
+    }
 
-                List<Enrollment> enrollments = enrollmentRepository.findByUserIdWithCourse(user.getId());
-                Map<Long, Enrollment> byCourse = enrollments.stream()
-                                .collect(Collectors.toMap(e -> e.getCourse().getId(), Function.identity(),
-                                                (a, b) -> a));
-                Set<Long> enrolledIds = new HashSet<>(byCourse.keySet());
+    @Transactional(readOnly = true)
+    public List<LearningPathDTO> listLearningPaths() {
+        User user = securityContextUtil.getCurrentUser();
 
-                List<Course> recommended = recommendationService.recommendFor(user, enrolledIds);
-
-                LearningDashboardDTO dto = new LearningDashboardDTO();
-                dto.setName(user.getName());
-                dto.setDepartment(user.getDepartment());
-                dto.setDesignation(user.getDesignation());
-                dto.setBranch(user.getBranch());
-
-                List<Enrollment> mandatory = enrollments.stream()
-                                .filter(e -> e.getEnrollmentType() == EnrollmentType.MANDATORY)
-                                .toList();
-                long mandatoryDone = mandatory.stream().filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED)
-                                .count();
-                dto.setMandatoryPercent(mandatory.isEmpty() ? 100
-                                : (int) Math.round((mandatoryDone * 100.0) / mandatory.size()));
-                dto.setCompletedCourses((int) enrollments.stream()
-                                .filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED).count());
-                dto.setInProgress((int) enrollments.stream().filter(e -> e.getStatus() == EnrollmentStatus.IN_PROGRESS)
-                                .count());
-                dto.setCertificates(certificateRepository.findByUserId(user.getId()).size());
-
-                double hours = enrollments.stream()
-                                .filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED
-                                                || e.getStatus() == EnrollmentStatus.IN_PROGRESS)
-                                .mapToDouble(e -> {
-                                        Double h = e.getCourse().getDurationHours();
-                                        int pct = e.getProgressPercent() == null ? 0 : e.getProgressPercent();
-                                        return (h == null ? 1.0 : h) * (pct / 100.0);
-                                })
-                                .sum();
-                int totalMinutes = (int) Math.round(hours * 60);
-                dto.setLearningHours((totalMinutes / 60) + "h " + (totalMinutes % 60) + "m");
-
-                dto.setMandatory(mandatory.stream()
-                                .map(e -> courseMapper.toSummary(e.getCourse(), e, "MANDATORY"))
-                                .toList());
-                dto.setEnrolled(enrollments.stream()
-                                .map(e -> courseMapper.toSummary(e.getCourse(), e,
-                                                e.getEnrollmentType() == EnrollmentType.MANDATORY ? "MANDATORY"
-                                                                : "OPTIONAL"))
-                                .toList());
-                dto.setRecommended(recommended.stream()
-                                .limit(6)
-                                .map(c -> courseMapper.toSummary(c, null, "RECOMMENDED"))
-                                .toList());
-                dto.setCategories(listCategories().stream()
-                                .filter(c -> !Boolean.TRUE.equals(c.getFoundationTrack()))
-                                .toList());
-
-                enrollments.stream()
-                                .filter(e -> e.getStatus() == EnrollmentStatus.IN_PROGRESS)
-                                .max(Comparator.comparing(
-                                                e -> e.getProgressPercent() == null ? 0 : e.getProgressPercent()))
-                                .ifPresent(e -> dto.setContinueLearning(courseMapper.toSummary(e.getCourse(), e,
-                                                e.getEnrollmentType() == EnrollmentType.MANDATORY ? "MANDATORY"
-                                                                : "OPTIONAL")));
-                if (dto.getContinueLearning() == null) {
-                        mandatory.stream()
-                                        .filter(e -> e.getStatus() != EnrollmentStatus.COMPLETED)
-                                        .findFirst()
-                                        .ifPresent(e -> dto.setContinueLearning(
-                                                        courseMapper.toSummary(e.getCourse(), e, "MANDATORY")));
-                }
-                return dto;
+        Map<Long, Enrollment> byCourse = Map.of();
+        if (user != null) {
+            byCourse = enrollmentRepository.findByUserIdWithCourse(user.getId()).stream()
+                    .filter(e -> e.getStatus() != EnrollmentStatus.REVOKED)
+                    .collect(Collectors.toMap(
+                            e -> e.getCourse().getId(),
+                            Function.identity(),
+                            (a, b) -> a));
         }
 
-        private LearningPathDTO toPathDto(LearningPath path, Map<Long, Enrollment> enrollments, User user) {
-                LearningPathDTO dto = new LearningPathDTO();
-                dto.setId(path.getPathCode());
-                dto.setTitle(path.getTitle());
-                dto.setDescription(path.getDescription());
-                dto.setSuggested(Boolean.TRUE.equals(path.getSuggested()));
-                dto.setCourses(path.getItems().stream()
-                                .sorted(Comparator.comparing(i -> i.getOrderIndex() == null ? 0 : i.getOrderIndex()))
-                                .map(item -> {
-                                        Course course = item.getCourse();
-                                        Enrollment enrollment = enrollments.get(course.getId());
-                                        return courseMapper.toSummary(course, enrollment,
-                                                        assignmentType(course, enrollment, user));
-                                })
-                                .toList());
-                dto.setCourseCount(dto.getCourses().size());
-                return dto;
+        Map<Long, Enrollment> enrollments = byCourse;
+        return learningPathRepository.findAllWithItems().stream()
+                .map(path -> toPathDto(path, enrollments, user))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public LearningDashboardDTO getDashboard() {
+        User user = securityContextUtil.getCurrentUser();
+        if (user == null) {
+            throw new ResourceNotFoundException("User", "session", "current");
         }
 
-        private String assignmentType(Course course, Enrollment enrollment, User user) {
-                if (enrollment != null && enrollment.getEnrollmentType() == EnrollmentType.MANDATORY) {
-                        return "MANDATORY";
-                }
-                if (Boolean.TRUE.equals(course.getFoundation())) {
-                        return "MANDATORY";
-                }
-                if (user != null) {
-                        boolean recommended = recommendationService.recommendFor(user, Set.of()).stream()
-                                        .anyMatch(c -> c.getId().equals(course.getId()));
-                        if (recommended) {
-                                return "RECOMMENDED";
-                        }
-                }
-                return "OPTIONAL";
+        List<Enrollment> enrollments = enrollmentRepository.findByUserIdWithCourse(user.getId()).stream()
+                .filter(e -> e.getStatus() != EnrollmentStatus.REVOKED)
+                .toList();
+        Map<Long, Enrollment> byCourse = enrollments.stream()
+                .collect(Collectors.toMap(
+                        e -> e.getCourse().getId(),
+                        Function.identity(),
+                        (a, b) -> a));
+        Set<Long> enrolledIds = new HashSet<>(byCourse.keySet());
+
+        List<Course> recommended = recommendationService.recommendFor(user, enrolledIds);
+
+        LearningDashboardDTO dto = new LearningDashboardDTO();
+        dto.setName(user.getName());
+        dto.setDepartment(user.getDepartment());
+        dto.setDesignation(user.getDesignation());
+        dto.setBranch(user.getBranch());
+
+        List<Enrollment> mandatory = enrollments.stream()
+                .filter(e -> e.getEnrollmentType() == EnrollmentType.MANDATORY)
+                .toList();
+
+        long mandatoryDone = mandatory.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED)
+                .count();
+
+        dto.setMandatoryPercent(mandatory.isEmpty()
+                ? 100
+                : (int) Math.round((mandatoryDone * 100.0) / mandatory.size()));
+
+        dto.setCompletedCourses((int) enrollments.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED)
+                .count());
+
+        dto.setInProgress((int) enrollments.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.IN_PROGRESS)
+                .count());
+
+        dto.setCertificates(certificateRepository.findByUserId(user.getId()).size());
+
+        double hours = enrollments.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED
+                        || e.getStatus() == EnrollmentStatus.IN_PROGRESS)
+                .mapToDouble(e -> {
+                    Double h = e.getCourse().getDurationHours();
+                    int pct = e.getProgressPercent() == null ? 0 : e.getProgressPercent();
+                    return (h == null ? 1.0 : h) * (pct / 100.0);
+                })
+                .sum();
+
+        int totalMinutes = (int) Math.round(hours * 60);
+        dto.setLearningHours((totalMinutes / 60) + "h " + (totalMinutes % 60) + "m");
+
+        dto.setMandatory(mandatory.stream()
+                .map(e -> courseMapper.toSummary(e.getCourse(), e, "MANDATORY"))
+                .toList());
+
+        dto.setEnrolled(enrollments.stream()
+                .map(e -> courseMapper.toSummary(
+                        e.getCourse(), e,
+                        e.getEnrollmentType() == EnrollmentType.MANDATORY ? "MANDATORY" : "OPTIONAL"))
+                .toList());
+
+        dto.setRecommended(recommended.stream()
+                .filter(course -> isCourseVisibleToUser(user, course, false))
+                .limit(6)
+                .map(c -> courseMapper.toSummary(c, null, "RECOMMENDED"))
+                .toList());
+
+        dto.setCategories(listCategories().stream()
+                .filter(c -> !Boolean.TRUE.equals(c.getFoundationTrack()))
+                .toList());
+
+        enrollments.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.IN_PROGRESS)
+                .max(Comparator.comparing(
+                        e -> e.getProgressPercent() == null ? 0 : e.getProgressPercent()))
+                .ifPresent(e -> dto.setContinueLearning(
+                        courseMapper.toSummary(
+                                e.getCourse(), e,
+                                e.getEnrollmentType() == EnrollmentType.MANDATORY ? "MANDATORY" : "OPTIONAL")));
+
+        if (dto.getContinueLearning() == null) {
+            mandatory.stream()
+                    .filter(e -> e.getStatus() != EnrollmentStatus.COMPLETED)
+                    .findFirst()
+                    .ifPresent(e -> dto.setContinueLearning(
+                            courseMapper.toSummary(e.getCourse(), e, "MANDATORY")));
         }
+
+        return dto;
+    }
+
+    private LearningPathDTO toPathDto(
+            LearningPath path,
+            Map<Long, Enrollment> enrollments,
+            User user) {
+        LearningPathDTO dto = new LearningPathDTO();
+        dto.setId(path.getPathCode());
+        dto.setTitle(path.getTitle());
+        dto.setDescription(path.getDescription());
+        dto.setSuggested(Boolean.TRUE.equals(path.getSuggested()));
+        dto.setCourses(path.getItems().stream()
+                .sorted(Comparator.comparing(
+                        i -> i.getOrderIndex() == null ? 0 : i.getOrderIndex()))
+                .map(item -> {
+                    Course course = item.getCourse();
+                    Enrollment enrollment = enrollments.get(course.getId());
+                    if (!isCourseVisibleToUser(user, course, enrollment != null)) {
+                        return null;
+                    }
+                    return courseMapper.toSummary(
+                            course, enrollment, assignmentType(course, enrollment, user));
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList());
+        dto.setCourseCount(dto.getCourses().size());
+        return dto;
+    }
+
+    private String assignmentType(Course course, Enrollment enrollment, User user) {
+        if (enrollment != null && enrollment.getEnrollmentType() == EnrollmentType.MANDATORY) {
+            return "MANDATORY";
+        }
+        if (Boolean.TRUE.equals(course.getFoundation())) {
+            return "MANDATORY";
+        }
+        if (user != null) {
+            boolean recommended = recommendationService.recommendFor(user, Set.of()).stream()
+                    .anyMatch(c -> c.getId().equals(course.getId()));
+            if (recommended) {
+                return "RECOMMENDED";
+            }
+        }
+        return "OPTIONAL";
+    }
 }

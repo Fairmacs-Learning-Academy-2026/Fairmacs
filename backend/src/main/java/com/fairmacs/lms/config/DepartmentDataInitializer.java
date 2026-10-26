@@ -1,3 +1,4 @@
+
 package com.fairmacs.lms.config;
 
 import com.fairmacs.lms.entity.Department;
@@ -12,122 +13,78 @@ public class DepartmentDataInitializer implements CommandLineRunner {
 
     private final DepartmentRepository departmentRepository;
 
-    public DepartmentDataInitializer(DepartmentRepository departmentRepository) {
+    public DepartmentDataInitializer(
+            DepartmentRepository departmentRepository) {
         this.departmentRepository = departmentRepository;
     }
 
     @Override
     public void run(String... args) {
 
+        // Never seed over an existing department master.
+        // Existing records will be migrated separately.
+        if (departmentRepository.count() > 0) {
+            System.out.println(
+                    "Department master already contains records. "
+                    + "Skipping department initialization."
+            );
+            return;
+        }
+
         List<DepartmentData> departments = List.of(
-
                 new DepartmentData(
-                        "Company & Industry Basics",
-                        "Foundation training covering Fairmacs, freight forwarding and the logistics industry."
+                        "Human Resource",
+                        "Human resources and employee administration."
                 ),
-
                 new DepartmentData(
-                        "Import",
-                        "Import-related fundamentals, processes and business knowledge."
+                        "Accounts",
+                        "Accounting, billing, payments and finance."
                 ),
-
                 new DepartmentData(
-                        "Export",
-                        "Export-related fundamentals, processes and business knowledge."
+                        "Admin",
+                        "Administrative and workplace support."
                 ),
-
                 new DepartmentData(
-                        "Sales & Business Development",
-                        "Customer acquisition, business development, sales and relationship management."
+                        "Operations",
+                        "Import, export and freight forwarding operations."
                 ),
-
-                new DepartmentData(
-                        "Pricing",
-                        "Freight pricing, quotations, rate management and commercial calculations."
-                ),
-
                 new DepartmentData(
                         "Documentation",
-                        "Shipping documentation, document preparation, verification and processing."
+                        "Shipping documents and document processing."
                 ),
-
-                new DepartmentData(
-                        "Operations – Import",
-                        "Operational activities related to import shipments and cargo handling."
-                ),
-
-                new DepartmentData(
-                        "Operations – Export",
-                        "Operational activities related to export shipments and cargo handling."
-                ),
-
-                new DepartmentData(
-                        "Customs & Compliance",
-                        "Customs procedures, regulatory requirements, trade compliance and related processes."
-                ),
-
-                new DepartmentData(
-                        "Accounts & Finance",
-                        "Finance, billing, collections, payments and accounting-related activities."
-                ),
-
                 new DepartmentData(
                         "Customer Service",
-                        "Customer communication, shipment updates, issue resolution and service management."
+                        "Customer communication and service management."
                 ),
-
                 new DepartmentData(
-                        "Transportation & Logistics",
-                        "Transportation planning, movement of cargo and logistics coordination."
+                        "Pricing",
+                        "Freight pricing, quotations and rate management."
                 ),
-
                 new DepartmentData(
-                        "Warehouse & CFS",
-                        "Warehouse operations, container freight station activities and cargo handling."
+                        "Sales",
+                        "Sales, business development and customer acquisition."
                 ),
-
                 new DepartmentData(
-                        "Quality & Process",
-                        "Quality management, process improvement, SOPs and operational standards."
-                ),
-
-                new DepartmentData(
-                        "HR & Administration",
-                        "Human resources, employee administration, policies and workplace processes."
-                ),
-
-                new DepartmentData(
-                        "IT & Information Security",
-                        "IT systems, technology operations, cybersecurity and information security."
+                        "General / Common",
+                        "Common training applicable across departments."
                 )
         );
 
-        int createdCount = 0;
-
         for (DepartmentData data : departments) {
+            Department department = new Department();
+            department.setName(data.name());
+            department.setDescription(data.description());
+            department.setEmployeeCount(0);
+            department.setActiveCoursesCount(0);
+            department.setCompletionRate(0.0);
 
-            if (!departmentRepository.existsByNameIgnoreCase(data.name())) {
-
-                Department department = new Department();
-
-                department.setName(data.name());
-                department.setDescription(data.description());
-
-                department.setEmployeeCount(0);
-                department.setActiveCoursesCount(0);
-                department.setCompletionRate(0.0);
-
-                departmentRepository.save(department);
-
-                createdCount++;
-            }
+            departmentRepository.save(department);
         }
 
-        System.out.println("========================================");
-        System.out.println("Department initialization completed.");
-        System.out.println("New departments created: " + createdCount);
-        System.out.println("Total departments: " + departmentRepository.count());
-        System.out.println("========================================");
+        System.out.println(
+                "Initialized " + departments.size()
+                + " Fairmacs departments."
+        );
     }
 
     private record DepartmentData(

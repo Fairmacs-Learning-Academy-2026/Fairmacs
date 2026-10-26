@@ -1,6 +1,12 @@
 package com.fairmacs.lms.entity;
 
 public enum UserStatus {
+
     ACTIVE,
-    DISABLED
+
+    INACTIVE,
+
+    ON_LEAVE,
+
+    TERMINATED
 }

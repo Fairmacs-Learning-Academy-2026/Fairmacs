@@ -13,9 +13,9 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
   const employeeDesignation = certData.designation || user?.designation || 'Designation';
 
   const courseTitle = certData.courseTitle || 'Freight Forwarding Fundamentals';
-  const score = certData.score ?? 92;
-  const certId = certData.certId || certData.certificateId || 'FM-CERT-00000';
-  const issueDate = certData.issueDate || certData.issuedDate || '20 Sep 2026';
+  const score = certData.score;
+  const certId = certData.certId || certData.certificateId;
+  const issueDate = certData.issueDate || certData.issuedDate;
 
   const handlePrint = () => {
     window.print();

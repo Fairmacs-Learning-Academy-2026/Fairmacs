@@ -205,11 +205,25 @@ public class CourseDTO {
         this.quiz = quiz;
     }
 
+    
     public static class ModuleDTO {
 
+    // Numeric database ID: used by quiz and progress APIs.
+        private Long dbId;
+
+    // Existing business ID: retain for backward compatibility.
         private String id;
+
         private String title;
         private List<LessonDTO> lessons = new ArrayList<>();
+
+        public Long getDbId() {
+            return dbId;
+        }
+
+        public void setDbId(Long dbId) {
+            this.dbId = dbId;
+        }
 
         public String getId() {
             return id;
@@ -256,6 +270,11 @@ public class CourseDTO {
         private String type;
         private String duration;
         private String assetUrl;
+        private String workdriveFileId;
+
+        public String getWorkdriveFileId() {return workdriveFileId;}
+
+        public void setWorkdriveFileId(String workdriveFileId) {this.workdriveFileId = workdriveFileId;}
 
         public Long getDbId() {
             return dbId;

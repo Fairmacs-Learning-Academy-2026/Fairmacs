@@ -1,3 +1,4 @@
+
 package com.fairmacs.lms.entity;
 
 import jakarta.persistence.*;
@@ -23,6 +24,9 @@ public class Course {
 
     @Column(nullable = false)
     private String category;
+
+    @Column(name = "draft_payload", columnDefinition = "TEXT")
+    private String draftPayload;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
@@ -61,6 +65,13 @@ public class Course {
     @Column
     private Boolean active = true;
 
+    @Column(name = "is_draft", nullable = false)
+    private Boolean draft = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", foreignKey = @ForeignKey(name = "fk_courses_created_by"))
+    private User createdBy;
+
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Module> modules;
 
@@ -71,6 +82,17 @@ public class Course {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "certificate_eligible", nullable = false)
+    private Boolean certificateEligible = false;
+
+    public Boolean getCertificateEligible() {
+        return certificateEligible;
+    }
+
+    public void setCertificateEligible(Boolean certificateEligible) {
+        this.certificateEligible = certificateEligible;
+    }
 
     public Course() {}
 
@@ -122,6 +144,12 @@ public class Course {
     public Boolean getActive() { return active; }
     public void setActive(Boolean active) { this.active = active; }
 
+    public Boolean getDraft() { return draft; }
+    public void setDraft(Boolean draft) { this.draft = draft; }
+
+    public User getCreatedBy() { return createdBy; }
+    public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
+
     public List<Module> getModules() { return modules; }
     public void setModules(List<Module> modules) { this.modules = modules; }
 
@@ -130,4 +158,7 @@ public class Course {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getDraftPayload() { return draftPayload; }
+    public void setDraftPayload(String draftPayload) { this.draftPayload = draftPayload; }
 }
