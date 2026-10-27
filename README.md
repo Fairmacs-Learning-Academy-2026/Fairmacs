@@ -1,4 +1,4 @@
-# Fairmacs KMS — Enterprise Knowledge Management System
+# Fairmacs Knowledge Management System
 
 [![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3.2.0-brightgreen.svg?logo=springboot)](https://spring.io/projects/spring-boot)
 [![React 19](https://img.shields.io/badge/React-19.2.8-blue.svg?logo=react)](https://react.dev/)
