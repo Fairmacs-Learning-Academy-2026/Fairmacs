@@ -17,7 +17,7 @@ The Fairmacs LMS engineering team takes the security of our platform and user da
 
 1. **Do NOT report security vulnerabilities via public GitHub issues, discussions, or pull requests.**
 2. Send an email with complete details to:
-   - **Primary Contact**: `security@fairmacs.com` (or repository maintainers)
+   - **Primary Contact**: repository maintainers
 3. Please include the following information in your advisory:
    - **Type of vulnerability** (e.g., Broken Access Control, SQL injection, Authentication bypass, SSRF).
    - **Affected component(s)**: Specific REST endpoint, controller, frontend component, or configuration.
