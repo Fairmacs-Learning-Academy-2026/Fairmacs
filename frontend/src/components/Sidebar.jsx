@@ -82,7 +82,7 @@ export default function Sidebar({ activeTab, setActiveTab, onOpenCertificates })
           </div>
           <div style={{ fontSize: '0.74rem', color: '#94a3b8', lineHeight: 1.45 }}>Learning support and content ownership are configurable.</div>
         </div>
-        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.85rem', paddingLeft: '0.25rem' }}>FAIRMACS LMS</div>
+        <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.85rem', paddingLeft: '0.25rem' }}>FAIRMACS KMS</div>
       </div>
     </aside>
   );

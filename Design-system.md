@@ -1,4 +1,4 @@
-# Fairmacs LMS — Design System & UI Specification
+# Fairmacs KMS — Design System & UI Specification
 
 **Version:** 1.0.0  
 **Target Platform:** Web (Desktop First, Tablet & Mobile Responsive)  
@@ -22,7 +22,7 @@
 
 ## 1. Design Philosophy & Core Pillars
 
-The Fairmacs LMS design system is tailored for an enterprise freight forwarding and global logistics corporation. The interface emphasizes:
+The Fairmacs KMS design system is tailored for an enterprise freight forwarding and global logistics corporation. The interface emphasizes:
 
 - **Clarity & Efficiency:** High-density data tables, clear progress meters, and minimal cognitive friction for employees completing required compliance modules.
 - **Enterprise Authority:** Anchored in a deep maritime navy (`#0f172a`, `#0b1f38`) paired with bright cyan and blue accents (`#0284c7`, `#06b6d4`), conveying security and precision.

@@ -759,7 +759,7 @@ export default function CourseBuilderModal({ courseId = '', initialCourseId = ''
 
           {currentStep === 4 && <>
             <h3 style={{ margin: 0, fontSize: '1.08rem', fontWeight: 800, color: '#0f172a' }}>Step 4: Assessment & Certificate Settings</h3>
-            <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', background: '#eff6ff', border: '1px solid #bfdbfe', padding: 11, borderRadius: 8, color: '#1e40af', fontSize: '0.85rem' }}><Award size={18} /> Certificate creation itself is handled by the LMS completion workflow. Configure the final assessment below.</div>
+            <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', background: '#eff6ff', border: '1px solid #bfdbfe', padding: 11, borderRadius: 8, color: '#1e40af', fontSize: '0.85rem' }}><Award size={18} /> Certificate creation itself is handled by the KMS completion workflow. Configure the final assessment below.</div>
             {renderQuizEditor(finalQuiz, setFinalQuiz, 'Final assessment')}
           </>}
 

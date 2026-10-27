@@ -769,7 +769,7 @@ function MainApp() {
 
   /*
    * Department detail pages are intentionally rendered outside the
-   * global LMS header/sidebar shell. The page owns its complete layout.
+   * global KMS header/sidebar shell. The page owns its complete layout.
    */
   if (location.pathname.startsWith('/hr/departments/')) {
     return renderContent();

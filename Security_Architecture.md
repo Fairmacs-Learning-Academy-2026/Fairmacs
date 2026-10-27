@@ -1,4 +1,4 @@
-# Fairmacs LMS — Security Architecture Blueprint
+# Fairmacs KMS — Security Architecture Blueprint
 
 **Document Reference:** SEC-ARCH-v1.0  
 **Classification:** Enterprise Security Architecture Specification  
@@ -22,7 +22,7 @@
 
 ## 1. Architectural Security Principles
 
-The security architecture of **Fairmacs LMS** is founded upon core defensive engineering principles:
+The security architecture of **Fairmacs KMS** is founded upon core defensive engineering principles:
 
 - **Defense in Depth:** Multi-layered security controls implemented at the network layer, HTTP gateway, filter chain, business service layer, and database layer. A failure in one layer does not compromise the system.
 - **Principle of Least Privilege (PoLP):** Users, controllers, and services operate with only the minimum privileges required to perform their functions.
@@ -136,7 +136,7 @@ Every incoming HTTP request passing through `JwtAuthenticationFilter.java` execu
 
 ## 4. Role-Based Access Control (RBAC) Subsystem
 
-Fairmacs LMS implements declarative method-level security enabled via `@EnableMethodSecurity(prePostEnabled = true)`:
+Fairmacs KMS implements declarative method-level security enabled via `@EnableMethodSecurity(prePostEnabled = true)`:
 
 ```
                           +------------------------+

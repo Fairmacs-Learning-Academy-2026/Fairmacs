@@ -1,6 +1,6 @@
-# Fairmacs LMS Backend
+# Fairmacs KMS Backend
 
-Spring Boot backend for the Fairmacs Learning Management System.
+Spring Boot backend for the Fairmacs Knowledge Management System.
 
 ## Prerequisites
 

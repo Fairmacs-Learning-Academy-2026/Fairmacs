@@ -1,9 +1,9 @@
-# Fairmacs LMS — Security Requirements Specification
+# Fairmacs KMS — Security Requirements Specification
 
 **Document Reference:** SEC-REQ-v1.0  
 **Classification:** Internal Corporate Security Standard  
 **Compliance Frameworks:** OWASP Top 10 (2021), ISO/IEC 27001:2022, GDPR / DPDP Act  
-**Target Application:** Fairmacs Enterprise Learning Management System
+**Target Application:** Fairmacs Enterprise Knowledge Management System
 
 ---
 
@@ -25,7 +25,7 @@
 
 ## 1. Executive Summary & Security Objectives
 
-Fairmacs LMS is an enterprise training platform managing corporate intellectual property, employee competencies, regulatory compliance certifications, and human resource records. The core security objectives are:
+Fairmacs KMS is an enterprise training platform managing corporate intellectual property, employee competencies, regulatory compliance certifications, and human resource records. The core security objectives are:
 
 1. **Confidentiality:** Prevent unauthorized disclosure of proprietary training materials, employee transcripts, and sensitive credentials.
 2. **Integrity:** Ensure examinations, grading, compliance records, and issued PDF certificates cannot be forged, manipulated, or bypassed.
@@ -36,7 +36,7 @@ Fairmacs LMS is an enterprise training platform managing corporate intellectual 
 
 ## 2. Standards & Regulatory Alignment
 
-| Standard / Framework | Application in Fairmacs LMS |
+| Standard / Framework | Application in Fairmacs KMS |
 |---|---|
 | **OWASP Top 10 (2021)** | Primary benchmark for Broken Access Control (A01), Cryptographic Failures (A02), Injection (A03), Insecure Design (A04), Security Misconfiguration (A05), and Vulnerable Components (A06). |
 | **ISO/IEC 27001 Control A.9 / A.10** | Access control management, password salting, cryptographic key handling, and encryption at rest. |
@@ -124,7 +124,7 @@ Each requirement is tagged with a unique identifier and categorized according to
 
 - **SR-INTEG-01 (OAuth 2.0 State Verification):** The Zoho OAuth flow **MUST** generate a cryptographically random `state` nonce stored in memory with an expiration TTL. Upon callback, the returned state must match before code exchange proceeds.
 - **SR-INTEG-02 (Credential Proxying):** Frontend clients **MUST NEVER** directly communicate with the Zoho WorkDrive API using Zoho access tokens. All downloads, streams, and uploads must be proxied through the backend.
-- **SR-INTEG-03 (Failure Isolation):** Transient outages or authorization errors from external services like Zoho WorkDrive **MUST NOT** crash the core LMS or expose raw cloud provider stack traces to the end user.
+- **SR-INTEG-03 (Failure Isolation):** Transient outages or authorization errors from external services like Zoho WorkDrive **MUST NOT** crash the core KMS or expose raw cloud provider stack traces to the end user.
 - **SR-INTEG-04 (Automated Token Refresh):** Access tokens **MUST** be automatically refreshed using the encrypted refresh token before expiration, without requiring manual administrative intervention.
 
 ---

@@ -1,7 +1,7 @@
-# Fairmacs LMS - Technical Architecture
+# Fairmacs KMS - Technical Architecture
 
 ## Overview
-The Fairmacs LMS has been enhanced with a robust frontend architecture ready for backend integration with Spring Boot and MySQL.
+The Fairmacs KMS has been enhanced with a robust frontend architecture ready for backend integration with Spring Boot and MySQL.
 
 ---
 
@@ -417,4 +417,4 @@ File Storage (AWS S3)
 
 ## Conclusion
 
-The Fairmacs LMS now has a production-ready frontend architecture that can seamlessly integrate with a Spring Boot backend. The modular design, proper routing, service layer, and state management provide a solid foundation for building a scalable, maintainable, and enterprise-grade learning management system.
+The Fairmacs KMS now has a production-ready frontend architecture that can seamlessly integrate with a Spring Boot backend. The modular design, proper routing, service layer, and state management provide a solid foundation for building a scalable, maintainable, and enterprise-grade knowledge management system.

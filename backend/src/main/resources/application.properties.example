@@ -1,5 +1,5 @@
 # ============================================================
-# Fairmacs LMS - Example Backend Configuration
+# Fairmacs KMS - Example Backend Configuration
 # Copy this file to application.properties or application-local.properties
 # and supply your actual environment values.
 # NEVER commit real credentials, passwords, or secrets to Git.

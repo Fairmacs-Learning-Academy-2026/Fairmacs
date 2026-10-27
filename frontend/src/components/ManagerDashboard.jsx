@@ -249,7 +249,7 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
             Welcome, {managerName}
           </h1>
           <p style={{ color: '#cbd5e1', fontSize: '.9rem', margin: 0, maxWidth: 680 }}>
-            Monitor team training progress, mandatory learning compliance and assessment performance using live LMS records.
+            Monitor team training progress, mandatory learning compliance and assessment performance using live KMS records.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>

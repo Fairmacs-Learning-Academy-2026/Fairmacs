@@ -1,4 +1,4 @@
-# Fairmacs LMS — Comprehensive Threat Model
+# Fairmacs KMS — Comprehensive Threat Model
 
 **Document Reference:** TM-SEC-v1.0  
 **Methodology:** STRIDE (per Element) & DREAD Risk Assessment  
@@ -26,7 +26,7 @@
 
 ## 1. Executive Summary & Scope
 
-This Threat Model provides a rigorous evaluation of the security posture of **Fairmacs LMS**. The system automates corporate employee onboarding, course curriculum distribution, timed compliance quizzes, official certificate generation, and third-party cloud document synchronization.
+This Threat Model provides a rigorous evaluation of the security posture of **Fairmacs KMS**. The system automates corporate employee onboarding, course curriculum distribution, timed compliance quizzes, official certificate generation, and third-party cloud document synchronization.
 
 The scope encompasses:
 - The React single-page frontend running in user web browsers.
@@ -43,10 +43,10 @@ The scope encompasses:
 
 ```mermaid
 flowchart LR
-    User([Learners / Trainers / Managers / HR]) -- "HTTPS / TLS 1.3" --> LMS[Fairmacs LMS API & Client]
-    Public([External Verification Auditor]) -- "HTTPS / Public Query" --> LMS
-    LMS -- "JDBC / SSL (HikariCP)" --> DB[(PostgreSQL / Supabase)]
-    LMS -- "OAuth 2.0 / REST API" --> Zoho[(Zoho WorkDrive API)]
+    User([Learners / Trainers / Managers / HR]) -- "HTTPS / TLS 1.3" --> KMS[Fairmacs KMS API & Client]
+    Public([External Verification Auditor]) -- "HTTPS / Public Query" --> KMS
+    KMS -- "JDBC / SSL (HikariCP)" --> DB[(PostgreSQL / Supabase)]
+    KMS -- "OAuth 2.0 / REST API" --> Zoho[(Zoho WorkDrive API)]
 ```
 
 ### 2.2 Level 1 Data Flow Diagram & Trust Boundaries

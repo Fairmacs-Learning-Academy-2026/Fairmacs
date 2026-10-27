@@ -68,7 +68,7 @@ public class SecurityConfig {
                         .permitAll()
 
                         // Zoho OAuth callback: Zoho redirects here
-                        // without the Fairmacs LMS JWT.
+                        // without the Fairmacs KMS JWT.
                         // OAuth state must be validated by the callback.
                         .requestMatchers(
                                 "/api/integrations/zoho/callback"
@@ -82,7 +82,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/certificates/**")
                         .authenticated()
 
-                        // All other LMS APIs remain protected
+                        // All other KMS APIs remain protected
                         .anyRequest()
                         .authenticated()
                 )

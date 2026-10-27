@@ -9,7 +9,7 @@ export const getZohoConnectUrl = async () => {
   const token = localStorage.getItem(TOKEN_KEY);
 
   if (!token) {
-    throw new Error("Please log in to Fairmacs LMS first.");
+    throw new Error("Please log in to Fairmacs KMS first.");
   }
 
   const response = await fetch(

@@ -1,4 +1,4 @@
-// Fairmacs LMS Mock Dataset & Domain Definitions
+// Fairmacs KMS Mock Dataset & Domain Definitions
 
 export const MOCK_USERS_DATABASE = [
   {
@@ -642,7 +642,7 @@ export const MOCK_CALENDAR_EVENTS = [
     time: '11:59 PM Deadline',
     trainer: 'IT Security Team',
     department: 'All Departments',
-    location: 'LMS Online Portal',
+    location: 'KMS Online Portal',
     type: 'Assessment'
   },
   {
@@ -653,7 +653,7 @@ export const MOCK_CALENDAR_EVENTS = [
     time: '11:59 PM Deadline',
     trainer: 'HR & Compliance Dept',
     department: 'Operations',
-    location: 'LMS Online Portal',
+    location: 'KMS Online Portal',
     type: 'Deadline'
   }
 ];

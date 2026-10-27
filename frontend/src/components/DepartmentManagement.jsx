@@ -449,7 +449,7 @@ export default function DepartmentManagement() {
 
             >
 
-              Departments are loaded directly from the LMS database.
+              Departments are loaded directly from the KMS database.
 
             </div>
 

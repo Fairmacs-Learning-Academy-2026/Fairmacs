@@ -52,7 +52,7 @@ public class ZohoOAuthController {
 
             return ResponseEntity.ok(
                     "Zoho WorkDrive authorization succeeded. "
-                    + "Return to the Fairmacs LMS."
+                    + "Return to the Fairmacs KMS."
             );
         } catch (Exception ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)

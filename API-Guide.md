@@ -1,4 +1,4 @@
-# Fairmacs LMS — REST API Reference & Developer Guide
+# Fairmacs KMS — REST API Reference & Developer Guide
 
 **Base URL:** `http://localhost:8080/api` (Local Dev) / `https://lms.fairmacs.com/api` (Production)  
 **Protocol:** HTTPS / JSON over REST  

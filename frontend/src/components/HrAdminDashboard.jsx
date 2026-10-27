@@ -340,7 +340,7 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Course Catalog</h2>
-              <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: 4 }}>Courses returned by the LMS API.</p>
+              <p style={{ color: '#64748b', fontSize: '0.85rem', marginTop: 4 }}>Courses returned by the KMS API.</p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input value={courseSearch} onChange={(event) => setCourseSearch(event.target.value)} placeholder="Search courses…" aria-label="Search courses" style={{ padding: '0.6rem 0.75rem', borderRadius: 8, border: '1px solid #cbd5e1' }} />

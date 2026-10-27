@@ -1,4 +1,4 @@
-# Fairmacs LMS — Enterprise Learning Management System
+# Fairmacs KMS — Enterprise Knowledge Management System
 
 [![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3.2.0-brightgreen.svg?logo=springboot)](https://spring.io/projects/spring-boot)
 [![React 19](https://img.shields.io/badge/React-19.2.8-blue.svg?logo=react)](https://react.dev/)
@@ -9,7 +9,7 @@
 [![Java](https://img.shields.io/badge/Java-17%20LTS-ED8B00.svg?logo=openjdk)](https://adoptium.net/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](#license)
 
-**Fairmacs LMS** is a modern, enterprise-grade Learning Management System engineered specifically for corporate workforce training, role-based skill development, mandatory compliance tracking, and verifiable credentialing across global freight forwarding and logistics operations.
+**Fairmacs KMS** is a modern, enterprise-grade Knowledge Management System engineered specifically for corporate workforce training, role-based skill development, mandatory compliance tracking, and verifiable credentialing across global freight forwarding and logistics operations.
 
 Built on an asynchronous, decoupled architecture with a **React 19 + Vite** single-page application on the frontend and a **Spring Boot 3 + PostgreSQL (Supabase)** microservice-ready backend, with integrated cloud document storage via **Zoho WorkDrive OAuth 2.0**.
 
@@ -299,7 +299,7 @@ fairmacs-lms/
 
 ## 🔐 Security & Credential Management
 
-Fairmacs LMS is architected under **Zero-Credential-in-Code** principles:
+Fairmacs KMS is architected under **Zero-Credential-in-Code** principles:
 
 1. **Pure Environment Variable Injection**: No database credentials, API keys, client secrets, or cryptographic tokens are ever committed to the repository.
 2. **Local Configuration Decoupling**: Developers can optionally use `application-local.properties` (which is strictly ignored by Git) to override local settings without risking accidental commits.

@@ -215,7 +215,7 @@ export default function Login() {
               textAlign: 'center'
             }}
           >
-            Fairmacs LMS
+            Fairmacs KMS
           </h1>
 
           <p

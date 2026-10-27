@@ -2,7 +2,7 @@
 
 ## 🛡️ Supported Versions
 
-We actively provide security updates and patches for the following versions of **Fairmacs LMS**:
+We actively provide security updates and patches for the following versions of **Fairmacs KMS**:
 
 | Version | Supported          | Security Maintenance Level |
 | ------- | ------------------ | -------------------------- |
@@ -13,7 +13,7 @@ We actively provide security updates and patches for the following versions of *
 
 ## 🔒 Reporting a Vulnerability
 
-The Fairmacs LMS engineering team takes the security of our platform and user data seriously. If you believe you have discovered a security vulnerability or sensitive information exposure, please adhere to our responsible disclosure process:
+The Fairmacs KMS engineering team takes the security of our platform and user data seriously. If you believe you have discovered a security vulnerability or sensitive information exposure, please adhere to our responsible disclosure process:
 
 1. **Do NOT report security vulnerabilities via public GitHub issues, discussions, or pull requests.**
 2. Send an email with complete details to:
@@ -35,7 +35,7 @@ The Fairmacs LMS engineering team takes the security of our platform and user da
 
 ## 🔐 Zero-Credential & Secret Safety Standards
 
-Fairmacs LMS adheres to a strict **Zero-Credential-in-Code** standard across all branches and commits:
+Fairmacs KMS adheres to a strict **Zero-Credential-in-Code** standard across all branches and commits:
 
 1. **No Hardcoded Secrets**:
    - Database credentials, API tokens, JWT secrets, and OAuth client secrets must **never** be hardcoded in application source code or committed to Git.

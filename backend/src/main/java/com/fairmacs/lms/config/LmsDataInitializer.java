@@ -35,8 +35,8 @@ public class LmsDataInitializer implements CommandLineRunner {
         /*
          * Development seed only.
          *
-         * This creates data only when the LMS catalog is empty.
-         * Existing users and existing LMS data are not deleted.
+         * This creates data only when the KMS catalog is empty.
+         * Existing users and existing KMS data are not deleted.
          */
 
         if (categoryRepository.count() > 0 ||
@@ -48,7 +48,7 @@ public class LmsDataInitializer implements CommandLineRunner {
         createDevelopmentCatalog();
 
         System.out.println("========================================");
-        System.out.println("LMS development catalog initialized.");
+        System.out.println("KMS development catalog initialized.");
         System.out.println("========================================");
     }
 

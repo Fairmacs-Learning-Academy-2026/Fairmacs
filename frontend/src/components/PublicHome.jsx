@@ -93,7 +93,7 @@ export default function PublicHome() {
               <div className="text-left">
                 <div className="font-bold tracking-wide">FAIRMACS</div>
                 <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
-                  Learning Management System
+                  Knowledge Management System
                 </div>
               </div>
             </button>
@@ -257,7 +257,7 @@ export default function PublicHome() {
                   <div className="flex items-center justify-between mb-8">
                     <div>
                       <div className="text-sm text-slate-400">
-                        FAIRMACS LMS
+                        FAIRMACS KMS
                       </div>
                       <div className="mt-1 text-xl font-semibold">
                         Learning Hub
@@ -326,7 +326,7 @@ export default function PublicHome() {
             </h2>
 
             <p className="mt-6 text-lg leading-8 text-slate-400">
-              The Fairmacs LMS provides a central space for employees to
+              The Fairmacs KMS provides a central space for employees to
               access learning resources, understand business functions,
               develop professional capabilities and continue growing within
               the organisation.
@@ -512,7 +512,7 @@ export default function PublicHome() {
 
           <p className="mt-6 max-w-2xl mx-auto text-lg leading-8 text-slate-400">
             Access your courses, learning paths, assessments and professional
-            development resources through the Fairmacs LMS.
+            development resources through the Fairmacs KMS.
           </p>
 
           <button
@@ -520,7 +520,7 @@ export default function PublicHome() {
             className="mt-9 inline-flex items-center gap-3 rounded-xl bg-blue-600 px-7 py-4 font-semibold hover:bg-blue-500 transition shadow-xl shadow-blue-900/20"
           >
             <LogIn size={18} />
-            Login to LMS
+            Login to KMS
             <ArrowRight size={18} />
           </button>
 
@@ -544,7 +544,7 @@ export default function PublicHome() {
                 <div>
                   <div className="font-semibold">FAIRMACS</div>
                   <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                    Learning Management System
+                    Knowledge Management System
                   </div>
                 </div>
               </div>

@@ -310,7 +310,7 @@ const createPdfDocument = (title, subtitle = '') => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFontSize(18);
   doc.setTextColor(23, 32, 51);
-  doc.text('FAIRMACS LMS', 14, 15);
+  doc.text('FAIRMACS KMS', 14, 15);
   doc.setFontSize(13);
   doc.text(title, 14, 23);
   if (subtitle) {
@@ -342,7 +342,7 @@ const exportManagerTeamReportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Team Report');
     sheet.addRows([
-      ['FAIRMACS LMS - TEAM TRAINING REPORT'], [],
+      ['FAIRMACS KMS - TEAM TRAINING REPORT'], [],
       ['Generated On', new Date().toLocaleString('en-IN')],
       ['Team Members', report.teamMembers ?? 0],
       ['Training Completion', `${report.overallCompletion ?? 0}%`],
@@ -392,7 +392,7 @@ const exportManagerComplianceToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Compliance Summary');
     sheet.addRows([
-      ['FAIRMACS LMS - TEAM COMPLIANCE SUMMARY'], [],
+      ['FAIRMACS KMS - TEAM COMPLIANCE SUMMARY'], [],
       ['Generated On', new Date().toLocaleString('en-IN')],
       ['Overall Completion', `${report.overallCompletion ?? 0}%`],
       ['Mandatory Compliance', `${report.mandatoryCompliance ?? 0}%`],
@@ -475,7 +475,7 @@ const exportOverdueTrainingReportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Overdue Training');
     sheet.addRows([
-      ['FAIRMACS LMS - OVERDUE TRAINING REPORT'], [],
+      ['FAIRMACS KMS - OVERDUE TRAINING REPORT'], [],
       ['Generated On', new Date().toLocaleString('en-IN')], ['Overdue Records', records.length], [],
       ['Employee ID', 'Employee Name', 'Department', 'Course ID', 'Course Title', 'Status', 'Progress', 'Due Date', 'Days Overdue']
     ]);
@@ -548,7 +548,7 @@ const exportHrReportToExcel = async () => {
     const summarySheet = workbook.addWorksheet('Summary');
 
     summarySheet.addRows([
-      ['FAIRMACS LMS - HR TRAINING REPORT'],
+      ['FAIRMACS KMS - HR TRAINING REPORT'],
       [],
       ['Generated On', new Date().toLocaleString('en-IN')],
       [],
@@ -714,7 +714,7 @@ const exportEmployeeReportToExcel = async (employee) => {
     const summarySheet = workbook.addWorksheet('Employee Summary');
 
     summarySheet.addRows([
-      ['FAIRMACS LMS - EMPLOYEE TRAINING REPORT'],
+      ['FAIRMACS KMS - EMPLOYEE TRAINING REPORT'],
       [],
       ['Generated On', new Date().toLocaleString('en-IN')],
       [],

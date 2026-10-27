@@ -229,7 +229,7 @@ export default function TrainingCalendar() {
           </div>
           <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginTop: '0.2rem' }}>Training Calendar</h1>
           <p style={{ color: '#cbd5e1', fontSize: '0.88rem', marginTop: '0.35rem' }}>
-            View scheduled training sessions and deadlines from the LMS.
+            View scheduled training sessions and deadlines from the KMS.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>

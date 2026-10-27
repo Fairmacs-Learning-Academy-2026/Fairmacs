@@ -1,9 +1,9 @@
-# Fairmacs LMS — Production Security Release Checklist
+# Fairmacs KMS — Production Security Release Checklist
 
 **Document Reference:** SEC-CHK-v1.0  
 **Target Release:** Production Deployment / Release Candidate  
 **Audience:** Security Auditors, DevOps Engineers, Full-Stack Developers, QA Leads  
-**Application:** Fairmacs Enterprise Learning Management System
+**Application:** Fairmacs Enterprise Knowledge Management System
 
 ---
 
@@ -24,7 +24,7 @@
 
 ## 1. Checklist Overview & How to Use
 
-This checklist is mandatory prior to promoting any release candidate of **Fairmacs LMS** to staging or production. Every item must be verified, tested, and marked with a checkmark (`[x]`). Any failed item must be documented with an associated remediation issue before production release approval.
+This checklist is mandatory prior to promoting any release candidate of **Fairmacs KMS** to staging or production. Every item must be verified, tested, and marked with a checkmark (`[x]`). Any failed item must be documented with an associated remediation issue before production release approval.
 
 ---
 
