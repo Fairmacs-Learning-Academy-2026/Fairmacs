@@ -29,7 +29,7 @@ public class FairmacsLmsApplicationStartupTest {
                         "app.notifications.scheduler.enabled=false",
                         "app.notifications.email.enabled=false"
                 )
-                .run()) {
+                .run("--server.port=0")) {
 
             assertNotNull(context, "ApplicationContext must not be null");
             assertTrue(context.isRunning(), "ApplicationContext must be active and running");

@@ -6,9 +6,11 @@ import com.fairmacs.lms.entity.Module;
 import com.fairmacs.lms.repository.*;
 import com.fairmacs.lms.security.SecurityContextUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.lang.reflect.Proxy;
 import java.time.LocalDate;
@@ -59,6 +61,7 @@ class Phase2FrontendAndReportingTest {
 
     @BeforeEach
     void setup() {
+        SecurityContextHolder.clearContext();
         courseStore.clear();
         departmentStore.clear();
         assignmentStore.clear();
@@ -352,6 +355,11 @@ class Phase2FrontendAndReportingTest {
                 enrollmentService,
                 securityContextUtil
         );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test

@@ -2076,6 +2076,13 @@ private java.util.Map<String, Object> toAuthoringQuizMap(Quiz quiz) {
 
 
     private void requireAuthoringPermission() {
+        User user = securityContextUtil.getCurrentUser();
+        if (user != null && user.getRole() != null) {
+            Role role = user.getRole();
+            if (role == Role.HR_ADMIN || role == Role.TRAINER) {
+                return;
+            }
+        }
 
         String role = securityContextUtil.getCurrentUserRole();
         String normalizedRole = role == null ? "" : role.trim();

@@ -28,6 +28,9 @@ jobs:
       SUPABASE_DB_URL: jdbc:postgresql://localhost:5432/fairmacs_ci
       SUPABASE_DB_USERNAME: postgres
       SUPABASE_DB_PASSWORD: postgres
+      JWT_SECRET: fairmacs_ci_test_secret_for_jwt_tokens_256bit_key_abcdef1234567890
+      ZOHO_CLIENT_ID: ci_dummy_client_id
+      ZOHO_CLIENT_SECRET: ci_dummy_client_secret
     defaults:
       run:
         working-directory: backend

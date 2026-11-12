@@ -320,6 +320,7 @@ public class Release2110PostgresIntegrationTest {
 
     @AfterAll
     void teardownDisposablePostgresSchema() {
+        SecurityContextHolder.clearContext();
         try {
             if (dataSource != null && !dataSource.isClosed()) {
                 dataSource.close();
@@ -347,6 +348,11 @@ public class Release2110PostgresIntegrationTest {
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    @AfterEach
+    void clearSecurity() {
+        SecurityContextHolder.clearContext();
     }
 
     private void authenticateAs(User user) {

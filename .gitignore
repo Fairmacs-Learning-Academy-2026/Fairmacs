@@ -46,5 +46,6 @@ backups/
 !backend/src/main/resources/db/migration/
 !backend/src/main/resources/db/migration/*.sql
 *.bak
+*.zip
 backend/uploads/
 uploads/

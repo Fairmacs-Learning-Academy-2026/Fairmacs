@@ -7,11 +7,13 @@ import com.fairmacs.lms.entity.Module;
 import com.fairmacs.lms.repository.*;
 import com.fairmacs.lms.security.SecurityContextUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.lang.reflect.Proxy;
 import java.time.LocalDate;
@@ -60,6 +62,7 @@ class CourseCreationAndPublishingTest {
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.clearContext();
         courseStore.clear();
         departmentStore.clear();
         userStore.clear();
@@ -397,6 +400,11 @@ class CourseCreationAndPublishingTest {
                 recommendationService,
                 securityContextUtil
         );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     private CourseAuthoringRequest createSampleCourseRequest(boolean publish, boolean isFoundation) {

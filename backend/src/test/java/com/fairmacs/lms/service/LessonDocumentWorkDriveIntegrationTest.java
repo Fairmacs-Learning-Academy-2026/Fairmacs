@@ -10,12 +10,14 @@ import com.fairmacs.lms.integration.zoho.ZohoWorkDriveService;
 import com.fairmacs.lms.repository.*;
 import com.fairmacs.lms.security.SecurityContextUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
@@ -51,6 +53,7 @@ class LessonDocumentWorkDriveIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.clearContext();
         courseStore.clear();
         moduleStore.clear();
         lessonStore.clear();
@@ -247,6 +250,11 @@ class LessonDocumentWorkDriveIntegrationTest {
         );
 
         lessonDocumentController = new LessonDocumentController(lessonDocumentAccessService);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
