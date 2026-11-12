@@ -18,27 +18,44 @@ public interface NotificationRepository
      * Get all notifications for a particular user.
      * Newest notifications appear first.
      */
-    List<Notification> findByRecipientIdOrderByCreatedAtDesc(Long userId);
+    @Query("SELECT n FROM Notification n WHERE n.recipient.id = :userId ORDER BY n.createdAt DESC")
+    List<Notification> findByRecipientIdOrderByCreatedAtDesc(@Param("userId") Long userId);
+
+    List<Notification> findByRecipient_IdOrderByCreatedAtDesc(Long userId);
 
     /*
      * Get unread notifications for a user.
      */
+    @Query("SELECT n FROM Notification n WHERE n.recipient.id = :userId AND n.read = false ORDER BY n.createdAt DESC")
     List<Notification> findByRecipientIdAndReadFalseOrderByCreatedAtDesc(
+            @Param("userId") Long userId
+    );
+
+    List<Notification> findByRecipient_IdAndReadFalseOrderByCreatedAtDesc(
             Long userId
     );
 
     /*
      * Count unread notifications.
      */
-    long countByRecipientIdAndReadFalse(Long userId);
+    @Query("SELECT COUNT(n) FROM Notification n WHERE n.recipient.id = :userId AND n.read = false")
+    long countByRecipientIdAndReadFalse(@Param("userId") Long userId);
+
+    long countByRecipient_IdAndReadFalse(Long userId);
 
     /*
      * Find a specific notification belonging to a specific user.
      *
      * This is important for security because a user should not
-     * be able to mark another user's notification as read.
+     * be able to mark another user's notification as read or dismiss it.
      */
+    @Query("SELECT n FROM Notification n WHERE n.id = :id AND n.recipient.id = :userId")
     Optional<Notification> findByIdAndRecipientId(
+            @Param("id") Long id,
+            @Param("userId") Long userId
+    );
+
+    Optional<Notification> findByIdAndRecipient_Id(
             Long id,
             Long userId
     );

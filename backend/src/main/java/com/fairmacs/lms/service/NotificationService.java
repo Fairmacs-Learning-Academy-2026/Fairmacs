@@ -206,6 +206,18 @@ public class NotificationService {
     }
 
     /*
+     * Dismiss (delete) one notification belonging to the user.
+     * Enforces recipient ownership validation: rejects cross-user dismiss.
+     */
+    @Transactional
+    public void dismissNotification(Long notificationId, Long userId) {
+        Notification notification = notificationRepository
+                .findByIdAndRecipientId(notificationId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+        notificationRepository.delete(notification);
+    }
+
+    /*
      * Get filtered notifications list as consumer-safe DTOs.
      */
     @Transactional(readOnly = true)
@@ -567,6 +579,30 @@ public class NotificationService {
             }
         }
         return count;
+    }
+
+    /**
+     * Overloaded convenience method for notifying HR Admins with standard policy/alert defaults.
+     */
+    @Transactional
+    public int notifyHrAdmins(
+            String title,
+            String message,
+            String type,
+            String actionUrl,
+            String deduplicationKeyPrefix
+    ) {
+        return notifyHrAdmins(
+                title,
+                message,
+                type,
+                NotificationPriority.NORMAL,
+                "POLICY",
+                null,
+                actionUrl,
+                deduplicationKeyPrefix,
+                null
+        );
     }
 
     /**

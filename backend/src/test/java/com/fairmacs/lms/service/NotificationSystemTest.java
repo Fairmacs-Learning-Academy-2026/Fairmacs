@@ -252,30 +252,35 @@ class NotificationSystemTest {
                                     .filter(n -> Objects.equals(n.getDeduplicationKey(), key))
                                     .findFirst();
                         }
-                        case "findByRecipientIdOrderByCreatedAtDesc" -> {
+                        case "findByRecipientIdOrderByCreatedAtDesc", "findByRecipient_IdOrderByCreatedAtDesc" -> {
                             Long uid = (Long) args[0];
                             return savedNotifications.stream()
                                     .filter(n -> Objects.equals(n.getRecipientUserId(), uid))
                                     .toList();
                         }
-                        case "findByRecipientIdAndReadFalseOrderByCreatedAtDesc" -> {
+                        case "findByRecipientIdAndReadFalseOrderByCreatedAtDesc", "findByRecipient_IdAndReadFalseOrderByCreatedAtDesc" -> {
                             Long uid = (Long) args[0];
                             return savedNotifications.stream()
                                     .filter(n -> Objects.equals(n.getRecipientUserId(), uid) && !Boolean.TRUE.equals(n.getRead()))
                                     .toList();
                         }
-                        case "countByRecipientIdAndReadFalse" -> {
+                        case "countByRecipientIdAndReadFalse", "countByRecipient_IdAndReadFalse" -> {
                             Long uid = (Long) args[0];
                             return savedNotifications.stream()
                                     .filter(n -> Objects.equals(n.getRecipientUserId(), uid) && !Boolean.TRUE.equals(n.getRead()))
                                     .count();
                         }
-                        case "findByIdAndRecipientId" -> {
+                        case "findByIdAndRecipientId", "findByIdAndRecipient_Id" -> {
                             Long id = (Long) args[0];
                             Long uid = (Long) args[1];
                             return savedNotifications.stream()
                                     .filter(n -> Objects.equals(n.getId(), id) && Objects.equals(n.getRecipientUserId(), uid))
                                     .findFirst();
+                        }
+                        case "delete" -> {
+                            Notification n = (Notification) args[0];
+                            savedNotifications.remove(n);
+                            return null;
                         }
                         case "markAllAsRead" -> {
                             Long uid = (Long) args[0];
@@ -568,6 +573,13 @@ class NotificationSystemTest {
 
         // Another user (userId = 20L) attempting to mark employee 10's notification as read must be rejected
         assertThrows(RuntimeException.class, () -> notificationService.markAsRead(created.getId(), 20L));
+
+        // Cross-user dismiss attempt by another user must be rejected
+        assertThrows(RuntimeException.class, () -> notificationService.dismissNotification(created.getId(), 20L));
+
+        // Dismissing own notification succeeds
+        notificationService.dismissNotification(created.getId(), 10L);
+        assertThrows(RuntimeException.class, () -> notificationService.markAsRead(created.getId(), 10L));
 
         // Create two more unread notifications and mark all as read
         notificationService.createNotification(10L, "Reminder 1", "Msg 1", NotificationType.COURSE_DUE_SOON);

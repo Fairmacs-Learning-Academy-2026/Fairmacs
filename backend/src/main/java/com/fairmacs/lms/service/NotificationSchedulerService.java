@@ -4,6 +4,7 @@ import com.fairmacs.lms.entity.*;
 import com.fairmacs.lms.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -40,6 +41,12 @@ public class NotificationSchedulerService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final NotificationJobLogRepository jobLogRepository;
+
+    @Autowired(required = false)
+    private PolicyAssignmentRepository policyAssignmentRepository;
+
+    @Autowired(required = false)
+    private PolicyAcknowledgementRepository policyAcknowledgementRepository;
 
     @Value("${app.notifications.scheduler.enabled:true}")
     private boolean schedulerEnabled = true;
@@ -80,6 +87,7 @@ public class NotificationSchedulerService {
             return;
         }
         processDeadlineAndOverdueReminders(currentLocalDate(), false);
+        processPolicyDeadlineReminders(currentLocalDate(), false);
     }
 
     /**
@@ -868,6 +876,167 @@ public class NotificationSchedulerService {
         } catch (Exception ex) {
             log.debug("Could not update NotificationJobLog: {}", ex.getMessage());
         }
+    }
+
+    /**
+     * Evaluates active policy assignments with due dates and emits due-soon and overdue notifications.
+     * Note: Assignments without a due date (open-ended) are strictly ignored and never flagged as overdue.
+     */
+    public Map<String, Object> processPolicyDeadlineReminders(LocalDate referenceDate, boolean manualTrigger) {
+        if (policyAssignmentRepository == null || policyAcknowledgementRepository == null) {
+            log.debug("Policy repositories not present; skipping policy deadline reminders.");
+            return Map.of("status", "SKIPPED_NO_REPOSITORIES");
+        }
+
+        LocalDate today = referenceDate != null ? referenceDate : currentLocalDate();
+        String executionKey = manualTrigger
+                ? "POLICY_DEADLINE_REMINDERS:MANUAL:" + System.currentTimeMillis()
+                : "POLICY_DEADLINE_REMINDERS:" + today;
+
+        if (!manualTrigger && jobLogRepository != null && jobLogRepository.existsByExecutionKeyAndStatus(executionKey, "COMPLETED")) {
+            log.debug("Policy deadline reminder job already completed for key={}", executionKey);
+            return Map.of("status", "SKIPPED_ALREADY_RAN", "executionKey", executionKey);
+        }
+
+        NotificationJobLog jobLog = startJobLog("POLICY_DEADLINE_AND_OVERDUE_REMINDERS", executionKey);
+        int processed = 0;
+        int created = 0;
+        int failures = 0;
+
+        try {
+            // Find all active policy assignments that have an explicit due date (strictly ignore null due dates!)
+            LocalDate dueIn5Days = today.plusDays(5);
+            LocalDate dueIn2Days = today.plusDays(2);
+
+            // 1. Due in 5 days
+            List<PolicyAssignment> dueSoon5 = policyAssignmentRepository.findActiveAssignmentsDueOn(dueIn5Days);
+            for (PolicyAssignment a : dueSoon5) {
+                processed++;
+                try {
+                    boolean acked = policyAcknowledgementRepository.existsByPolicyVersionIdAndEmployeeUserId(
+                            a.getPolicyVersion().getId(),
+                            a.getEmployeeUser().getId()
+                    );
+                    if (!acked) {
+                        String title = "Policy Due Soon: " + a.getPolicyDocument().getTitle();
+                        String message = "The policy \"" + a.getPolicyDocument().getTitle() + "\" is due for acknowledgement in 5 days (" + a.getDueDate() + ").";
+                        String dedupKey = "policy-due-5d:" + a.getId();
+
+                        Notification n = notificationService.createNotification(
+                                a.getEmployeeUser().getId(),
+                                title,
+                                message,
+                                NotificationType.POLICY_DUE_SOON,
+                                "NORMAL",
+                                "POLICY",
+                                a.getPolicyDocument().getId().toString(),
+                                "/profile#policies",
+                                dedupKey,
+                                Map.of("policyId", a.getPolicyDocument().getId(), "dueDate", a.getDueDate().toString())
+                        );
+                        if (n != null) created++;
+                    }
+                } catch (Exception ex) {
+                    failures++;
+                    log.warn("Error sending 5-day policy reminder for assignmentId={}: {}", a.getId(), ex.getMessage());
+                }
+            }
+
+            // 2. Due in 2 days
+            List<PolicyAssignment> dueSoon2 = policyAssignmentRepository.findActiveAssignmentsDueOn(dueIn2Days);
+            for (PolicyAssignment a : dueSoon2) {
+                processed++;
+                try {
+                    boolean acked = policyAcknowledgementRepository.existsByPolicyVersionIdAndEmployeeUserId(
+                            a.getPolicyVersion().getId(),
+                            a.getEmployeeUser().getId()
+                    );
+                    if (!acked) {
+                        String title = "Urgent: Policy Due Soon - " + a.getPolicyDocument().getTitle();
+                        String message = "The policy \"" + a.getPolicyDocument().getTitle() + "\" is due for acknowledgement in 2 days (" + a.getDueDate() + "). Please review and acknowledge promptly.";
+                        String dedupKey = "policy-due-2d:" + a.getId();
+
+                        Notification n = notificationService.createNotification(
+                                a.getEmployeeUser().getId(),
+                                title,
+                                message,
+                                NotificationType.POLICY_DUE_SOON,
+                                "HIGH",
+                                "POLICY",
+                                a.getPolicyDocument().getId().toString(),
+                                "/profile#policies",
+                                dedupKey,
+                                Map.of("policyId", a.getPolicyDocument().getId(), "dueDate", a.getDueDate().toString())
+                        );
+                        if (n != null) created++;
+                    }
+                } catch (Exception ex) {
+                    failures++;
+                    log.warn("Error sending 2-day policy reminder for assignmentId={}: {}", a.getId(), ex.getMessage());
+                }
+            }
+
+            // 3. Overdue assignments (strictly only where dueDate < today, null due dates are NEVER overdue)
+            List<PolicyAssignment> overdueList = policyAssignmentRepository.findActiveOverdueAssignments(today);
+            for (PolicyAssignment a : overdueList) {
+                processed++;
+                try {
+                    boolean acked = policyAcknowledgementRepository.existsByPolicyVersionIdAndEmployeeUserId(
+                            a.getPolicyVersion().getId(),
+                            a.getEmployeeUser().getId()
+                    );
+                    if (!acked) {
+                        String title = "Policy Overdue: " + a.getPolicyDocument().getTitle();
+                        String message = "The acknowledgement for \"" + a.getPolicyDocument().getTitle() + "\" is overdue since " + a.getDueDate() + ". Please review and submit your acknowledgement.";
+                        String dedupKey = "policy-overdue:" + a.getId() + ":" + today;
+
+                        Notification n = notificationService.createNotification(
+                                a.getEmployeeUser().getId(),
+                                title,
+                                message,
+                                NotificationType.POLICY_OVERDUE,
+                                "HIGH",
+                                "POLICY",
+                                a.getPolicyDocument().getId().toString(),
+                                "/profile#policies",
+                                dedupKey,
+                                Map.of("policyId", a.getPolicyDocument().getId(), "dueDate", a.getDueDate().toString())
+                        );
+                        if (n != null) created++;
+                    }
+                } catch (Exception ex) {
+                    failures++;
+                    log.warn("Error sending policy overdue reminder for assignmentId={}: {}", a.getId(), ex.getMessage());
+                }
+            }
+
+            completeJobLog(
+                    jobLog,
+                    "COMPLETED",
+                    processed,
+                    created,
+                    failures,
+                    "Evaluated " + processed + " active policy assignments with due dates; created " + created + " notifications."
+            );
+        } catch (Exception ex) {
+            failures++;
+            completeJobLog(
+                    jobLog,
+                    "FAILED",
+                    processed,
+                    created,
+                    failures,
+                    "Policy reminder job failed: " + ex.getMessage()
+            );
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("jobName", "POLICY_DEADLINE_AND_OVERDUE_REMINDERS");
+        summary.put("referenceDate", today.toString());
+        summary.put("processedAssignments", processed);
+        summary.put("notificationsCreated", created);
+        summary.put("failures", failures);
+        return summary;
     }
 
     private void notifySystemJobFailure(String jobLabel, String periodKey) {

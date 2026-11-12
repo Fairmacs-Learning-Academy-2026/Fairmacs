@@ -153,6 +153,18 @@ public class NotificationController {
     }
 
     /*
+     * Dismiss one notification belonging to the logged-in user.
+     */
+    @DeleteMapping({"/{id}", "/{id}/dismiss"})
+    public ResponseEntity<Void> dismissNotification(
+            @PathVariable Long id
+    ) {
+        Long userId = securityContextUtil.getCurrentUserId();
+        notificationService.dismissNotification(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /*
      * Mark all notifications belonging to the logged-in user as read.
      */
     @PatchMapping("/read-all")
