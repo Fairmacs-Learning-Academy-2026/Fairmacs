@@ -2,6 +2,8 @@
 package com.fairmacs.lms.integration.zoho;
 
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class ZohoOAuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(ZohoOAuthService.class);
+
     @Value("${zoho.client-id}")
     private String clientId;
 
@@ -39,7 +43,7 @@ public class ZohoOAuthService {
     @Value("${zoho.accounts-url}")
     private String accountsUrl;
 
-    @Value("${ZOHO_TOKEN_ENCRYPTION_KEY}")
+    @Value("${zoho.token-encryption-key:${ZOHO_TOKEN_ENCRYPTION_KEY:}}")
     private String encryptionKeyBase64;
 
     private final JdbcTemplate jdbcTemplate;
@@ -59,6 +63,9 @@ public class ZohoOAuthService {
 
     @PostConstruct
     public void initialize() {
+        if (encryptionKeyBase64 == null || encryptionKeyBase64.isBlank()) {
+            return;
+        }
         // Validate the encryption key at startup.
         encryptionKey();
         loadRefreshToken();
@@ -258,7 +265,12 @@ public class ZohoOAuthService {
                 (rs, rowNum) -> rs.getString(1));
 
         if (!tokens.isEmpty()) {
-            refreshToken = decrypt(tokens.get(0));
+            try {
+                refreshToken = decrypt(tokens.get(0));
+            } catch (Exception e) {
+                log.warn("Could not decrypt stored Zoho refresh token at startup (key mismatch or unconfigured): {}", e.getMessage());
+                refreshToken = null;
+            }
         }
     }
 
@@ -313,6 +325,11 @@ public class ZohoOAuthService {
     }
 
     private SecretKeySpec encryptionKey() {
+        if (encryptionKeyBase64 == null || encryptionKeyBase64.isBlank()) {
+            throw new IllegalStateException(
+                    "ZOHO_TOKEN_ENCRYPTION_KEY must be configured as a Base64 "
+                    + "encoding of exactly 32 random bytes.");
+        }
         byte[] key = Base64.getDecoder().decode(encryptionKeyBase64);
 
         if (key.length != 32) {

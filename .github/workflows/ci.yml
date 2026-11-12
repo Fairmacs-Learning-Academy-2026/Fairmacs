@@ -31,6 +31,7 @@ jobs:
       JWT_SECRET: fairmacs_ci_test_secret_for_jwt_tokens_256bit_key_abcdef1234567890
       ZOHO_CLIENT_ID: ci_dummy_client_id
       ZOHO_CLIENT_SECRET: ci_dummy_client_secret
+      ZOHO_TOKEN_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
     defaults:
       run:
         working-directory: backend

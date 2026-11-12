@@ -27,7 +27,8 @@ public class FairmacsLmsApplicationStartupTest {
                         "server.port=0",
                         "spring.main.banner-mode=off",
                         "app.notifications.scheduler.enabled=false",
-                        "app.notifications.email.enabled=false"
+                        "app.notifications.email.enabled=false",
+                        "ZOHO_TOKEN_ENCRYPTION_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
                 )
                 .run("--server.port=0")) {
 
