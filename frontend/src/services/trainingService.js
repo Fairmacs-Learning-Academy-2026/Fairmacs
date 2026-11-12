@@ -1,22 +1,26 @@
 // Training Service
 // Handles training assignments and calendar events
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import {
+  API_BASE_URL,
+  getAuthHeaders,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
 export const trainingService = {
   // Assign training to target (employee, department, role, or all)
   assignTraining: async (assignmentData) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/training/assignments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(assignmentData),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to assign training');
@@ -31,14 +35,15 @@ export const trainingService = {
 
   // Get training assignments for user
   getUserAssignments: async (userId) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/training/assignments/user/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch assignments');
@@ -53,14 +58,15 @@ export const trainingService = {
 
   // Get all training assignments (HR/Manager)
   getAllAssignments: async () => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/training/assignments`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch all assignments');
@@ -75,17 +81,17 @@ export const trainingService = {
 
   // Create calendar event
   createCalendarEvent: async (eventData) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/training/calendar`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(eventData),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to create calendar event');
@@ -100,14 +106,15 @@ export const trainingService = {
 
   // Get calendar events
   getCalendarEvents: async (month, year) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/training/calendar?month=${month}&year=${year}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch calendar events');
@@ -122,15 +129,16 @@ export const trainingService = {
 
   // Delete training assignment (HR only)
   deleteAssignment: async (assignmentId) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/training/assignments/${assignmentId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to delete assignment');

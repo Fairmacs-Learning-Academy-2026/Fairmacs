@@ -5,7 +5,7 @@ import com.fairmacs.lms.security.SecurityContextUtil;
 import com.fairmacs.lms.service.ManagerAllCoursesService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.web.bind.annotation.CrossOrigin;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,7 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/manager")
-@CrossOrigin
+
 public class ManagerAllCoursesController {
     private final ManagerAllCoursesService managerAllCoursesService;
     private final SecurityContextUtil securityContextUtil;

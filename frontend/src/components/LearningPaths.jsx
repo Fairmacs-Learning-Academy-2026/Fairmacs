@@ -52,7 +52,7 @@ function normalizeLearningPaths(payload) {
         path.departmentName ??
         path.department?.name ??
         path.department ??
-        'General / Common',
+        'General',
       type:
         path.type ??
         (path.mandatory === true ? 'Mandatory' : path.mandatory === false ? 'Recommended' : 'Not specified'),
@@ -118,10 +118,14 @@ export default function LearningPaths() {
     >
       <div
         style={{
-          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+          background: 'linear-gradient(135deg, rgba(16, 42, 67, 0.95) 0%, rgba(11, 31, 56, 0.92) 50%, rgba(27, 54, 93, 0.90) 100%)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
           padding: '1.75rem 2rem',
-          borderRadius: '14px',
+          borderRadius: '20px',
           color: 'white',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          boxShadow: '0 16px 38px rgba(11, 31, 56, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -239,7 +243,7 @@ export default function LearningPaths() {
             No learning paths available
           </h2>
           <p style={{ fontSize: '0.88rem' }}>
-            The backend returned no learning paths. No sample data is being displayed.
+            No learning paths found. Please refresh and try again.
           </p>
         </div>
       ) : (
@@ -256,12 +260,15 @@ export default function LearningPaths() {
             return (
               <div
                 key={path.id}
+                className="glass-card"
                 style={{
-                  background: 'white',
-                  borderRadius: '12px',
+                  background: 'rgba(255, 255, 255, 0.78)',
+                  backdropFilter: 'blur(14px)',
+                  WebkitBackdropFilter: 'blur(14px)',
+                  borderRadius: '16px',
                   padding: '1.5rem',
-                  border: '1px solid #e2e8f0',
-                  boxShadow: 'var(--shadow-sm)',
+                  border: '1px solid rgba(255, 255, 255, 0.85)',
+                  boxShadow: '0 8px 30px rgba(31, 70, 120, 0.06)',
                   display: 'flex',
                   flexDirection: 'column',
                   minWidth: 0,

@@ -59,18 +59,22 @@ function sameMonth(dateString, year, month) {
 }
 
 const panelStyle = {
-  background: '#fff',
-  borderRadius: 12,
-  padding: '1.25rem',
-  border: '1px solid #e2e8f0',
-  boxShadow: 'var(--shadow-sm)'
+  background: 'rgba(255, 255, 255, 0.78)',
+  backdropFilter: 'blur(14px)',
+  WebkitBackdropFilter: 'blur(14px)',
+  borderRadius: 16,
+  padding: '1.35rem',
+  border: '1px solid rgba(255, 255, 255, 0.85)',
+  boxShadow: '0 8px 30px rgba(31, 70, 120, 0.06)'
 };
 
 const inputStyle = {
   width: '100%',
-  padding: '0.65rem 0.8rem',
-  borderRadius: 8,
-  border: '1px solid #cbd5e1',
+  padding: '0.65rem 0.85rem',
+  borderRadius: 10,
+  border: '1px solid rgba(203, 213, 225, 0.85)',
+  background: 'rgba(255, 255, 255, 0.82)',
+  backdropFilter: 'blur(6px)',
   fontSize: '0.88rem',
   boxSizing: 'border-box'
 };
@@ -358,7 +362,7 @@ export default function TrainingCalendar() {
                 <div><label htmlFor="event-time" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: 5 }}>Time Range</label><input id="event-time" value={newEvent.time} onChange={(event) => setNewEvent({ ...newEvent, time: event.target.value })} placeholder="e.g. 10:00 AM - 12:00 PM" style={inputStyle} /></div>
               </div>
               <div><label htmlFor="event-audience" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: 5 }}>Who should attend? *</label><select id="event-audience" value={newEvent.targetType} onChange={(event) => setNewEvent({ ...newEvent, targetType: event.target.value, targetUserIds: [] })} style={inputStyle}><option value="ALL">All employees</option><option value="DEPARTMENT">A department</option><option value="EMPLOYEES">Selected employees</option></select></div>
-              {newEvent.targetType === 'DEPARTMENT' && <div><label htmlFor="event-department" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: 5 }}>Target Department *</label><select id="event-department" required value={newEvent.department} onChange={(event) => setNewEvent({ ...newEvent, department: event.target.value })} style={inputStyle}>{['Operations', 'Documentation', 'Pricing', 'Sales', 'Accounts', 'Human Resource', 'IT & Technology', 'Management & Leadership'].map((department) => <option key={department} value={department}>{department}</option>)}</select></div>}
+              {newEvent.targetType === 'DEPARTMENT' && <div><label htmlFor="event-department" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: 5 }}>Target Department *</label><select id="event-department" required value={newEvent.department} onChange={(event) => setNewEvent({ ...newEvent, department: event.target.value })} style={inputStyle}>{['Operations', 'Documentation', 'Pricing', 'Sales', 'Accounts', 'People Operations', 'Information Technology', 'Management & Leadership'].map((department) => <option key={department} value={department}>{department}</option>)}</select></div>}
               {newEvent.targetType === 'EMPLOYEES' && <div><label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: 5 }}>Select Employees * {employeesLoading ? '(loading…)' : ''}</label><div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #cbd5e1', borderRadius: 8, padding: 8 }}>{employees.map((employee) => <label key={employee.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 2px', fontSize: '0.84rem' }}><input type="checkbox" checked={newEvent.targetUserIds.includes(employee.id)} onChange={(event) => setNewEvent({ ...newEvent, targetUserIds: event.target.checked ? [...newEvent.targetUserIds, employee.id] : newEvent.targetUserIds.filter((id) => id !== employee.id) })} /> <span>{employee.name} {employee.employeeId ? `(${employee.employeeId})` : ''} {employee.department ? `— ${employee.department}` : ''}</span></label>)}{!employeesLoading && employees.length === 0 && <span style={{ color: '#64748b', fontSize: '0.82rem' }}>No employees available.</span>}</div></div>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
                 <div><label htmlFor="event-trainer" style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: 5 }}>Trainer / Facilitator</label><input id="event-trainer" value={newEvent.trainer} onChange={(event) => setNewEvent({ ...newEvent, trainer: event.target.value })} style={inputStyle} /></div>

@@ -11,7 +11,10 @@ public class LoginResponse {
     private String roleLabel;
     private String designation;
     private String department;
+    private String level;
+    private String branch;
     private String avatar;
+    private boolean mustChangePassword;
 
     public LoginResponse() {}
 
@@ -42,6 +45,15 @@ public class LoginResponse {
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
 
+    public String getLevel() { return level; }
+    public void setLevel(String level) { this.level = level; }
+
+    public String getBranch() { return branch; }
+    public void setBranch(String branch) { this.branch = branch; }
+
     public String getAvatar() { return avatar; }
     public void setAvatar(String avatar) { this.avatar = avatar; }
+
+    public boolean isMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
 }

@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   Award,
@@ -16,13 +18,22 @@ import {
   Mail,
   Building2,
   Briefcase,
-  BadgeCheck
+  BadgeCheck,
+  Menu,
+  Clock,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 
 import { useAuth } from '../context/AuthContext';
-import { notificationService } from '../services/notificationService';
+import {
+  notificationService,
+  formatNotificationCategory,
+  resolveNotificationNavigation
+} from '../services/notificationService';
 import FairmacsLogo from './FairmacsLogo';
 import PasswordModal from './PasswordModal';
+import UserAvatar from './UserAvatar';
 
 const DEFAULT_AVATAR =
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
@@ -78,8 +89,14 @@ const menuButtonStyle = {
   cursor: 'pointer'
 };
 
-export default function Header({ onOpenCertificates, onNavigateHome }) {
+export default function Header({
+  onOpenCertificates,
+  onOpenNotifications,
+  onNavigateHome,
+  onToggleMobileNav
+}) {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
@@ -88,42 +105,78 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
 
   const [notifications, setNotifications] = useState([]);
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [serverUnreadCount, setServerUnreadCount] = useState(0);
 
   // ============================================================
-  // LOAD NOTIFICATIONS
+  // ABOUT MODAL: close on Escape and lock page scroll while open
   // ============================================================
 
   useEffect(() => {
-    let mounted = true;
+    if (!showAboutModal) return undefined;
 
-    const loadNotifications = async () => {
-      if (!user) return;
-
-      try {
-        setNotificationLoading(true);
-        const data = await notificationService.getNotifications();
-        if (mounted) setNotifications(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Failed to load notifications:', error);
-        if (mounted) setNotifications([]);
-      } finally {
-        if (mounted) setNotificationLoading(false);
-      }
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setShowAboutModal(false);
     };
 
-    loadNotifications();
+    const previousOverflow = document.body.style.overflow;
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
 
     return () => {
-      mounted = false;
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
     };
+  }, [showAboutModal]);
+
+  // ============================================================
+  // LOAD NOTIFICATIONS (with 60s refresh & cross-page sync)
+  // ============================================================
+
+  const loadNotifications = useCallback(async (silent = false) => {
+    if (!user) return;
+
+    try {
+      if (!silent) setNotificationLoading(true);
+      const [data, count] = await Promise.all([
+        notificationService.getNotifications({ size: 25 }),
+        notificationService.getUnreadCount()
+      ]);
+      setNotifications(Array.isArray(data) ? data : []);
+      setServerUnreadCount(typeof count === 'number' ? Math.max(0, count) : 0);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+      if (!silent) setNotifications([]);
+    } finally {
+      if (!silent) setNotificationLoading(false);
+    }
   }, [user]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  useEffect(() => {
+    loadNotifications(false);
+
+    const intervalId = setInterval(() => {
+      loadNotifications(true);
+    }, 60000);
+
+    const handleSync = () => {
+      loadNotifications(true);
+    };
+    window.addEventListener('fairmacs:notifications-updated', handleSync);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('fairmacs:notifications-updated', handleSync);
+    };
+  }, [loadNotifications]);
+
+  const unreadCount = serverUnreadCount;
 
   const markAllRead = async () => {
     try {
       await notificationService.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setServerUnreadCount(0);
+      window.dispatchEvent(new CustomEvent('fairmacs:notifications-updated'));
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
     }
@@ -135,36 +188,82 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
       setNotifications((prev) =>
         prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
       );
+      setServerUnreadCount((prev) => Math.max(0, prev - 1));
+      window.dispatchEvent(new CustomEvent('fairmacs:notifications-updated'));
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }
   };
 
+  const handleNotificationClick = async (notif) => {
+    if (!notif.read) {
+      await markNotificationRead(notif.id);
+    }
+    setShowNotifDrawer(false);
+    const dest = resolveNotificationNavigation(notif);
+    if (dest?.path) {
+      navigate(dest.path);
+    }
+  };
+
+  const handleViewAllNotifications = () => {
+    setShowNotifDrawer(false);
+    if (onOpenNotifications) {
+      onOpenNotifications();
+    } else {
+      navigate('/notifications');
+    }
+  };
+
   // ============================================================
-  // NOTIFICATION VISUAL TYPE
+  // NOTIFICATION VISUAL TYPE & PRIORITY
   // ============================================================
 
   const getNotificationVisual = (type) => {
-    switch (type) {
-      case 'TRAINING_DUE_SOON':
+    switch (String(type || '').toUpperCase()) {
       case 'TRAINING_OVERDUE':
+      case 'COURSE_OVERDUE':
       case 'ASSESSMENT_FAILED':
+      case 'COURSE_CANCELLED':
+      case 'SYSTEM_ALERT':
         return { background: '#ffe4e6', color: '#e11d48', icon: <AlertTriangle style={icon(15)} /> };
+
+      case 'TRAINING_DUE_SOON':
+      case 'COURSE_DUE_SOON':
+      case 'DEADLINE_CHANGED':
+        return { background: '#fef3c7', color: '#d97706', icon: <Clock style={icon(15)} /> };
 
       case 'CERTIFICATE_ISSUED':
         return { background: '#fef3c7', color: '#d97706', icon: <Trophy style={icon(15)} /> };
 
       case 'COURSE_COMPLETED':
+      case 'MODULE_COMPLETED':
       case 'ASSESSMENT_RESULT':
         return { background: '#dcfce7', color: '#16a34a', icon: <Check style={icon(15)} /> };
 
       case 'ANNOUNCEMENT':
+      case 'GENERAL_ANNOUNCEMENT':
+      case 'TEAM_COMPLIANCE':
+      case 'HR_ADMIN_ALERT':
         return { background: '#e0f2fe', color: '#0284c7', icon: <Info style={icon(15)} /> };
 
       case 'COURSE_ASSIGNED':
+      case 'QUIZ_AVAILABLE':
+      case 'RETAKE_AVAILABLE':
       default:
         return { background: '#e0f2fe', color: '#0284c7', icon: <BookOpen style={icon(15)} /> };
     }
+  };
+
+  const getPriorityBadgeStyle = (priority) => {
+    const p = String(priority || 'NORMAL').toUpperCase();
+    if (p === 'CRITICAL') {
+      return { background: '#fee2e2', color: '#b91c1c', label: 'Critical' };
+    }
+    if (p === 'HIGH') {
+      return { background: '#ffedd5', color: '#c2410c', label: 'High' };
+    }
+    return null;
   };
 
   // ============================================================
@@ -208,47 +307,44 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
 
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
 
-  const roleBadge =
-    user?.role === 'HR_ADMIN'
-      ? { background: '#f3e8ff', color: '#7e22ce' }
-      : user?.role === 'MANAGER'
-      ? { background: '#fef3c7', color: '#b45309' }
-      : { background: '#e0f2fe', color: '#0369a1' };
+  const userRole = String(user?.role || '').toUpperCase();
+  const showCertificateAction = userRole === 'EMPLOYEE' && Boolean(onOpenCertificates);
 
   return (
-    <header className="header">
+    <header className="header floating-glass-header">
       {/* ======================================================
-          BRAND LOGO
+          BRAND LOGO & MOBILE HAMBURGER
       ====================================================== */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {onToggleMobileNav && (
+          <button
+            type="button"
+            className="glass-icon-button mobile-menu-toggle"
+            onClick={onToggleMobileNav}
+            aria-label="Toggle navigation menu"
+            title="Open Menu"
+            style={{ width: 36, height: 36 }}
+          >
+            <Menu style={icon(18)} />
+          </button>
+        )}
 
-      <div
-        className="brand-logo"
-        onClick={onNavigateHome}
-        style={{ cursor: 'pointer' }}
-        title="Return to Fairmacs Home Page"
-      >
-        <FairmacsLogo variant="default" height={42} />
+        <div
+          className="brand-logo"
+          onClick={onNavigateHome}
+          style={{ cursor: 'pointer' }}
+          title="Fairmacs - KMS"
+        >
+          <FairmacsLogo variant="default" height={42} />
+        </div>
       </div>
 
       {/* ======================================================
           DYNAMIC GREETING (hidden on narrow screens via CSS)
       ====================================================== */}
-
       <div className="header-greeting">
-        <span style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
+        <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--deep-navy)' }}>
           {getGreeting()}, {firstName} 👋
-        </span>
-
-        <span
-          style={{
-            ...roleBadge,
-            fontSize: '0.72rem',
-            fontWeight: 700,
-            padding: '0.2rem 0.6rem',
-            borderRadius: '20px'
-          }}
-        >
-          {roleLabel}
         </span>
       </div>
 
@@ -261,54 +357,50 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '1.25rem',
+          gap: '1rem',
           position: 'relative'
         }}
       >
-        {/* CERTIFICATES */}
-
-        <button
-          onClick={onOpenCertificates}
-          style={{
-            background: '#f0fdf4',
-            color: '#166534',
-            border: '1px solid #bbf7d0',
-            padding: '0.4rem 0.8rem',
-            borderRadius: '20px',
-            fontSize: '0.8rem',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          <Award style={icon(16)} />
-          Certificates
-        </button>
+        {/* CERTIFICATES (learner milestone access for Employee role) */}
+        {showCertificateAction && (
+          <button
+            onClick={onOpenCertificates}
+            type="button"
+            className="glass-button-secondary"
+            style={{
+              background: 'rgba(236, 253, 245, 0.75)',
+              color: '#047857',
+              border: '1px solid rgba(167, 243, 208, 0.85)',
+              padding: '0.42rem 0.85rem',
+              borderRadius: '20px',
+              fontSize: '0.8rem',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.12)'
+            }}
+          >
+            <Award style={icon(15)} />
+            Certificates
+          </button>
+        )}
 
         {/* NOTIFICATIONS */}
 
         <div style={{ position: 'relative' }}>
           <button
             onClick={() => {
-              setShowNotifDrawer(!showNotifDrawer);
+              const nextState = !showNotifDrawer;
+              setShowNotifDrawer(nextState);
               setShowDropdown(false);
+              if (nextState) {
+                loadNotifications(true);
+              }
             }}
-            style={{
-              position: 'relative',
-              background: '#f1f5f9',
-              border: 'none',
-              padding: '0.55rem',
-              borderRadius: '50%',
-              color: '#475569',
-              cursor: 'pointer',
-              display: 'flex'
-            }}
+            type="button"
+            className="glass-icon-button"
+            style={{ position: 'relative' }}
             title="Notifications"
+            aria-label="Notifications"
           >
-            <Bell style={icon(18)} />
+            <Bell style={icon(17)} />
 
             {unreadCount > 0 && (
               <span
@@ -316,35 +408,34 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   position: 'absolute',
                   top: -2,
                   right: -2,
-                  background: '#f43f5e',
+                  background: 'linear-gradient(135deg, #e11d48, #f43f5e)',
                   color: 'white',
                   fontSize: '0.65rem',
                   fontWeight: 800,
-                  width: 18,
+                  minWidth: 18,
                   height: 18,
-                  borderRadius: '50%',
+                  padding: '0 4px',
+                  borderRadius: '999px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(225, 29, 72, 0.4)'
                 }}
               >
-                {unreadCount}
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
 
           {showNotifDrawer && (
             <div
-              className="header-menu"
+              className="header-menu glass-dropdown"
               style={{
                 position: 'absolute',
                 right: 0,
                 top: '48px',
-                width: '340px',
-                background: 'white',
-                borderRadius: '12px',
-                boxShadow: '0 10px 30px rgba(0, 0, 0, 0.18)',
-                border: '1px solid #e2e8f0',
+                width: '380px',
+                maxWidth: 'calc(100vw - 24px)',
                 padding: '1rem',
                 zIndex: 1000,
                 animation: 'fadeIn 0.2s ease-out'
@@ -362,38 +453,64 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   marginBottom: '0.75rem'
                 }}
               >
-                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a' }}>
-                  Notifications
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span>Notifications</span>
                   {unreadCount > 0 && (
-                    <span style={{ color: '#0284c7' }}> ({unreadCount})</span>
+                    <span
+                      style={{
+                        background: '#e0f2fe',
+                        color: '#0284c7',
+                        fontSize: '0.7rem',
+                        padding: '0.1rem 0.45rem',
+                        borderRadius: '999px'
+                      }}
+                    >
+                      {unreadCount} unread
+                    </span>
                   )}
                 </div>
 
-                {unreadCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <button
-                    onClick={markAllRead}
+                    onClick={() => loadNotifications(false)}
+                    title="Refresh notifications"
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#0284c7',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: 'pointer'
+                      color: '#64748b',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center'
                     }}
                   >
-                    Mark all read
+                    <RefreshCw style={icon(13)} />
                   </button>
-                )}
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Notification List */}
-
+              
               <div
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.75rem',
-                  maxHeight: '300px',
+                  gap: '0.65rem',
+                  maxHeight: '340px',
                   overflowY: 'auto'
                 }}
               >
@@ -402,51 +519,109 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                     Loading notifications...
                   </div>
                 ) : notifications.length === 0 ? (
-                  <div style={{ padding: '1.5rem', textAlign: 'center', fontSize: '0.78rem', color: '#64748b' }}>
-                    No notifications
+                  <div style={{ padding: '1.75rem 1rem', textAlign: 'center', fontSize: '0.8rem', color: '#64748b' }}>
+                    You’re all caught up! No notifications yet.
                   </div>
                 ) : (
-                  notifications.map((notif) => {
+                  notifications.slice(0, 8).map((notif) => {
                     const visual = getNotificationVisual(notif.type);
+                    const priorityBadge = getPriorityBadgeStyle(notif.priority);
+                    const exactDate = notif.createdAt
+                      ? new Date(notif.createdAt).toLocaleString()
+                      : '';
 
                     return (
                       <div
                         key={notif.id}
-                        onClick={() => {
-                          if (!notif.read) markNotificationRead(notif.id);
-                        }}
+                        onClick={() => handleNotificationClick(notif)}
                         style={{
-                          background: notif.read ? '#ffffff' : '#f0f9ff',
+                          background: notif.read ? 'rgba(255, 255, 255, 0.85)' : '#f0f9ff',
                           padding: '0.75rem',
-                          borderRadius: '8px',
-                          border: '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          border: notif.read ? '1px solid #e2e8f0' : '1px solid #bae6fd',
                           display: 'flex',
-                          gap: '0.6rem',
+                          gap: '0.65rem',
                           alignItems: 'flex-start',
-                          cursor: notif.read ? 'default' : 'pointer'
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
                         }}
                       >
                         <div
                           style={{
-                            padding: '0.35rem',
+                            padding: '0.4rem',
                             borderRadius: '50%',
                             background: visual.background,
                             color: visual.color,
-                            flexShrink: 0
+                            flexShrink: 0,
+                            marginTop: '0.1rem'
                           }}
                         >
                           {visual.icon}
                         </div>
 
-                        <div style={{ minWidth: 0 }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
+                            <span
+                              style={{
+                                fontSize: '0.64rem',
+                                fontWeight: 700,
+                                padding: '0.1rem 0.45rem',
+                                borderRadius: '999px',
+                                background: '#f1f5f9',
+                                color: '#475569'
+                              }}
+                            >
+                              {formatNotificationCategory(notif.type)}
+                            </span>
+                            {priorityBadge && (
+                              <span
+                                style={{
+                                  fontSize: '0.62rem',
+                                  fontWeight: 800,
+                                  padding: '0.1rem 0.42rem',
+                                  borderRadius: '999px',
+                                  background: priorityBadge.background,
+                                  color: priorityBadge.color
+                                }}
+                              >
+                                {priorityBadge.label}
+                              </span>
+                            )}
+                            {!notif.read && (
+                              <span
+                                style={{
+                                  width: 7,
+                                  height: 7,
+                                  borderRadius: '50%',
+                                  background: '#1677FF',
+                                  marginLeft: 'auto'
+                                }}
+                                title="Unread"
+                              />
+                            )}
+                          </div>
+
                           <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a' }}>
                             {notif.title}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: '0.15rem', lineHeight: 1.35 }}>
+                          <div style={{ fontSize: '0.74rem', color: '#475569', marginTop: '0.15rem', lineHeight: 1.4 }}>
                             {notif.message}
                           </div>
-                          <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '0.35rem' }}>
-                            {formatNotificationTime(notif.createdAt)}
+                          <div
+                            style={{
+                              fontSize: '0.68rem',
+                              color: '#94a3b8',
+                              marginTop: '0.35rem',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                            title={exactDate}
+                          >
+                            <span>{formatNotificationTime(notif.createdAt)}</span>
+                            <span style={{ color: '#1677FF', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
+                              Open <ExternalLink style={icon(10)} />
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -454,49 +629,61 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                   })
                 )}
               </div>
+
+              {/* Footer: View All Notifications */}
+              <div
+                style={{
+                  borderTop: '1px solid #f1f5f9',
+                  marginTop: '0.75rem',
+                  paddingTop: '0.65rem',
+                  textAlign: 'center'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleViewAllNotifications}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(22, 119, 255, 0.25)',
+                    background: 'rgba(226, 240, 255, 0.55)',
+                    color: '#1677FF',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  View All Notifications
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* PROFILE DROPDOWN */}
-
         <div style={{ position: 'relative' }}>
           <button
+            type="button"
+            className="header-profile-trigger"
             onClick={() => {
               setShowDropdown(!showDropdown);
               setShowNotifDrawer(false);
             }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              background: 'none',
-              border: 'none',
-              borderLeft: '1px solid #e2e8f0', /* FIX: now placed after "border: none" */
-              paddingLeft: '0.75rem',
-              cursor: 'pointer',
-              textAlign: 'left'
-            }}
           >
-            <img
-              src={user?.avatar || DEFAULT_AVATAR}
-              alt={user?.name}
-              style={{
-                width: 38,
-                height: 38,
-                flexShrink: 0,
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '2px solid #0284c7'
-              }}
+            <UserAvatar
+              name={user?.name}
+              employeeId={user?.employeeId}
+              email={user?.email}
+              size="sm"
             />
 
             <div className="header-profile-text">
               <div
                 style={{
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  color: '#0f172a',
+                  fontSize: '0.84rem',
+                  fontWeight: 750,
+                  color: '#102A43',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.25rem'
@@ -506,7 +693,7 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
                 <ChevronDown style={{ ...icon(14), color: '#64748b' }} />
               </div>
 
-              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>
+              <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 500 }}>
                 {user?.designation}
               </div>
             </div>
@@ -516,16 +703,12 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
 
           {showDropdown && (
             <div
-              className="header-menu"
+              className="header-menu glass-dropdown"
               style={{
                 position: 'absolute',
                 right: 0,
                 top: '50px',
                 width: '260px',
-                background: 'white',
-                borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-                border: '1px solid #e2e8f0',
                 padding: '0.75rem',
                 zIndex: 1000,
                 animation: 'fadeIn 0.2s ease-out'
@@ -554,12 +737,12 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
               <button
                 onClick={() => {
                   setShowDropdown(false);
-                  setShowAboutModal(true);
+                  navigate('/profile');
                 }}
                 style={menuButtonStyle}
               >
                 <User style={{ ...icon(16), color: '#0284c7' }} />
-                About
+                My Profile
               </button>
 
               <button
@@ -595,176 +778,183 @@ export default function Header({ onOpenCertificates, onNavigateHome }) {
 
       {/* ======================================================
           ABOUT MODAL
+          Rendered through a portal into document.body. The header uses
+          backdrop-filter and position: sticky, which would otherwise trap
+          this fixed overlay inside the 68px header (clipped and layered
+          under the page content).
       ====================================================== */}
-
-      {showAboutModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowAboutModal(false)}
-          style={{ zIndex: 2000 }}
-        >
+      {showAboutModal &&
+        createPortal(
           <div
-            className="modal-content animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: '100%', maxWidth: '520px', padding: 0, overflow: 'hidden' }}
+            className="modal-overlay"
+            onClick={() => setShowAboutModal(false)}
+            style={{ zIndex: 2000 }}
           >
-            {/* Modal Header */}
-
             <div
+              className="modal-content animate-fade-in"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Employee profile"
               style={{
-                background: 'linear-gradient(135deg, #0b1f38 0%, #0c2340 55%, #075985 100%)',
-                padding: '1.5rem',
-                color: 'white',
-                position: 'relative'
+                width: '100%',
+                maxWidth: '520px',
+                padding: 0,
+                maxHeight: 'calc(100dvh - 32px)',
+                overflowY: 'auto'
               }}
             >
-              <button
-                onClick={() => setShowAboutModal(false)}
+              {/* Modal Header */}
+              <div
                 style={{
-                  position: 'absolute',
-                  right: '1rem',
-                  top: '1rem',
-                  background: 'rgba(255,255,255,0.15)',
-                  border: 'none',
+                  background: 'linear-gradient(135deg, #0b1f38 0%, #0c2340 55%, #075985 100%)',
+                  padding: '1.5rem',
                   color: 'white',
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  position: 'relative'
                 }}
               >
-                <X style={icon(18)} />
-              </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <img
-                  src={user?.avatar || DEFAULT_AVATAR}
-                  alt={user?.name}
+                <button
+                  onClick={() => setShowAboutModal(false)}
+                  aria-label="Close profile"
                   style={{
-                    width: 72,
-                    height: 72,
-                    flexShrink: 0,
+                    position: 'absolute',
+                    right: '1rem',
+                    top: '1rem',
+                    background: 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    color: 'white',
+                    width: 32,
+                    height: 32,
                     borderRadius: '50%',
-                    objectFit: 'cover',
-                    border: '3px solid rgba(255,255,255,0.9)'
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
-                />
+                >
+                  <X style={icon(18)} />
+                </button>
 
-                <div>
-                  <div
-                    style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      color: '#7dd3fc',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.8px',
-                      marginBottom: '0.2rem'
-                    }}
-                  >
-                    Employee Profile
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <UserAvatar
+                    name={user?.name}
+                    employeeId={user?.employeeId}
+                    email={user?.email}
+                    size="xl"
+                  />
 
-                  <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800 }}>
-                    {user?.name || 'User'}
-                  </h2>
+                  <div>
+                    <div
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        color: '#7dd3fc',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.8px',
+                        marginBottom: '0.2rem'
+                      }}
+                    >
+                      Employee Profile
+                    </div>
 
-                  <div style={{ marginTop: '0.2rem', fontSize: '0.8rem', color: '#cbd5e1' }}>
-                    {user?.designation || 'Employee'}
+                    <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800 }}>
+                      {user?.name || 'User'}
+                    </h2>
+
+                    <div style={{ marginTop: '0.2rem', fontSize: '0.8rem', color: '#cbd5e1' }}>
+                      {user?.designation || 'Employee'}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Details */}
+              {/* Details */}
+              <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.2rem' }}>
+                  Personal & Work Information
+                </div>
 
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.2rem' }}>
-                Personal & Work Information
-              </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                  <InfoCard Icon={BadgeCheck} label="Employee ID">
+                    {user?.employeeId || user?.id || 'N/A'}
+                  </InfoCard>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                <InfoCard Icon={BadgeCheck} label="Employee ID">
-                  {user?.employeeId || user?.id || 'N/A'}
-                </InfoCard>
+                  <InfoCard Icon={ShieldCheck} label="Role">
+                    {roleLabel || 'N/A'}
+                  </InfoCard>
 
-                <InfoCard Icon={ShieldCheck} label="Role">
-                  {roleLabel || 'N/A'}
-                </InfoCard>
+                  <InfoCard
+                    Icon={Mail}
+                    label="Email"
+                    valueStyle={{ fontSize: '0.8rem', color: '#0284c7', wordBreak: 'break-word' }}
+                  >
+                    {user?.email || 'N/A'}
+                  </InfoCard>
 
-                <InfoCard
-                  Icon={Mail}
-                  label="Email"
-                  valueStyle={{ fontSize: '0.8rem', color: '#0284c7', wordBreak: 'break-word' }}
+                  <InfoCard Icon={Building2} label="Department">
+                    {user?.department || 'N/A'}
+                  </InfoCard>
+
+                  <InfoCard Icon={Briefcase} label="Designation" wide>
+                    {user?.designation || 'N/A'}
+                  </InfoCard>
+                </div>
+
+                {/* Account Status */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: '0.25rem',
+                    padding: '0.85rem 1rem',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '10px'
+                  }}
                 >
-                  {user?.email || 'N/A'}
-                </InfoCard>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <ShieldCheck style={{ ...icon(18), color: '#16a34a' }} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534' }}>
+                      Account Status
+                    </span>
+                  </div>
 
-                <InfoCard Icon={Building2} label="Department">
-                  {user?.department || 'N/A'}
-                </InfoCard>
-
-                <InfoCard Icon={Briefcase} label="Designation" wide>
-                  {user?.designation || 'N/A'}
-                </InfoCard>
-              </div>
-
-              {/* Account Status */}
-
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginTop: '0.25rem',
-                  padding: '0.85rem 1rem',
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  borderRadius: '10px'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <ShieldCheck style={{ ...icon(18), color: '#16a34a' }} />
-                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534' }}>
-                    Account Status
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 800,
+                      color: '#166534',
+                      background: '#dcfce7',
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: '20px'
+                    }}
+                  >
+                    {user?.status || 'ACTIVE'}
                   </span>
                 </div>
 
-                <span
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 800,
-                    color: '#166534',
-                    background: '#dcfce7',
-                    padding: '0.25rem 0.6rem',
-                    borderRadius: '20px'
-                  }}
+                <button
+                  onClick={() => setShowAboutModal(false)}
+                  className="btn-primary"
+                  style={{ width: '100%', justifyContent: 'center', marginTop: '0.25rem' }}
                 >
-                  {user?.status || 'ACTIVE'}
-                </span>
+                  Close
+                </button>
               </div>
-
-              <button
-                onClick={() => setShowAboutModal(false)}
-                className="btn-primary"
-                style={{ width: '100%', justifyContent: 'center', marginTop: '0.25rem' }}
-              >
-                Close
-              </button>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* ======================================================
-          PASSWORD MODAL
+          PASSWORD MODAL (also portaled for the same reason)
       ====================================================== */}
-
-      {showPasswordModal && (
-        <PasswordModal onClose={() => setShowPasswordModal(false)} />
-      )}
+      {showPasswordModal &&
+        createPortal(
+          <PasswordModal onClose={() => setShowPasswordModal(false)} />,
+          document.body
+        )}
     </header>
   );
 }

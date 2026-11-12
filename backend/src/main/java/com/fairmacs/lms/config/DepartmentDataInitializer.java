@@ -33,8 +33,8 @@ public class DepartmentDataInitializer implements CommandLineRunner {
 
         List<DepartmentData> departments = List.of(
                 new DepartmentData(
-                        "Human Resource",
-                        "Human resources and employee administration."
+                        "People Operations",
+                        "People Operations and employee administration."
                 ),
                 new DepartmentData(
                         "Accounts",
@@ -65,7 +65,11 @@ public class DepartmentDataInitializer implements CommandLineRunner {
                         "Sales, business development and customer acquisition."
                 ),
                 new DepartmentData(
-                        "General / Common",
+                        "Information Technology",
+                        "Information technology, software, and systems infrastructure."
+                ),
+                new DepartmentData(
+                        "General",
                         "Common training applicable across departments."
                 )
         );

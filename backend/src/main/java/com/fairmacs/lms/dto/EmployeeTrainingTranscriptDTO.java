@@ -171,34 +171,24 @@ public class EmployeeTrainingTranscriptDTO {
     public static class CourseRecordDTO {
 
         private Long enrollmentId;
-
         private Long courseDatabaseId;
-
         private String courseId;
-
         private String courseTitle;
-
         private String category;
-
         private String enrollmentType;
-
         private String status;
-
         private Integer progressPercent;
-
         private Integer score;
-
         private String certificateId;
-
         private LocalDate dueDate;
-
         private LocalDateTime enrolledAt;
-
         private LocalDateTime completedDate;
-
         private LocalDateTime lastAccessed;
-
         private Double durationHours;
+        private String courseDepartment;
+        private Long owningDepartmentId;
+        private String assignmentType;
+        private String employeeDepartment;
 
         public CourseRecordDTO() {
         }
@@ -321,6 +311,38 @@ public class EmployeeTrainingTranscriptDTO {
 
         public void setDurationHours(Double durationHours) {
             this.durationHours = durationHours;
+        }
+
+        public String getCourseDepartment() {
+            return courseDepartment;
+        }
+
+        public void setCourseDepartment(String courseDepartment) {
+            this.courseDepartment = courseDepartment;
+        }
+
+        public Long getOwningDepartmentId() {
+            return owningDepartmentId;
+        }
+
+        public void setOwningDepartmentId(Long owningDepartmentId) {
+            this.owningDepartmentId = owningDepartmentId;
+        }
+
+        public String getAssignmentType() {
+            return assignmentType;
+        }
+
+        public void setAssignmentType(String assignmentType) {
+            this.assignmentType = assignmentType;
+        }
+
+        public String getEmployeeDepartment() {
+            return employeeDepartment;
+        }
+
+        public void setEmployeeDepartment(String employeeDepartment) {
+            this.employeeDepartment = employeeDepartment;
         }
     }
 }

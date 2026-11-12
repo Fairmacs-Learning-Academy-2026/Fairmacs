@@ -60,7 +60,7 @@ public class Quiz {
      * Maximum number of attempts allowed.
      */
     @Column
-    private Integer maxAttempts = 3;
+    private Integer maxAttempts;
 
     /**
      * Number of questions available in the question bank
@@ -71,7 +71,10 @@ public class Quiz {
      * Questions per attempt = 10
      */
     @Column
-    private Integer questionsPerAttempt = 10;
+    private Integer questionsPerAttempt;
+
+    @Column(name = "cooldown_minutes")
+    private Integer cooldownMinutes = 5;
 
     /**
      * Randomly select questions from the question bank.
@@ -184,6 +187,14 @@ public class Quiz {
 
     public void setQuestionsPerAttempt(Integer questionsPerAttempt) {
         this.questionsPerAttempt = questionsPerAttempt;
+    }
+
+    public Integer getCooldownMinutes() {
+        return cooldownMinutes != null ? cooldownMinutes : 5;
+    }
+
+    public void setCooldownMinutes(Integer cooldownMinutes) {
+        this.cooldownMinutes = cooldownMinutes;
     }
 
     public Boolean getRandomizeQuestions() {

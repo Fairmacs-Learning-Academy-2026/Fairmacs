@@ -39,4 +39,8 @@ public interface QuizProgressRepository extends JpaRepository<QuizProgress, Long
     default boolean existsByQuizIdAndUserIdAndPassedTrue(Long quizId, Long userId) {
         return existsByQuiz_IdAndUser_IdAndPassedTrue(quizId, userId);
     }
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM QuizProgress qp WHERE qp.quiz.course.id = :courseId")
+    void deleteByCourseId(@org.springframework.data.repository.query.Param("courseId") Long courseId);
 }

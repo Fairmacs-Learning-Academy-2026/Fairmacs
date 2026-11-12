@@ -9,6 +9,11 @@ public class DepartmentDetailsDTO {
     private String description;
     private int employeeCount;
     private int assignedCoursesCount;
+    private int ownedCoursesCount;
+    private int mandatoryAssignmentsCount;
+    private int recommendedAssignmentsCount;
+    private int overdueAssignmentsCount;
+    private double averageAssessmentScore;
     private double completionRate;
     private List<DepartmentEmployeeDTO> employees;
     private List<DepartmentCourseDTO> courses;
@@ -41,6 +46,16 @@ public class DepartmentDetailsDTO {
     public void setEmployeeCount(int employeeCount) { this.employeeCount = employeeCount; }
     public int getAssignedCoursesCount() { return assignedCoursesCount; }
     public void setAssignedCoursesCount(int assignedCoursesCount) { this.assignedCoursesCount = assignedCoursesCount; }
+    public int getOwnedCoursesCount() { return ownedCoursesCount; }
+    public void setOwnedCoursesCount(int ownedCoursesCount) { this.ownedCoursesCount = ownedCoursesCount; }
+    public int getMandatoryAssignmentsCount() { return mandatoryAssignmentsCount; }
+    public void setMandatoryAssignmentsCount(int mandatoryAssignmentsCount) { this.mandatoryAssignmentsCount = mandatoryAssignmentsCount; }
+    public int getRecommendedAssignmentsCount() { return recommendedAssignmentsCount; }
+    public void setRecommendedAssignmentsCount(int recommendedAssignmentsCount) { this.recommendedAssignmentsCount = recommendedAssignmentsCount; }
+    public int getOverdueAssignmentsCount() { return overdueAssignmentsCount; }
+    public void setOverdueAssignmentsCount(int overdueAssignmentsCount) { this.overdueAssignmentsCount = overdueAssignmentsCount; }
+    public double getAverageAssessmentScore() { return averageAssessmentScore; }
+    public void setAverageAssessmentScore(double averageAssessmentScore) { this.averageAssessmentScore = averageAssessmentScore; }
     public double getCompletionRate() { return completionRate; }
     public void setCompletionRate(double completionRate) { this.completionRate = completionRate; }
     public List<DepartmentEmployeeDTO> getEmployees() { return employees; }

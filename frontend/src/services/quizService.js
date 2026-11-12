@@ -1,36 +1,13 @@
 // Quiz Service
 // Server-authoritative quiz start / submit API calls.
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import {
+  API_BASE_URL,
+  getAuthHeaders,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
-const TOKEN_KEY = 'fairmacs_token';
-const USER_KEY = 'fairmacs_user';
-
-const getToken = () => {
-  return localStorage.getItem(TOKEN_KEY) || '';
-};
-
-const forceLogout = () => {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-
-  // Remove legacy authentication keys.
-  localStorage.removeItem('fairmacs_lms_token');
-  localStorage.removeItem('fairmacs_lms_user');
-
-  window.location.href = '/login';
-};
-
-const getAuthHeaders = () => {
-  const token = getToken();
-
-  return {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
+const forceLogout = () => handleUnauthorized(true);
 
 const readError = async (response, fallback) => {
   try {

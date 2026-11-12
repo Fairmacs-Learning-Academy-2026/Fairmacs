@@ -1,8 +1,8 @@
-
 package com.fairmacs.lms.repository;
 
 import com.fairmacs.lms.entity.Course;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -62,6 +62,22 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("""
         SELECT c
         FROM Course c
+        WHERE c.draft = true
+        ORDER BY c.updatedAt DESC
+    """)
+    List<Course> findAllDrafts();
+
+    @Query("""
+        SELECT c
+        FROM Course c
+        WHERE c.courseId = :courseId
+          AND c.draft = true
+    """)
+    Optional<Course> findDraftByCourseId(@Param("courseId") String courseId);
+
+    @Query("""
+        SELECT c
+        FROM Course c
         WHERE c.courseId = :courseId
           AND c.draft = true
           AND c.createdBy.id = :userId
@@ -74,10 +90,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     @Query("""
         SELECT DISTINCT c
         FROM Course c
-        LEFT JOIN FETCH c.catalogCategory
+        LEFT JOIN FETCH c.catalogCategory cat
         WHERE c.active = true
           AND COALESCE(c.draft, false) = false
-          AND (:categorySlug IS NULL OR c.catalogCategory.slug = :categorySlug)
+          AND (:categorySlug IS NULL OR :categorySlug = '' OR cat.slug = :categorySlug)
           AND (
                 :q IS NULL OR :q = ''
                 OR LOWER(c.title) LIKE LOWER(CONCAT('%', :q, '%'))
@@ -90,4 +106,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
         @Param("q") String q,
         @Param("categorySlug") String categorySlug
     );
+
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM Course c WHERE c.id = :courseId")
+    void deleteCourseById(@Param("courseId") Long courseId);
 }

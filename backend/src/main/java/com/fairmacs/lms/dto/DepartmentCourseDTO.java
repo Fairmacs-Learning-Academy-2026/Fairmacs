@@ -7,6 +7,14 @@ public class DepartmentCourseDTO {
     private Boolean active;
     private int enrolledEmployees;
     private double completionRate;
+    private boolean owned;
+    private String assignmentType;
+    private String owningDepartmentName;
+    private int mandatoryCount;
+    private int recommendedCount;
+    private int completedCount;
+    private int overdueCount;
+    private double averageScore;
 
     public DepartmentCourseDTO() {}
 
@@ -32,4 +40,21 @@ public class DepartmentCourseDTO {
     public void setEnrolledEmployees(int enrolledEmployees) { this.enrolledEmployees = enrolledEmployees; }
     public double getCompletionRate() { return completionRate; }
     public void setCompletionRate(double completionRate) { this.completionRate = completionRate; }
+
+    public boolean isOwned() { return owned; }
+    public void setOwned(boolean owned) { this.owned = owned; }
+    public String getAssignmentType() { return assignmentType; }
+    public void setAssignmentType(String assignmentType) { this.assignmentType = assignmentType; }
+    public String getOwningDepartmentName() { return owningDepartmentName; }
+    public void setOwningDepartmentName(String owningDepartmentName) { this.owningDepartmentName = owningDepartmentName; }
+    public int getMandatoryCount() { return mandatoryCount; }
+    public void setMandatoryCount(int mandatoryCount) { this.mandatoryCount = mandatoryCount; }
+    public int getRecommendedCount() { return recommendedCount; }
+    public void setRecommendedCount(int recommendedCount) { this.recommendedCount = recommendedCount; }
+    public int getCompletedCount() { return completedCount; }
+    public void setCompletedCount(int completedCount) { this.completedCount = completedCount; }
+    public int getOverdueCount() { return overdueCount; }
+    public void setOverdueCount(int overdueCount) { this.overdueCount = overdueCount; }
+    public double getAverageScore() { return averageScore; }
+    public void setAverageScore(double averageScore) { this.averageScore = averageScore; }
 }

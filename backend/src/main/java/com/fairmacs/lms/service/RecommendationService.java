@@ -2,10 +2,14 @@ package com.fairmacs.lms.service;
 
 import com.fairmacs.lms.dto.CourseDTO;
 import com.fairmacs.lms.entity.Course;
+import com.fairmacs.lms.entity.CourseDepartmentAssignment;
+import com.fairmacs.lms.entity.EnrollmentType;
 import com.fairmacs.lms.entity.RecommendationRule;
 import com.fairmacs.lms.entity.User;
+import com.fairmacs.lms.repository.CourseDepartmentAssignmentRepository;
 import com.fairmacs.lms.repository.CourseRepository;
 import com.fairmacs.lms.repository.RecommendationRuleRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -33,16 +37,48 @@ public class RecommendationService {
 
     private final RecommendationRuleRepository recommendationRuleRepository;
     private final CourseRepository courseRepository;
+    private final CourseDepartmentAssignmentRepository courseDepartmentAssignmentRepository;
 
-    public RecommendationService(RecommendationRuleRepository recommendationRuleRepository,
+    public RecommendationService(
+            RecommendationRuleRepository recommendationRuleRepository,
             CourseRepository courseRepository) {
+        this(recommendationRuleRepository, courseRepository, null);
+    }
+
+    @Autowired
+    public RecommendationService(
+            RecommendationRuleRepository recommendationRuleRepository,
+            CourseRepository courseRepository,
+            @Autowired(required = false) CourseDepartmentAssignmentRepository courseDepartmentAssignmentRepository) {
         this.recommendationRuleRepository = recommendationRuleRepository;
         this.courseRepository = courseRepository;
+        this.courseDepartmentAssignmentRepository = courseDepartmentAssignmentRepository;
     }
 
     public List<Course> recommendFor(User user, Set<Long> alreadyEnrolledCourseIds) {
         LinkedHashMap<Long, Course> ordered = new LinkedHashMap<>();
 
+        if (user == null) {
+            return List.of();
+        }
+
+        // 1. Target department assignments configured with RECOMMENDED
+        if (user.getDepartment() != null && courseDepartmentAssignmentRepository != null) {
+            List<CourseDepartmentAssignment> assignments = courseDepartmentAssignmentRepository
+                    .findByDepartment_NameIgnoreCase(user.getDepartment());
+            if (assignments != null) {
+                for (CourseDepartmentAssignment a : assignments) {
+                    if (a.getAssignmentType() == EnrollmentType.RECOMMENDED && a.getCourse() != null) {
+                        Course course = a.getCourse();
+                        if (isEligibleRecommendation(course, user, alreadyEnrolledCourseIds)) {
+                            ordered.put(course.getId(), course);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Department / designation recommendation rules
         if (user.getDepartment() != null) {
             List<RecommendationRule> rules = recommendationRuleRepository
                     .findByDepartmentIgnoreCase(user.getDepartment());
@@ -55,22 +91,56 @@ public class RecommendationService {
                             a.getPriority() == null ? 0 : a.getPriority()))
                     .forEach(rule -> {
                         Course course = rule.getCourse();
-                        if (course != null && !alreadyEnrolledCourseIds.contains(course.getId())) {
+                        if (course != null && isEligibleRecommendation(course, user, alreadyEnrolledCourseIds)) {
                             ordered.put(course.getId(), course);
                         }
                     });
         }
 
+        // 3. Category slugs matching employee department
         List<String> slugs = DEPARTMENT_CATEGORY_SLUGS.getOrDefault(
                 user.getDepartment() == null ? "" : user.getDepartment().toLowerCase(Locale.ROOT),
                 List.of());
         courseRepository.findActiveWithCategory().stream()
-                .filter(c -> !Boolean.TRUE.equals(c.getFoundation()))
+                .filter(c -> isEligibleRecommendation(c, user, alreadyEnrolledCourseIds))
                 .filter(c -> c.getCatalogCategory() != null && slugs.contains(c.getCatalogCategory().getSlug()))
-                .filter(c -> !alreadyEnrolledCourseIds.contains(c.getId()))
                 .forEach(c -> ordered.putIfAbsent(c.getId(), c));
 
         return new ArrayList<>(ordered.values());
+    }
+
+    private boolean isEligibleRecommendation(Course course, User user, Set<Long> alreadyEnrolledCourseIds) {
+        if (course == null) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(course.getFoundation())) {
+            return false;
+        }
+        if (course.getActive() != null && !course.getActive()) {
+            return false;
+        }
+        if (alreadyEnrolledCourseIds != null && alreadyEnrolledCourseIds.contains(course.getId())) {
+            return false;
+        }
+
+        String userLevel = normalizeLevel(user.getLevel());
+        String courseLevel = normalizeLevel(course.getLevel());
+        if (userLevel != null && courseLevel != null && !userLevel.equals(courseLevel)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private String normalizeLevel(String level) {
+        if (level == null || level.isBlank()) {
+            return null;
+        }
+        String normalized = level.trim().toUpperCase();
+        if (normalized.startsWith("L") && normalized.length() == 2 && Character.isDigit(normalized.charAt(1))) {
+            normalized = "P" + normalized.charAt(1);
+        }
+        return normalized.matches("P[0-4]") ? normalized : null;
     }
 
     public String resolveAssignmentType(Course course, EnrollmentLookup lookup) {

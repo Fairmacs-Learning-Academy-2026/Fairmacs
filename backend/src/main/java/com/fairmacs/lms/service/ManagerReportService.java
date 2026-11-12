@@ -61,7 +61,10 @@ public class ManagerReportService {
                 enrollmentRepository
                         .findActiveEmployeeEnrollmentsByDepartment(
                                 department
-                        );
+                        )
+                        .stream()
+                        .filter(e -> e.getStatus() != com.fairmacs.lms.entity.EnrollmentStatus.REVOKED)
+                        .toList();
 
         Map<Long, List<Enrollment>> employeeEnrollments =
                 new HashMap<>();

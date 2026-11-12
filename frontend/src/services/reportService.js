@@ -1,19 +1,24 @@
 // Report Service
 // Handles analytics, reports, and audit logs
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import {
+  API_BASE_URL,
+  getAuthHeaders,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
 export const reportService = {
   // Get HR dashboard metrics
   getHRMetrics: async () => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/reports/hr-metrics`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return null;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch HR metrics');
@@ -28,14 +33,15 @@ export const reportService = {
 
   // Get department analytics
   getDepartmentAnalytics: async (department) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/reports/department/${department}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return null;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch department analytics');
@@ -50,14 +56,15 @@ export const reportService = {
 
   // Get audit logs
   getAuditLogs: async (limit = 50, offset = 0) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/reports/audit-logs?limit=${limit}&offset=${offset}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch audit logs');
@@ -72,15 +79,17 @@ export const reportService = {
 
   // Get completion report
   getCompletionReport: async (filters = {}) => {
-    const token = localStorage.getItem('fairmacs_token');
     const queryParams = new URLSearchParams(filters).toString();
     
     try {
       const response = await fetch(`${API_BASE_URL}/reports/completion?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch completion report');
@@ -95,14 +104,15 @@ export const reportService = {
 
   // Export report to PDF/Excel
   exportReport: async (reportType, format = 'pdf') => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/reports/export?type=${reportType}&format=${format}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to export report');
@@ -127,14 +137,15 @@ export const reportService = {
 
   // Get overdue training report
   getOverdueReport: async () => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/reports/overdue`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch overdue report');

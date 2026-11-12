@@ -1,5 +1,6 @@
 package com.fairmacs.lms.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -33,6 +34,7 @@ public class Category {
     @Column
     private Boolean foundationTrack = false;
 
+    @JsonIgnore
     @OneToMany(mappedBy = "catalogCategory")
     private List<Course> courses = new ArrayList<>();
 

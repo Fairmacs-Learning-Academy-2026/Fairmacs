@@ -25,6 +25,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -33,6 +34,11 @@ import java.util.stream.Collectors;
 public class CatalogService {
 
     private static final Map<String, Integer> LEVEL_RANK = Map.of(
+            "P0", 0,
+            "P1", 1,
+            "P2", 2,
+            "P3", 3,
+            "P4", 4,
             "L0", 0,
             "L1", 1,
             "L2", 2,
@@ -120,10 +126,23 @@ public class CatalogService {
                         .thenComparing(Course::getTitle))
                 .map(course -> {
                     Enrollment enrollment = byCourse.get(course.getId());
+                    boolean targetDeptMandatory = user != null && user.getDepartment() != null
+                            && course.getDepartmentAssignments() != null
+                            && course.getDepartmentAssignments().stream().anyMatch(a ->
+                                    a.getDepartment() != null
+                                    && a.getDepartment().getName().equalsIgnoreCase(user.getDepartment())
+                                    && a.getAssignmentType() == EnrollmentType.MANDATORY);
                     boolean mandatory = (enrollment != null
                             && enrollment.getEnrollmentType() == EnrollmentType.MANDATORY)
-                            || Boolean.TRUE.equals(course.getFoundation());
-                    boolean recommended = recommendedIds.contains(course.getId());
+                            || Boolean.TRUE.equals(course.getFoundation())
+                            || targetDeptMandatory;
+                    boolean recommended = recommendedIds.contains(course.getId())
+                            || (user != null && user.getDepartment() != null
+                                    && course.getDepartmentAssignments() != null
+                                    && course.getDepartmentAssignments().stream().anyMatch(a ->
+                                            a.getDepartment() != null
+                                            && a.getDepartment().getName().equalsIgnoreCase(user.getDepartment())
+                                            && a.getAssignmentType() == EnrollmentType.RECOMMENDED));
                     String type = mandatory ? "MANDATORY"
                             : (recommended ? "RECOMMENDED" : "OPTIONAL");
                     return courseMapper.toSummary(course, enrollment, type);
@@ -136,6 +155,14 @@ public class CatalogService {
         User user = securityContextUtil.getCurrentUser();
 
         Course course = courseRepository.findDetailByCourseId(courseCode)
+                .or(() -> {
+                    try {
+                        Long id = Long.parseLong(courseCode);
+                        return courseRepository.findDetailById(id);
+                    } catch (NumberFormatException e) {
+                        return Optional.empty();
+                    }
+                })
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Course", "courseId", courseCode));
 
@@ -147,7 +174,7 @@ public class CatalogService {
 
         if (!isCourseVisibleToUser(user, course, alreadyEnrolled)) {
             throw new SecurityException(
-                    "This course is not available for your employee level.");
+                    "This course is not available for your employee position.");
         }
 
         Enrollment enrollment = currentEnrollment;
@@ -190,7 +217,10 @@ public class CatalogService {
         }
 
         String normalized = level.trim().toUpperCase();
-        return LEVEL_RANK.containsKey(normalized) ? normalized : null;
+        if (normalized.startsWith("L") && normalized.length() == 2 && Character.isDigit(normalized.charAt(1))) {
+            normalized = "P" + normalized.charAt(1);
+        }
+        return (normalized.startsWith("P") && LEVEL_RANK.containsKey(normalized)) ? normalized : null;
     }
 
     @Transactional(readOnly = true)
@@ -346,6 +376,22 @@ public class CatalogService {
         }
         if (Boolean.TRUE.equals(course.getFoundation())) {
             return "MANDATORY";
+        }
+        if (user != null && user.getDepartment() != null && course.getDepartmentAssignments() != null) {
+            boolean hasMandatory = course.getDepartmentAssignments().stream()
+                    .anyMatch(a -> a.getDepartment() != null
+                            && a.getDepartment().getName().equalsIgnoreCase(user.getDepartment())
+                            && a.getAssignmentType() == EnrollmentType.MANDATORY);
+            if (hasMandatory) {
+                return "MANDATORY";
+            }
+            boolean hasRecommended = course.getDepartmentAssignments().stream()
+                    .anyMatch(a -> a.getDepartment() != null
+                            && a.getDepartment().getName().equalsIgnoreCase(user.getDepartment())
+                            && a.getAssignmentType() == EnrollmentType.RECOMMENDED);
+            if (hasRecommended) {
+                return "RECOMMENDED";
+            }
         }
         if (user != null) {
             boolean recommended = recommendationService.recommendFor(user, Set.of()).stream()

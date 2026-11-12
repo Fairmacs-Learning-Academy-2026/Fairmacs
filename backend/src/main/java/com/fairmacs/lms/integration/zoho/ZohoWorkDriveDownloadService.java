@@ -1,4 +1,3 @@
-
 package com.fairmacs.lms.integration.zoho;
 
 import org.slf4j.Logger;
@@ -51,7 +50,7 @@ public class ZohoWorkDriveDownloadService {
         if (fileId == null || fileId.isBlank()) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
-                    "No document is attached to this lesson.");
+                    "No document is attached to this resource.");
         }
 
         String requestStage = "initializing";
@@ -123,10 +122,16 @@ public class ZohoWorkDriveDownloadService {
                 contentType = MediaType.parseMediaType(
                         "application/vnd.openxmlformats-officedocument."
                                 + "wordprocessingml.document");
+            } else if (lowerName.endsWith(".png")) {
+                contentType = MediaType.IMAGE_PNG;
+            } else if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+                contentType = MediaType.IMAGE_JPEG;
+            } else if (lowerName.endsWith(".webp")) {
+                contentType = MediaType.parseMediaType("image/webp");
             } else {
                 throw new ResponseStatusException(
                         HttpStatus.UNSUPPORTED_MEDIA_TYPE,
-                        "Only PDF and DOCX lesson documents are supported.");
+                        "Only PDF, DOCX, PNG, JPEG, and WEBP documents are supported.");
             }
 
             // Step 2: Download the private file from WorkDrive.
@@ -186,5 +191,16 @@ public class ZohoWorkDriveDownloadService {
                     HttpStatus.BAD_GATEWAY,
                     "Could not connect to Zoho WorkDrive.");
         }
+    }
+
+    public DownloadedDocument downloadThumbnail(String fileId) {
+        DownloadedDocument doc = download(fileId);
+        MediaType type = doc.contentType();
+        if (type == null || (!type.equals(MediaType.IMAGE_PNG) && !type.equals(MediaType.IMAGE_JPEG) && !type.toString().contains("webp"))) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                    "The requested WorkDrive file is not a supported image thumbnail.");
+        }
+        return doc;
     }
 }

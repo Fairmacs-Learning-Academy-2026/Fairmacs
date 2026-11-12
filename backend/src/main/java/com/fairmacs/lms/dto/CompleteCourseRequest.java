@@ -5,6 +5,7 @@ public class CompleteCourseRequest {
     private Long enrollmentId;
     private Long courseId;
     private String courseCode;
+    private Long quizId;
     private Integer score;
 
     public CompleteCourseRequest() {}
@@ -17,6 +18,9 @@ public class CompleteCourseRequest {
 
     public String getCourseCode() { return courseCode; }
     public void setCourseCode(String courseCode) { this.courseCode = courseCode; }
+
+    public Long getQuizId() { return quizId; }
+    public void setQuizId(Long quizId) { this.quizId = quizId; }
 
     public Integer getScore() { return score; }
     public void setScore(Integer score) { this.score = score; }

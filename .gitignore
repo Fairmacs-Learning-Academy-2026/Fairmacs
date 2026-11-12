@@ -43,6 +43,8 @@ target/
 backups/
 *.dump
 *.sql
+!backend/src/main/resources/db/migration/
+!backend/src/main/resources/db/migration/*.sql
 *.bak
 backend/uploads/
 uploads/

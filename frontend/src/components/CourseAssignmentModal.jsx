@@ -28,6 +28,15 @@ async function apiRequest(path, options = {}) {
   return data;
 }
 
+function formatPosition(pos) {
+  if (!pos) return '';
+  const s = String(pos).trim().toUpperCase();
+  if (s.startsWith('L') && s.length === 2 && ['0', '1', '2', '3', '4'].includes(s[1])) {
+    return 'P' + s[1];
+  }
+  return s;
+}
+
 export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
   const [employees, setEmployees] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -42,9 +51,9 @@ export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
   const [pendingRemoval, setPendingRemoval] = useState(null);
 
   const courseCode = course?.courseCode || course?.courseId || course?.id || course?.code || '';
-  const courseDbId = course?.dbId ?? (typeof course?.id === 'number' ? course.id : null);
+  const courseDbId = course?.dbId ?? course?.courseDbId ?? (typeof course?.id === 'number' ? course.id : null);
   const courseTitle = course?.title || course?.courseTitle || 'Selected course';
-  const courseLevel = course?.level || 'Not specified';
+  const coursePosition = formatPosition(course?.position || course?.level) || 'Not specified';
 
   useEffect(() => {
     let alive = true;
@@ -67,7 +76,8 @@ export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
             name: String(employee.name ?? employee.fullName ?? employee.employeeName ?? fullName ?? email ?? `Employee ${id ?? ''}`),
             email: String(email),
             department: String(employee.departmentName ?? employee.department?.name ?? employee.department ?? ''),
-            level: String(employee.level ?? employee.employeeLevel ?? ''),
+            position: formatPosition(employee.position ?? employee.level ?? employee.employeeLevel ?? ''),
+            level: formatPosition(employee.position ?? employee.level ?? employee.employeeLevel ?? ''),
             role: String(employee.role ?? employee.userRole ?? 'EMPLOYEE'),
             status: String(employee.status ?? 'ACTIVE').toUpperCase()
           };
@@ -103,7 +113,7 @@ export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
     const query = search.trim().toLowerCase();
     if (!query) return employees;
     return employees.filter((employee) =>
-      [employee.name, employee.email, employee.department, employee.level]
+      [employee.name, employee.email, employee.department, employee.position, employee.level]
         .some((value) => value.toLowerCase().includes(query))
     );
   }, [employees, search]);
@@ -194,7 +204,7 @@ export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
             <div>
               <h2 className="text-base font-semibold text-slate-900">Manage Course Assignment</h2>
               <p className="text-xs text-slate-500">
-                <span className="font-medium text-slate-700">{courseTitle}</span> &bull; Level: <span className="capitalize">{courseLevel}</span>
+                <span className="font-medium text-slate-700">{courseTitle}</span> &bull; Position: <span className="capitalize">{coursePosition}</span>
               </p>
             </div>
           </div>
@@ -240,7 +250,7 @@ export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">Due Date (Optional)</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600">Due Date</label>
               <div className="relative mt-1.5">
                 <CalendarDays size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input 
@@ -349,7 +359,7 @@ export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
                         <th className="w-12 px-4 py-3"></th>
                         <th className="px-4 py-3">Employee</th>
                         <th className="px-4 py-3">Department</th>
-                        <th className="px-4 py-3">Level</th>
+                        <th className="px-4 py-3">Position</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -373,7 +383,7 @@ export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
                             </td>
                             <td className="px-4 py-3 text-slate-600">{employee.department || '-'}</td>
                             <td className="px-4 py-3">
-                              <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">{employee.level || '-'}</span>
+                              <span className="inline-flex rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">{employee.position || employee.level || '-'}</span>
                             </td>
                           </tr>
                         );

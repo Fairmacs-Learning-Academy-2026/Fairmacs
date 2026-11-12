@@ -1,19 +1,30 @@
 package com.fairmacs.lms.controller;
 
-import com.fairmacs.lms.service.QuizService;
-import com.fairmacs.lms.repository.QuizRepository;
-import com.fairmacs.lms.entity.Quiz;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.access.prepost.PreAuthorize;
-
 import java.util.Map;
+import java.util.stream.Collectors;
+
+import com.fairmacs.lms.dto.BulkQuestionParseResultDTO;
+import com.fairmacs.lms.dto.QuizAuthoringDTO;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.fairmacs.lms.repository.QuizRepository;
+import com.fairmacs.lms.service.QuizService;
 
 @RestController
 @RequestMapping("/api/quizzes")
-@CrossOrigin(origins = "*")
 public class QuizController {
 
     private final QuizService quizService;
@@ -25,10 +36,10 @@ public class QuizController {
     }
 
     /**
- * HR/Admin preview: includes correct answers and creates no attempt.
- */
+     * HR/Admin & Trainer preview: includes correct answers and creates no attempt.
+     */
     @GetMapping("/{quizId}/preview")
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
     public ResponseEntity<Map<String, Object>> previewQuiz(
             @PathVariable Long quizId) {
 
@@ -89,6 +100,79 @@ public class QuizController {
         );
     }
 
+    // =========================================================================
+    // BULK QUESTION IMPORT & QUIZ AUTHORING ENDPOINTS
+    // =========================================================================
+
+    @PostMapping(value = "/bulk-import/parse", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<BulkQuestionParseResultDTO> parseBulkFile(
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(quizService.parseBulkQuestions(file, null));
+    }
+
+    @PostMapping(value = "/bulk-import/parse-text", consumes = { MediaType.APPLICATION_JSON_VALUE })
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<BulkQuestionParseResultDTO> parseBulkText(
+            @RequestBody Map<String, String> payload) {
+        String pastedText = payload != null ? payload.get("text") : null;
+        return ResponseEntity.ok(quizService.parseBulkQuestions(null, pastedText));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<Map<String, Object>> createQuiz(
+            @RequestBody QuizAuthoringDTO request) {
+        return ResponseEntity.ok(quizService.createQuiz(request.getCourseId(), request.getModuleId(), request));
+    }
+
+    @GetMapping("/{quizId}")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<Map<String, Object>> getQuiz(
+            @PathVariable Long quizId) {
+        return ResponseEntity.ok(quizService.getQuizDetail(quizId));
+    }
+
+    @PutMapping("/{quizId}")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<Map<String, Object>> updateQuiz(
+            @PathVariable Long quizId,
+            @RequestBody QuizAuthoringDTO request) {
+        return ResponseEntity.ok(quizService.updateQuiz(quizId, request));
+    }
+
+    @DeleteMapping("/{quizId}")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<Void> deleteQuiz(
+            @PathVariable Long quizId) {
+        quizService.deleteQuiz(quizId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{quizId}/questions")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<Map<String, Object>> addQuestion(
+            @PathVariable Long quizId,
+            @RequestBody QuizAuthoringDTO.QuizQuestionDTO request) {
+        return ResponseEntity.ok(quizService.addQuestion(quizId, request));
+    }
+
+    @PutMapping("/questions/{questionId}")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<Map<String, Object>> updateQuestion(
+            @PathVariable Long questionId,
+            @RequestBody QuizAuthoringDTO.QuizQuestionDTO request) {
+        return ResponseEntity.ok(quizService.updateQuestion(questionId, request));
+    }
+
+    @DeleteMapping("/questions/{questionId}")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER')")
+    public ResponseEntity<Void> deleteQuestion(
+            @PathVariable Long questionId) {
+        quizService.deleteQuestion(questionId);
+        return ResponseEntity.noContent().build();
+    }
+
     public static class QuizSubmissionRequest {
 
         private String attemptId;
@@ -122,4 +206,4 @@ public class QuizController {
             this.timeTakenSeconds = timeTakenSeconds;
         }
     }
-}   
+}

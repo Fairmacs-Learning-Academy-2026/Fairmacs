@@ -31,25 +31,8 @@ public class LmsDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-
-        /*
-         * Development seed only.
-         *
-         * This creates data only when the KMS catalog is empty.
-         * Existing users and existing KMS data are not deleted.
-         */
-
-        if (categoryRepository.count() > 0 ||
-            courseRepository.count() > 0) {
-
-            return;
-        }
-
-        createDevelopmentCatalog();
-
-        System.out.println("========================================");
-        System.out.println("KMS development catalog initialized.");
-        System.out.println("========================================");
+        // Mock course seeding disabled.
+        // Courses are now authored and managed directly via the Course Builder.
     }
 
     private void createDevelopmentCatalog() {

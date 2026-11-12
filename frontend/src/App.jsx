@@ -26,21 +26,31 @@ import TrainerDashboard from './components/TrainerDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import ManagerAllCourses from './components/ManagerAllCourses';
 import HrAdminDashboard from './components/HrAdminDashboard';
+import EmployeeManagement from './components/EmployeeManagement';
+import DepartmentManagement from './components/DepartmentManagement';
+import HrCoursesPage from './components/HrCoursesPage';
+import HrDraftsPage from './components/HrDraftsPage';
+import HrCertificatesPage from './components/HrCertificatesPage';
+import HrAnnouncementsPage from './components/HrAnnouncementsPage';
+import HrSettingsPage from './components/HrSettingsPage';
 import DepartmentDetails from './components/DepartmentDetails';
 import DepartmentCourseEmployees from './components/DepartmentCourseEmployees';
 import CourseCatalog from './components/CourseCatalog';
 import CourseViewer from './components/CourseViewer';
-import CourseDetailsModal from './components/CourseDetailsModal';
+import CourseOverviewPage from './components/CourseOverviewPage';
 import QuizModal from './components/QuizModal';
 import CertificateViewer from './components/CertificateViewer';
 import CertificatesPage from './components/CertificatesPage';
-import LearningPaths from './components/LearningPaths';
 import TrainingCalendar from './components/TrainingCalendar';
 import ReportsView from './components/ReportsView';
 import Login from './components/Login';
 import Unauthorized from './components/Unauthorized';
 import Drafts from './components/Drafts';
 import CourseBuilderModal from './components/CourseBuilderModal';
+import NotificationsPage from './components/NotificationsPage';
+import ProfilePage from './components/ProfilePage';
+import PasswordModal from './components/PasswordModal';
+import ErrorBoundary from './components/ErrorBoundary';
 
 
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -57,12 +67,22 @@ const tabToPath = {
   dashboard: '/dashboard',
   catalog: '/courses',
   mylearning: '/progress',
-  paths: '/learning-paths',
   calendar: '/training-calendar',
   reports: '/reports',
   certificates: '/certificates',
   drafts: '/drafts',
   allCourses: '/manager/all-courses',
+  notifications: '/notifications',
+  profile: '/profile',
+  hrOverview: '/hr/overview',
+  hrEmployees: '/hr/employees',
+  hrDepartments: '/hr/departments',
+  hrCourses: '/hr/courses',
+  hrDrafts: '/hr/drafts',
+  hrReports: '/hr/reports',
+  hrCertificates: '/hr/certificates',
+  hrAnnouncements: '/hr/announcements',
+  hrSettings: '/hr/settings',
 };
 
 
@@ -71,15 +91,26 @@ const pathToTab = {
   '/trainer': 'dashboard',
   '/manager': 'dashboard',
   '/manager/all-courses': 'allCourses',
-  '/admin': 'dashboard',
+  '/admin': 'hrOverview',
+  '/hr': 'hrOverview',
+  '/hr/overview': 'hrOverview',
+  '/hr/employees': 'hrEmployees',
+  '/hr/departments': 'hrDepartments',
+  '/hr/courses': 'hrCourses',
+  '/hr/drafts': 'hrDrafts',
+  '/hr/reports': 'hrReports',
+  '/hr/certificates': 'hrCertificates',
+  '/hr/announcements': 'hrAnnouncements',
+  '/hr/settings': 'hrSettings',
 
   '/courses': 'catalog',
   '/progress': 'mylearning',
-  '/learning-paths': 'paths',
   '/training-calendar': 'calendar',
   '/reports': 'reports',
   '/certificates': 'certificates',
   '/drafts': 'drafts',
+  '/notifications': 'notifications',
+  '/profile': 'profile',
 };
 
 
@@ -100,7 +131,7 @@ export function getDashboardPath(role) {
       return '/manager';
 
     case 'HR_ADMIN':
-      return '/admin';
+      return '/hr/overview';
 
     case 'EMPLOYEE':
     default:
@@ -183,6 +214,21 @@ function MainApp() {
   const [selectedDraftId, setSelectedDraftId] =
     useState(null);
 
+  const [draftsRefreshKey, setDraftsRefreshKey] =
+    useState(0);
+
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (typeof window !== 'undefined' && window.innerWidth > 768 && mobileNavOpen) {
+        setMobileNavOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [mobileNavOpen]);
+
 
   /* =========================================================
      KEEP ACTIVE TAB SYNCHRONIZED WITH URL
@@ -214,6 +260,22 @@ function MainApp() {
         to="/login"
         replace
       />
+    );
+  }
+
+  if (user.mustChangePassword) {
+    return (
+      <div
+        className="app-container"
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+      >
+        <PasswordModal forceChange={true} />
+      </div>
     );
   }
 
@@ -253,7 +315,7 @@ function MainApp() {
      COURSE HANDLERS
   ========================================================== */
 
-  const handleSelectCourse = async (course) => {
+  const handleSelectCourse = async (course, options = {}) => {
 
     try {
 
@@ -273,9 +335,17 @@ function MainApp() {
         );
       }
 
-      setSelectedCourse(
-        fullCourse
-      );
+      setSelectedCourse({
+        ...fullCourse,
+        reviewMode: Boolean(
+          options.reviewMode ||
+          course.reviewMode ||
+          course.enrollmentStatus === 'COMPLETED' ||
+          course.status === 'COMPLETED' ||
+          fullCourse.enrollmentStatus === 'COMPLETED' ||
+          fullCourse.status === 'COMPLETED'
+        )
+      });
       navigate(`/courses/${encodeURIComponent(fullCourse.id || fullCourse.courseId || courseCode)}/learn`);
 
     } catch (error) {
@@ -293,48 +363,13 @@ function MainApp() {
   };
 
 
-  const handleOpenCourseDetails = async (
-    course
-  ) => {
-
+  const handleOpenCourseDetails = (course) => {
     if (!course) return;
-
-    try {
-      /*
-       * Course catalog and My Learning use the lightweight
-       * CourseDTO summary. Fetch the detail DTO before opening
-       * the overview modal so modules and lessons are available.
-       */
-      const courseCode =
-        course.id ||
-        course.courseId;
-
-      const fullCourse =
-        await courseService.getCourseById(
-          courseCode
-        );
-
-      if (!fullCourse) {
-        throw new Error(
-          'Unable to load course details.'
-        );
-      }
-
-      setSelectedCourseDetails(
-        fullCourse
-      );
-
-    } catch (error) {
-
-      console.error(
-        'Open course details error:',
-        error
-      );
-
-      alert(
-        error.message ||
-        'Unable to load course details.'
-      );
+    const courseCode = course.id || course.courseId || course.dbId;
+    if (courseCode) {
+      setSelectedCourse(null);
+      setSelectedCourseDetails(null);
+      navigate(`/courses/${encodeURIComponent(courseCode)}/overview`);
     }
   };
 
@@ -515,6 +550,106 @@ function MainApp() {
     }
 
     /* -----------------------------------------
+       HR DEDICATED PAGES
+    ------------------------------------------ */
+
+    if (
+      location.pathname === '/hr/overview' ||
+      location.pathname === '/admin' ||
+      location.pathname === '/hr'
+    ) {
+      return (
+        <HrAdminDashboard
+          onOpenVerifiedCertificate={handleOpenVerifiedCertificate}
+        />
+      );
+    }
+
+    if (location.pathname === '/hr/employees') {
+      return (
+        <div style={{ background: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+          <EmployeeManagement />
+        </div>
+      );
+    }
+
+    if (location.pathname === '/hr/departments') {
+      return (
+        <div style={{ background: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+          <DepartmentManagement />
+        </div>
+      );
+    }
+
+    if (location.pathname === '/hr/courses') {
+      return <HrCoursesPage />;
+    }
+
+    if (location.pathname === '/hr/drafts') {
+      return <HrDraftsPage />;
+    }
+
+    if (location.pathname === '/hr/reports') {
+      return (
+        <div style={{ background: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+          <ReportsView currentRole="HR_ADMIN" embedded={true} />
+        </div>
+      );
+    }
+
+    if (location.pathname === '/hr/certificates') {
+      return (
+        <HrCertificatesPage
+          onViewCertificate={handleOpenVerifiedCertificate}
+        />
+      );
+    }
+
+    if (location.pathname === '/hr/announcements') {
+      return <HrAnnouncementsPage />;
+    }
+
+    if (location.pathname === '/hr/settings') {
+      return <HrSettingsPage />;
+    }
+
+    /* -----------------------------------------
+       COURSE OVERVIEW PAGE
+    ------------------------------------------ */
+    const overviewMatch = location.pathname.match(/^\/courses\/([^/]+)(?:\/overview)?\/?$/);
+    const isLearnPath = Boolean(location.pathname.match(/^\/courses\/([^/]+)\/learn\/?$/));
+    if (!isLearnPath && overviewMatch && overviewMatch[1] && overviewMatch[1] !== 'courses') {
+      const overviewCourseId = decodeURIComponent(overviewMatch[1]);
+      return (
+        <ErrorBoundary
+          title="Course Overview Error"
+          onReset={() => {
+            navigate('/dashboard');
+          }}
+        >
+          <CourseOverviewPage
+            courseId={overviewCourseId}
+            onStartLearning={(courseToStart) => {
+              handleSelectCourse(courseToStart || { id: overviewCourseId, courseId: overviewCourseId });
+            }}
+            onViewCertificate={() => {
+              setActiveTab('certificates');
+              navigate('/certificates');
+            }}
+            onBackToDashboard={() => {
+              setActiveTab('dashboard');
+              navigate('/dashboard');
+            }}
+            onBackToCatalog={() => {
+              setActiveTab('catalog');
+              navigate('/courses');
+            }}
+          />
+        </ErrorBoundary>
+      );
+    }
+
+    /* -----------------------------------------
        COURSE VIEWER
     ------------------------------------------ */
 
@@ -525,24 +660,40 @@ function MainApp() {
     if (selectedCourse) {
 
       return (
-        <CourseViewer
-          course={selectedCourse}
-
-          onBack={() => {
+        <ErrorBoundary
+          title="Course Viewer Error"
+          onReset={() => {
             setSelectedCourse(null);
             navigate('/courses');
           }}
+        >
+          <CourseViewer
+            course={selectedCourse}
 
-          onStartQuiz={
-            handleStartQuiz
-          }
-        />
+            onBack={() => {
+              setSelectedCourse(null);
+              navigate('/courses');
+            }}
+
+            onStartQuiz={
+              handleStartQuiz
+            }
+          />
+        </ErrorBoundary>
       );
     }
 
 
     if (activeTab === 'allCourses') {
       return <ManagerAllCourses />;
+    }
+
+    if (activeTab === 'notifications') {
+      return <NotificationsPage />;
+    }
+
+    if (activeTab === 'profile' || location.pathname === '/profile') {
+      return <ProfilePage />;
     }
 
     /* -----------------------------------------
@@ -565,23 +716,7 @@ function MainApp() {
         />
       );
     }
-
-
-    /* -----------------------------------------
-       LEARNING PATHS
-    ------------------------------------------ */
-
-    if (
-      activeTab === 'paths'
-    ) {
-
-      return (
-        <LearningPaths />
-      );
-    }
-
-
-    /* -----------------------------------------
+/* -----------------------------------------
        TRAINING CALENDAR
     ------------------------------------------ */
 
@@ -662,9 +797,15 @@ function MainApp() {
     ------------------------------------------ */
 
     if (activeTab === 'drafts') {
+      const normalizedRole = String(user?.role || '').toUpperCase();
+      if (normalizedRole !== 'HR_ADMIN' && normalizedRole !== 'TRAINER') {
+        return <Unauthorized />;
+      }
       return (
     <>
       <Drafts
+        refreshKey={draftsRefreshKey}
+        onCreateDraft={() => setSelectedDraftId('NEW_DRAFT')}
         onOpenDraft={(draft) => {
           const draftId = draft.courseId || draft.id;
 
@@ -680,10 +821,14 @@ function MainApp() {
       {selectedDraftId && (
         <CourseBuilderModal
           key={selectedDraftId}
-          courseId={selectedDraftId}
-          onClose={() => setSelectedDraftId(null)}
+          courseId={selectedDraftId === 'NEW_DRAFT' ? '' : selectedDraftId}
+          onClose={() => {
+            setSelectedDraftId(null);
+            setDraftsRefreshKey((k) => k + 1);
+          }}
           onPublish={() => {
             setSelectedDraftId(null);
+            setDraftsRefreshKey((k) => k + 1);
           }}
         />
       )}
@@ -777,75 +922,38 @@ function MainApp() {
 
   return (
     <div className="app-container">
-
-      <Header
-
-  onOpenCertificates={() =>
-    handleTabChange('certificates')
-  }
-
-  onNavigateHome={() =>
-    handleTabChange(
-      'dashboard'
-    )
-  }
-
-/>
-
-
       <div className="app-main-layout">
-
         <Sidebar
+          activeTab={activeTab}
+          setActiveTab={(tab) => {
+            handleTabChange(tab);
+            setMobileNavOpen(false);
+          }}
+          onOpenCertificates={() => {
+            handleTabChange('certificates');
+            setMobileNavOpen(false);
+          }}
+          mobileOpen={mobileNavOpen}
+          onCloseMobile={() => setMobileNavOpen(false)}
+        />
 
-  activeTab={
-    activeTab
-  }
+        <div className="app-workspace-column">
+          <Header
+            activeTab={activeTab}
+            onOpenCertificates={() => handleTabChange('certificates')}
+            onOpenNotifications={() => handleTabChange('notifications')}
+            onNavigateHome={() => handleTabChange('dashboard')}
+            onToggleMobileNav={() => setMobileNavOpen((prev) => !prev)}
+          />
 
-  setActiveTab={
-    handleTabChange
-  }
-
-  onOpenCertificates={() =>
-    handleTabChange('certificates')
-  }
-
-/>
-
-
-        <main className="main-content">
-
-          {renderContent()}
-
-        </main>
-
+          <main className="main-content">
+            {renderContent()}
+          </main>
+        </div>
       </div>
 
 
-      {/* =====================================================
-          COURSE DETAILS MODAL
-      ====================================================== */}
 
-      {selectedCourseDetails && (
-
-        <CourseDetailsModal
-
-          course={
-            selectedCourseDetails
-          }
-
-          onClose={() =>
-            setSelectedCourseDetails(
-              null
-            )
-          }
-
-          onStartLearning={
-            handleStartLearning
-          }
-
-        />
-
-      )}
 
 
       {/* =====================================================
@@ -1041,20 +1149,98 @@ export default function App() {
             }
           />
 
+          {/* =================================================
+              HR / ADMIN DEDICATED ROUTES
+          ================================================= */}
+
           <Route
             path="/admin"
+            element={<Navigate to="/hr/overview" replace />}
+          />
+
+          <Route
+            path="/hr"
+            element={<Navigate to="/hr/overview" replace />}
+          />
+
+          <Route
+            path="/hr/overview"
             element={
-
-              <RoleRoute
-                allowedRoles={[
-                  'HR_ADMIN'
-                ]}
-              >
-
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
                 <MainApp />
-
               </RoleRoute>
+            }
+          />
 
+          <Route
+            path="/hr/employees"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/hr/departments"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/hr/courses"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/hr/drafts"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/hr/reports"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/hr/certificates"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/hr/announcements"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/hr/settings"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
             }
           />
 
@@ -1096,26 +1282,25 @@ export default function App() {
           />
 
           <Route
-            path="/courses"
+            path="/courses/:courseId/overview"
             element={
-
               <ProtectedRoute>
-
                 <MainApp />
-
               </ProtectedRoute>
-
             }
           />
 
-
-          {/* =================================================
-              LEARNING PATHS
-              All authenticated roles
-          ================================================= */}
+          <Route
+            path="/courses/:courseId"
+            element={
+              <ProtectedRoute>
+                <MainApp />
+              </ProtectedRoute>
+            }
+          />
 
           <Route
-            path="/learning-paths"
+            path="/courses"
             element={
 
               <ProtectedRoute>
@@ -1158,6 +1343,7 @@ export default function App() {
 
               <RoleRoute
                 allowedRoles={[
+                  'EMPLOYEE',
                   'TRAINER',
                   'MANAGER',
                   'HR_ADMIN'
@@ -1177,6 +1363,22 @@ export default function App() {
 
           <Route
             path="/certificates"
+            element={
+              <ProtectedRoute>
+                <MainApp />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <MainApp />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
             element={
               <ProtectedRoute>
                 <MainApp />

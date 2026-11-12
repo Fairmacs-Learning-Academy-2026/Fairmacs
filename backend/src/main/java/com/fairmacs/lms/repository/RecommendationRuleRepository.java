@@ -13,4 +13,8 @@ public interface RecommendationRuleRepository extends JpaRepository<Recommendati
 
     @Query("SELECT r FROM RecommendationRule r JOIN FETCH r.course c WHERE LOWER(r.department) = LOWER(:department)")
     List<RecommendationRule> findByDepartmentIgnoreCase(@Param("department") String department);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM RecommendationRule r WHERE r.course.id = :courseId")
+    void deleteByCourseId(@Param("courseId") Long courseId);
 }

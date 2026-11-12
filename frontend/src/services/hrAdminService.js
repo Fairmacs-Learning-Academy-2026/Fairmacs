@@ -1,15 +1,13 @@
-const API_BASE = "http://localhost:8080/api/hr";
+import {
+  API_BASE_URL,
+  getAuthToken,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
-function getToken() {
-  return (
-    localStorage.getItem("fairmacs_lms_token") ||
-    localStorage.getItem("fairmacs_token") ||
-    ""
-  );
-}
+const API_BASE = `${API_BASE_URL}/hr`;
 
 async function request(path, options = {}) {
-  const token = getToken();
+  const token = getAuthToken();
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -21,6 +19,10 @@ async function request(path, options = {}) {
       ...(options.headers || {}),
     },
   });
+
+  if (response.status === 401) {
+    handleUnauthorized(true);
+  }
 
   let data = null;
 
@@ -50,16 +52,10 @@ function validateEmployeeId(employeeId) {
 }
 
 export const hrAdminService = {
-  // =========================================================
-  // GET ALL EMPLOYEES
-  // =========================================================
   async getEmployees() {
     return request("/employees");
   },
 
-  // =========================================================
-  // CREATE EMPLOYEE
-  // =========================================================
   async createEmployee(employee) {
     if (!employee) {
       throw new Error("Employee details are required.");
@@ -71,10 +67,6 @@ export const hrAdminService = {
     });
   },
 
-  // =========================================================
-  // UPDATE EMPLOYEE DETAILS
-  // Requires backend: PUT /api/hr/employees/{employeeId}
-  // =========================================================
   async updateEmployee(employeeId, employee) {
     const id = validateEmployeeId(employeeId);
 
@@ -88,11 +80,6 @@ export const hrAdminService = {
     });
   },
 
-  // =========================================================
-  // DELETE / DEACTIVATE EMPLOYEE
-  // Requires backend: DELETE /api/hr/employees/{employeeId}
-  // Backend should preserve training history where required.
-  // =========================================================
   async deleteEmployee(employeeId) {
     const id = validateEmployeeId(employeeId);
 
@@ -101,10 +88,7 @@ export const hrAdminService = {
     });
   },
 
-  // =========================================================
-  // CHANGE EMPLOYEE LIFECYCLE STATUS
-  // =========================================================
-  async changeEmployeeStatus(employeeId, status) {
+  async changeEmployeeStatus(employeeId, status, reason = "HR administrative update") {
     const id = validateEmployeeId(employeeId);
 
     if (!status) {
@@ -113,28 +97,19 @@ export const hrAdminService = {
 
     return request(`/employees/${id}/status`, {
       method: "PATCH",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, reason }),
     });
   },
 
-  // =========================================================
-  // RESET EMPLOYEE PASSWORD
-  // =========================================================
-  async resetEmployeePassword(
-    employeeId,
-    newPassword = "Reset@123"
-  ) {
+  async resetEmployeePassword(employeeId, newPassword) {
     const id = validateEmployeeId(employeeId);
 
     return request(`/employees/${id}/reset-password`, {
       method: "POST",
-      body: JSON.stringify({ newPassword }),
+      body: JSON.stringify(newPassword ? { newPassword } : {}),
     });
   },
 
-  // =========================================================
-  // IMPORT EMPLOYEES FROM EXCEL
-  // =========================================================
   async importEmployees(file) {
     if (!file) {
       throw new Error("Please select an Excel file.");
@@ -147,6 +122,30 @@ export const hrAdminService = {
       method: "POST",
       body: formData,
     });
+  },
+
+  async downloadImportTemplate() {
+    const token = getToken();
+    const response = await fetch(`${API_BASE}/employees/import-template`, {
+      method: "GET",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Unable to download Excel import template (${response.status}).`);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "fairmacs-employee-import-template.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   },
 };
 

@@ -10,16 +10,63 @@ import {
   Check,
   Circle,
   Lock,
-  Clock3
+  CheckCircle,
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Minimize,
+  RefreshCw,
+  WifiOff
 } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { enrollmentService } from '../services/enrollmentService';
+import { notifyEnrollmentUpdated } from '../utils/enrollmentSync';
 import { useAuth } from '../context/AuthContext';
 import { renderAsync } from 'docx-preview';
+import CertificateViewer from './CertificateViewer';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+const formatMediaTime = seconds => {
+  const safe = Number.isFinite(Number(seconds)) && Number(seconds) > 0
+    ? Math.floor(Number(seconds))
+    : 0;
+  const hrs = Math.floor(safe / 3600);
+  const mins = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  if (hrs > 0) {
+    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+};
+
+const parseFilenameFromHeaders = headers => {
+  if (!headers) return '';
+  const direct = headers.get?.('x-document-filename') || headers.get?.('X-Document-Filename');
+  if (direct && direct.trim()) return direct.trim();
+  const disposition = headers.get?.('content-disposition') || headers.get?.('Content-Disposition') || '';
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;\n]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1].trim().replace(/^["']|["']$/g, ''));
+    } catch {
+      return utf8Match[1].trim();
+    }
+  }
+  const stdMatch = disposition.match(/filename="?([^";\n]+)"?/i);
+  return stdMatch?.[1]?.trim() || '';
+};
 
 export default function CourseViewer({
   course,
   onBack,
-  onStartQuiz
+  onStartQuiz,
+  reviewMode = false
 }) {
   const { user } = useAuth();
 
@@ -81,12 +128,75 @@ export default function CourseViewer({
   const [documentBlob, setDocumentBlob] = useState(null);
   const [documentUrl, setDocumentUrl] = useState('');
   const [documentContentType, setDocumentContentType] = useState('');
+  const [documentFilename, setDocumentFilename] = useState('');
   const [documentLoading, setDocumentLoading] = useState(false);
   const [documentError, setDocumentError] = useState('');
+  const [pdfRendering, setPdfRendering] = useState(false);
+  const [pdfPageCount, setPdfPageCount] = useState(0);
+  const pdfContainerRef = useRef(null);
   const docxContainerRef = useRef(null);
+
+  // Video player refs & states (HTML5 & YouTube)
+  const html5VideoRef = useRef(null);
+  const videoWrapperRef = useRef(null);
   const youtubeIframeRef = useRef(null);
   const youtubePlayerRef = useRef(null);
   const youtubeCompletionHandledRef = useRef(false);
+  const lastTimeRef = useRef(0);
+  const actualWatchTimeRef = useRef(0);
+  const youtubeCheckpointIntervalRef = useRef(null);
+
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [videoVolume, setVideoVolume] = useState(1);
+  const [videoMuted, setVideoMuted] = useState(false);
+  const [videoPlaybackRate, setVideoPlaybackRate] = useState(1);
+  const [videoFullscreen, setVideoFullscreen] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoBuffering, setVideoBuffering] = useState(false);
+  const [videoError, setVideoError] = useState('');
+  const [youtubeLoading, setYoutubeLoading] = useState(false);
+  const [youtubeBuffering, setYoutubeBuffering] = useState(false);
+  const [youtubeError, setYoutubeError] = useState('');
+  const [isOffline, setIsOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+
+  // Page Visibility API automatic pause/resume & autoplay fallback
+  const wasPlayingBeforeHideRef = useRef(false);
+  const wasManuallyPausedRef = useRef(false);
+  const autoPausedByVisibilityRef = useRef(false);
+  const pausedAtPositionRef = useRef(0);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+
+  // Checkpoint deduplication & offline queue
+  const lastSavedCheckpointRef = useRef({ lessonDbId: null, percent: -1, position: -1 });
+  const pendingCheckpointRef = useRef(null);
+
+  useEffect(() => {
+    lastTimeRef.current = 0;
+    actualWatchTimeRef.current = 0;
+    wasPlayingBeforeHideRef.current = false;
+    wasManuallyPausedRef.current = false;
+    autoPausedByVisibilityRef.current = false;
+    pausedAtPositionRef.current = 0;
+    lastSavedCheckpointRef.current = { lessonDbId: null, percent: -1, position: -1 };
+    setAutoplayBlocked(false);
+    setVideoPlaying(false);
+    setVideoCurrentTime(0);
+    setVideoDuration(0);
+    setVideoLoading(false);
+    setVideoBuffering(false);
+    setVideoError('');
+    setYoutubeLoading(false);
+    setYoutubeBuffering(false);
+    setYoutubeError('');
+    return () => {
+      if (youtubeCheckpointIntervalRef.current) {
+        window.clearInterval(youtubeCheckpointIntervalRef.current);
+        youtubeCheckpointIntervalRef.current = null;
+      }
+    };
+  }, [activeLesson?.dbId, activeLesson?.id]);
 
   const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL ||
@@ -99,6 +209,48 @@ export default function CourseViewer({
   const [pendingModuleQuiz, setPendingModuleQuiz] = useState(null);
   const [quizUnlockStatuses, setQuizUnlockStatuses] = useState({});
   const [countdownNow, setCountdownNow] = useState(Date.now());
+  const [viewingCertificate, setViewingCertificate] = useState(null);
+  const [loadingCertificate, setLoadingCertificate] = useState(false);
+
+  const handleOpenCertificate = async () => {
+    const courseDbId = course?.dbId ?? course?.courseDbId ?? course?.id;
+    if (!courseDbId) return;
+    setLoadingCertificate(true);
+    try {
+      const token =
+        localStorage.getItem('fairmacs_token') ||
+        localStorage.getItem('fairmacs_lms_token') ||
+        localStorage.getItem('token') ||
+        '';
+      const res = await fetch(`/api/certificates/course/${encodeURIComponent(courseDbId)}`, {
+        headers: {
+          Accept: 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const cert = await res.json();
+        setViewingCertificate(cert);
+      } else {
+        setViewingCertificate({
+          userName: user?.name,
+          courseTitle: course?.title,
+          certificateId: course?.certificateId || 'OP001',
+          issuedAt: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load certificate:', err);
+      setViewingCertificate({
+        userName: user?.name,
+        courseTitle: course?.title,
+        certificateId: course?.certificateId || 'OP001',
+        issuedAt: new Date().toISOString()
+      });
+    } finally {
+      setLoadingCertificate(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -199,7 +351,7 @@ export default function CourseViewer({
   const courseDbId = Number(course?.dbId ?? course?.courseDbId);
 
   if (!Number.isSafeInteger(courseDbId) || courseDbId <= 0) {
-    alert('A valid course database ID is unavailable. Please refresh and try again.');
+    alert('Course is not found. Please refresh and try again.');
     return;
   }
 
@@ -224,6 +376,230 @@ export default function CourseViewer({
 
   return Number(id);
 };
+
+  /*
+   * ---------------------------------------------------------
+   * SEQUENTIAL LESSON UNLOCKING & LOCK STATE (PHASE 5)
+   * ---------------------------------------------------------
+   */
+  const isLessonUnlocked = targetIndex => {
+    if (isHrAdmin) return true;
+    if (targetIndex === 0) return true;
+    if (targetIndex < 0 || targetIndex >= allLessons.length) return false;
+
+    const targetLesson = allLessons[targetIndex];
+    const targetDbId = targetLesson?.dbId ?? targetLesson?.id;
+
+    // Completed lessons always remain accessible for review
+    if (Boolean(completedLessons[targetDbId])) return true;
+
+    // 1. All preceding lessons must be completed
+    for (let i = 0; i < targetIndex; i++) {
+      const prevLesson = allLessons[i];
+      const prevDbId = prevLesson?.dbId ?? prevLesson?.id;
+      if (!completedLessons[prevDbId]) {
+        return false;
+      }
+    }
+
+    // 2. Inter-module quiz prerequisite check:
+    // If target lesson belongs to Module M (M > 0), any prior module with a quiz must be passed.
+    if (!isFoundationCourse && Array.isArray(course?.modules)) {
+      let targetModuleIndex = -1;
+      for (let mIdx = 0; mIdx < course.modules.length; mIdx++) {
+        const m = course.modules[mIdx];
+        const lessons = Array.isArray(m.lessons) ? m.lessons : [];
+        if (lessons.some(l => (l?.dbId ?? l?.id) === targetDbId)) {
+          targetModuleIndex = mIdx;
+          break;
+        }
+      }
+
+      if (targetModuleIndex > 0) {
+        for (let mIdx = 0; mIdx < targetModuleIndex; mIdx++) {
+          const priorModule = course.modules[mIdx];
+          const priorModuleNumericId = getNumericModuleId(priorModule);
+          const priorQuiz = moduleQuizzes.find(q =>
+            Number(q.moduleId) === priorModuleNumericId &&
+            String(q.type || '').toUpperCase() === 'MODULE'
+          );
+          if (priorQuiz) {
+            const pId = priorQuiz?.dbId ?? priorQuiz?.id ?? priorQuiz?.quizId;
+            const pStatus = pId != null ? quizUnlockStatuses[String(pId)] : null;
+            const isPassed = Boolean(pStatus?.alreadyPassed || pStatus?.quizPassed);
+            if (!isPassed) {
+              return false;
+            }
+          }
+        }
+      }
+    }
+
+    return true;
+  };
+
+  const getLessonLockReason = targetIndex => {
+    if (isHrAdmin || targetIndex <= 0 || targetIndex >= allLessons.length) return null;
+    const targetLesson = allLessons[targetIndex];
+    const targetDbId = targetLesson?.dbId ?? targetLesson?.id;
+    if (Boolean(completedLessons[targetDbId])) return null;
+
+    for (let i = 0; i < targetIndex; i++) {
+      const prevLesson = allLessons[i];
+      const prevDbId = prevLesson?.dbId ?? prevLesson?.id;
+      if (!completedLessons[prevDbId]) {
+        return `Complete the previous lesson ("${prevLesson?.title || 'Lesson ' + (i + 1)}") to unlock this lesson.`;
+      }
+    }
+
+    if (!isFoundationCourse && Array.isArray(course?.modules)) {
+      let targetModuleIndex = -1;
+      for (let mIdx = 0; mIdx < course.modules.length; mIdx++) {
+        const m = course.modules[mIdx];
+        const lessons = Array.isArray(m.lessons) ? m.lessons : [];
+        if (lessons.some(l => (l?.dbId ?? l?.id) === targetDbId)) {
+          targetModuleIndex = mIdx;
+          break;
+        }
+      }
+
+      if (targetModuleIndex > 0) {
+        for (let mIdx = 0; mIdx < targetModuleIndex; mIdx++) {
+          const priorModule = course.modules[mIdx];
+          const priorModuleNumericId = getNumericModuleId(priorModule);
+          const priorQuiz = moduleQuizzes.find(q =>
+            Number(q.moduleId) === priorModuleNumericId &&
+            String(q.type || '').toUpperCase() === 'MODULE'
+          );
+          if (priorQuiz) {
+            const pId = priorQuiz?.dbId ?? priorQuiz?.id ?? priorQuiz?.quizId;
+            const pStatus = pId != null ? quizUnlockStatuses[String(pId)] : null;
+            const isPassed = Boolean(pStatus?.alreadyPassed || pStatus?.quizPassed);
+            if (!isPassed) {
+              return `Pass the module quiz for "${priorModule?.title || 'Module ' + (mIdx + 1)}" before accessing lessons in this module.`;
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
+  // Helper for module quiz locking and status
+  const getModuleQuizState = module => {
+    if (isFoundationCourse) return { available: false };
+    const moduleNumericId = getNumericModuleId(module);
+    const moduleQuiz = moduleQuizzes.find(quiz =>
+      Number(quiz.moduleId) === moduleNumericId &&
+      String(quiz.type || '').toUpperCase() === 'MODULE'
+    );
+    if (!moduleQuiz) return { available: false };
+
+    const quizId = moduleQuiz?.dbId ?? moduleQuiz?.id ?? moduleQuiz?.quizId;
+    const status = quizId != null ? quizUnlockStatuses[String(quizId)] : null;
+    const isPassed = Boolean(status?.alreadyPassed || status?.quizPassed);
+    const cooldown = getQuizCooldown(moduleQuiz);
+
+    const moduleLessons = Array.isArray(module.lessons) ? module.lessons : [];
+    const allModuleLessonsDone = moduleLessons.length > 0 && moduleLessons.every(l => Boolean(completedLessons[l?.dbId]));
+
+    let priorQuizzesPassed = true;
+    let priorFailedModuleTitle = '';
+    const currentModIdx = (course?.modules || []).findIndex(m => getNumericModuleId(m) === moduleNumericId);
+    if (currentModIdx > 0) {
+      for (let i = 0; i < currentModIdx; i++) {
+        const pMod = course.modules[i];
+        const pModId = getNumericModuleId(pMod);
+        const pQuiz = moduleQuizzes.find(q => Number(q.moduleId) === pModId && String(q.type || '').toUpperCase() === 'MODULE');
+        if (pQuiz) {
+          const pId = pQuiz?.dbId ?? pQuiz?.id ?? pQuiz?.quizId;
+          const pStatus = pId != null ? quizUnlockStatuses[String(pId)] : null;
+          if (!pStatus?.alreadyPassed && !pStatus?.quizPassed) {
+            priorQuizzesPassed = false;
+            priorFailedModuleTitle = pMod.title || `Module ${i + 1}`;
+            break;
+          }
+        }
+      }
+    }
+
+    let isLocked = false;
+    let lockReason = '';
+    if (!allModuleLessonsDone) {
+      isLocked = true;
+    } else if (!priorQuizzesPassed) {
+      isLocked = true;
+      lockReason = `Pass the module quiz for "${priorFailedModuleTitle}" before attempting this quiz.`;
+    } else if (cooldown.active) {
+      isLocked = true;
+      lockReason = `Cooldown active. Retry available at ${formatRetryTime(cooldown.retryAt)}.`;
+    }
+
+    return {
+      available: true,
+      quiz: moduleQuiz,
+      isPassed,
+      isLocked: !isHrAdmin && isLocked,
+      lockReason,
+      cooldown,
+      allModuleLessonsDone,
+      priorQuizzesPassed
+    };
+  };
+
+  // Helper for final assessment locking and status
+  const getFinalAssessmentState = () => {
+    if (isFoundationCourse || !finalQuiz) return { available: false };
+    const quizId = finalQuiz?.dbId ?? finalQuiz?.id ?? finalQuiz?.quizId;
+    const status = quizId != null ? quizUnlockStatuses[String(quizId)] : null;
+    const isPassed = Boolean(status?.alreadyPassed || status?.quizPassed);
+    const cooldown = getQuizCooldown(finalQuiz);
+
+    const allLessonsDone = totalLessons > 0 && allLessons.every(l => Boolean(completedLessons[l?.dbId]));
+    const allModuleQuizzesDone = moduleQuizzes.length === 0 || moduleQuizzes.every(q => {
+      const qId = q?.dbId ?? q?.id ?? q?.quizId;
+      const qStatus = qId != null ? quizUnlockStatuses[String(qId)] : null;
+      return Boolean(qStatus?.alreadyPassed || qStatus?.quizPassed);
+    });
+
+    let isLocked = false;
+    let lockReason = '';
+    if (!allLessonsDone) {
+      isLocked = true;
+    } else if (!allModuleQuizzesDone) {
+      isLocked = true;
+      lockReason = 'Pass all module quizzes before taking the final assessment.';
+    } else if (cooldown.active) {
+      isLocked = true;
+      lockReason = `Cooldown active. Retry available at ${formatRetryTime(cooldown.retryAt)}.`;
+    }
+
+    return {
+      available: true,
+      quiz: finalQuiz,
+      isPassed,
+      isLocked: !isHrAdmin && isLocked,
+      lockReason,
+      cooldown,
+      allLessonsDone,
+      allModuleQuizzesDone
+    };
+  };
+
+  // Auto-adjust current lesson if it points to a locked lesson on progress load
+  useEffect(() => {
+    if (!isHrAdmin && allLessons.length > 0 && !isLessonUnlocked(currentLessonIndex)) {
+      let firstUnlocked = 0;
+      for (let i = 0; i < allLessons.length; i++) {
+        if (isLessonUnlocked(i) && !completedLessons[allLessons[i]?.dbId]) {
+          firstUnlocked = i;
+          break;
+        }
+      }
+      setCurrentLessonIndex(firstUnlocked);
+    }
+  }, [completedLessons, quizUnlockStatuses, allLessons.length, isHrAdmin]);
 
 
 
@@ -255,8 +631,15 @@ export default function CourseViewer({
         null
     );
 
+  const [enrollmentStatus, setEnrollmentStatus] = useState(
+    course?.enrollmentStatus ??
+      course?.status ??
+      course?.enrollment?.status ??
+      ''
+  );
+
   /*
-   * Keep the enrollment ID synchronized when the selected course
+   * Keep the enrollment ID and status synchronized when the selected course
    * changes. useState only uses its initial value once.
    */
   useEffect(() => {
@@ -266,10 +649,19 @@ export default function CourseViewer({
         course?.enrollment?.id ??
         null
     );
+    setEnrollmentStatus(
+      course?.enrollmentStatus ??
+        course?.status ??
+        course?.enrollment?.status ??
+        ''
+    );
   }, [
     course?.enrollmentDbId,
     course?.enrollmentId,
-    course?.enrollment?.id
+    course?.enrollment?.id,
+    course?.enrollmentStatus,
+    course?.status,
+    course?.enrollment?.status
   ]);
 
   const enrollmentId = resolvedEnrollmentId;
@@ -297,6 +689,8 @@ export default function CourseViewer({
           course?.enrollment?.id ??
           null;
 
+        let matchingEnrollment = null;
+
         /*
          * If the course details do not contain the enrollment ID,
          * get the employee's enrollments and find this course.
@@ -310,7 +704,7 @@ export default function CourseViewer({
             course?.courseId ??
             course?.id;
 
-          const matchingEnrollment =
+          matchingEnrollment =
             Array.isArray(enrollments)
               ? enrollments.find(enrollment => {
                   const enrollmentCourseId =
@@ -349,6 +743,10 @@ export default function CourseViewer({
         setResolvedEnrollmentId(
           currentEnrollmentId
         );
+
+        if (matchingEnrollment?.status) {
+          setEnrollmentStatus(matchingEnrollment.status);
+        }
 
         /*
          * Now load the actual lesson progress.
@@ -434,8 +832,11 @@ export default function CourseViewer({
     setDocumentBlob(null);
     setDocumentUrl('');
     setDocumentContentType('');
+    setDocumentFilename('');
     setDocumentError('');
     setDocumentLoading(false);
+    setPdfRendering(false);
+    setPdfPageCount(0);
     return;
   }
 
@@ -448,6 +849,13 @@ export default function CourseViewer({
     setDocumentBlob(null);
     setDocumentUrl('');
     setDocumentContentType('');
+    setDocumentFilename(
+      activeLesson?.originalFileName ||
+      activeLesson?.fileName ||
+      activeLesson?.filename ||
+      ''
+    );
+    setPdfPageCount(0);
 
     try {
       const token =
@@ -505,6 +913,13 @@ export default function CourseViewer({
       const contentType = (
         response.headers.get('content-type') || blob.type || ''
       ).split(';')[0].trim().toLowerCase();
+      const resolvedFilename =
+        parseFilenameFromHeaders(response.headers) ||
+        activeLesson?.originalFileName ||
+        activeLesson?.fileName ||
+        activeLesson?.filename ||
+        activeLesson?.title ||
+        'Lesson Document';
 
       if (cancelled) return;
 
@@ -514,6 +929,7 @@ export default function CourseViewer({
 
       setDocumentBlob(blob);
       setDocumentContentType(contentType);
+      setDocumentFilename(resolvedFilename);
       setDocumentUrl(objectUrl);
     } catch (error) {
       if (!cancelled) {
@@ -540,8 +956,148 @@ export default function CourseViewer({
 }, [
   API_BASE_URL,
   documentLessonId,
-  isDocumentLesson
+  isDocumentLesson,
+  activeLesson?.originalFileName,
+  activeLesson?.fileName,
+  activeLesson?.filename,
+  activeLesson?.title
 ]);
+
+  // Controlled PDF.js canvas renderer (completely removes browser PDF toolbar, download, print, and native controls)
+  useEffect(() => {
+    const isPdfContent =
+      documentContentType === 'application/pdf' ||
+      lessonType === 'pdf' ||
+      (lessonType === 'document' && !documentContentType.includes('wordprocessingml.document'));
+
+    if (
+      !isDocumentLesson ||
+      !documentBlob ||
+      !pdfContainerRef.current ||
+      !isPdfContent
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    let loadingTask = null;
+    let pdfDoc = null;
+    let resizeTimer = null;
+    let lastRenderedWidth = 0;
+    const container = pdfContainerRef.current;
+
+    const renderPdfPages = async () => {
+      if (cancelled || !container) return;
+      setPdfRendering(true);
+      try {
+        if (!pdfDoc) {
+          const arrayBuffer = await documentBlob.arrayBuffer();
+          if (cancelled) return;
+          loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+          pdfDoc = await loadingTask.promise;
+          if (cancelled) {
+            try { await pdfDoc.destroy(); } catch { /* ignore */ }
+            return;
+          }
+          setPdfPageCount(pdfDoc.numPages || 0);
+        }
+
+        const totalPages = pdfDoc.numPages || 0;
+        const availableWidth = Math.max(280, (container.clientWidth || 720) - 32);
+        lastRenderedWidth = availableWidth;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        const fragment = document.createDocumentFragment();
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          if (cancelled) return;
+          const page = await pdfDoc.getPage(pageNum);
+          if (cancelled) return;
+
+          const unscaledViewport = page.getViewport({ scale: 1 });
+          const fitScale = unscaledViewport.width > 0
+            ? availableWidth / unscaledViewport.width
+            : 1;
+          const viewport = page.getViewport({ scale: fitScale });
+
+          const pageWrapper = document.createElement('div');
+          Object.assign(pageWrapper.style, {
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            marginBottom: pageNum < totalPages ? '16px' : '0'
+          });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.floor(viewport.width * dpr);
+          canvas.height = Math.floor(viewport.height * dpr);
+          Object.assign(canvas.style, {
+            width: `${Math.floor(viewport.width)}px`,
+            height: `${Math.floor(viewport.height)}px`,
+            maxWidth: '100%',
+            background: '#ffffff',
+            borderRadius: '6px',
+            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
+            border: '1px solid #e2e8f0',
+            display: 'block'
+          });
+
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.scale(dpr, dpr);
+            await page.render({
+              canvasContext: ctx,
+              viewport
+            }).promise;
+          }
+
+          pageWrapper.appendChild(canvas);
+          fragment.appendChild(pageWrapper);
+        }
+
+        if (!cancelled && container) {
+          container.replaceChildren(fragment);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('PDF rendering failed:', error);
+          setDocumentError('The PDF document is corrupted or could not be displayed.');
+        }
+      } finally {
+        if (!cancelled) {
+          setPdfRendering(false);
+        }
+      }
+    };
+
+    renderPdfPages();
+
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== 'undefined' && container) {
+      resizeObserver = new ResizeObserver(entries => {
+        const entry = entries?.[0];
+        if (!entry || cancelled || !pdfDoc) return;
+        const nextWidth = Math.max(280, Math.floor(entry.contentRect.width) - 32);
+        if (Math.abs(nextWidth - lastRenderedWidth) > 24) {
+          if (resizeTimer) window.clearTimeout(resizeTimer);
+          resizeTimer = window.setTimeout(() => {
+            if (!cancelled) renderPdfPages();
+          }, 200);
+        }
+      });
+      resizeObserver.observe(container);
+    }
+
+    return () => {
+      cancelled = true;
+      if (resizeTimer) window.clearTimeout(resizeTimer);
+      try { resizeObserver?.disconnect?.(); } catch { /* ignore */ }
+      try { loadingTask?.destroy?.(); } catch { /* ignore */ }
+      try { pdfDoc?.destroy?.(); } catch { /* ignore */ }
+      try { container?.replaceChildren?.(); } catch { /* ignore */ }
+    };
+  }, [documentBlob, documentContentType, isDocumentLesson, lessonType]);
 
   useEffect(() => {
   if (
@@ -595,89 +1151,55 @@ export default function CourseViewer({
 
   /*
    * ---------------------------------------------------------
-   * COURSE / LESSON SAFETY
-   * ---------------------------------------------------------
-   */
-  if (!course) {
-    return (
-      <div
-        style={{
-          padding: '2rem',
-          textAlign: 'center'
-        }}
-      >
-        <h2>Unable to load course</h2>
-
-        <p>
-          Course details are not available.
-        </p>
-
-        <button
-          className="btn-primary"
-          onClick={onBack}
-          style={{ marginTop: '1rem' }}
-        >
-          Back to Courses
-        </button>
-      </div>
-    );
-  }
-
-  if (allLessons.length === 0) {
-    return (
-      <div
-        style={{
-          padding: '2rem',
-          textAlign: 'center'
-        }}
-      >
-        <h2>No lessons available</h2>
-
-        <p>
-          This course does not have any lessons
-          loaded yet.
-        </p>
-
-        <button
-          className="btn-primary"
-          onClick={onBack}
-          style={{ marginTop: '1rem' }}
-        >
-          Back to Courses
-        </button>
-      </div>
-    );
-  }
-
-  const totalLessons = allLessons.length;
-
-  /*
-   * ---------------------------------------------------------
    * PROGRESS CALCULATION
    * ---------------------------------------------------------
    */
-  const completedCount =
-    Object.values(completedLessons).filter(Boolean)
-      .length;
+  const totalLessons = allLessons.length;
+  const completedCount = allLessons.filter(lesson =>
+    Boolean(completedLessons[lesson?.dbId ?? lesson?.id])
+  ).length;
 
-  const progressPercent =
-    totalLessons > 0
-      ? Math.round(
-          (completedCount / totalLessons) * 100
-        )
-      : 0;
+  const isFoundationCourse = Boolean(course?.foundation || course?.isFoundation);
+  const resolvedStatus = String(
+    enrollmentStatus ||
+    course?.enrollmentStatus ||
+    course?.status ||
+    course?.enrollment?.status ||
+    ''
+  ).toUpperCase();
+  const isCourseCompleted =
+    resolvedStatus === 'COMPLETED' ||
+    (isFoundationCourse && totalLessons > 0 && completedCount >= totalLessons);
+
+  const totalModuleQuizzes = isFoundationCourse ? 0 : (Array.isArray(moduleQuizzes) ? moduleQuizzes.length : 0);
+  const passedModuleQuizzes = isFoundationCourse ? 0 : (Array.isArray(moduleQuizzes) ? moduleQuizzes.filter(q => {
+    const id = q?.dbId ?? q?.id ?? q?.quizId;
+    const status = id != null ? quizUnlockStatuses[String(id)] : null;
+    return Boolean(status?.alreadyPassed || status?.quizPassed);
+  }).length : 0);
+
+  const totalItems = totalLessons + totalModuleQuizzes;
+  const completedItems = completedCount + passedModuleQuizzes;
+
+  const progressPercent = isCourseCompleted
+    ? 100
+    : isFoundationCourse
+      ? (totalLessons > 0 ? Math.min(100, Math.round((completedCount / totalLessons) * 100)) : 0)
+      : (totalItems > 0 ? Math.min(98, Math.round((completedItems / totalItems) * 98)) : 0);
 
   /*
    * ---------------------------------------------------------
-   * SAVE LESSON PROGRESS
+   * SAVE LESSON PROGRESS (WITH DEDUPLICATION & OFFLINE QUEUE)
    * ---------------------------------------------------------
    */
   const saveLessonProgress = async (
     lesson,
     completionPercent,
     watchedSeconds = 0,
-    lastPositionSeconds = 0
+    lastPositionSeconds = 0,
+    options = {}
   ) => {
+    const { silent = false, force = false } = options;
 
     /*
      * IMPORTANT:
@@ -688,16 +1210,32 @@ export default function CourseViewer({
       lesson?.dbId;
 
     if (!enrollmentId || !lessonDbId) {
-      console.warn(
-        'Cannot save progress: enrollment ID or lesson database ID is missing.',
-        {
-          enrollmentId,
-          lessonDbId,
-          lesson
-        }
-      );
+      if (!silent) {
+        console.warn(
+          'Cannot save progress. Please refresh and try again',
+          {
+            enrollmentId,
+            lessonDbId,
+            lesson
+          }
+        );
+      }
+      return false;
+    }
 
-      return;
+    const safePercent = Math.max(0, Math.min(100, Math.round(Number(completionPercent) || 0)));
+    const safeWatched = Math.max(0, Math.floor(Number(watchedSeconds) || 0));
+    const safePosition = Math.max(0, Math.floor(Number(lastPositionSeconds) || 0));
+
+    // Avoid duplicate non-completion checkpoint calls for identical position & percent
+    if (
+      !force &&
+      safePercent < 100 &&
+      lastSavedCheckpointRef.current.lessonDbId === lessonDbId &&
+      lastSavedCheckpointRef.current.percent === safePercent &&
+      Math.abs(lastSavedCheckpointRef.current.position - safePosition) < 2
+    ) {
+      return true;
     }
 
     try {
@@ -707,36 +1245,66 @@ export default function CourseViewer({
         await enrollmentService.updateLessonProgress(
           enrollmentId,
           lessonDbId,
-          completionPercent,
-          watchedSeconds,
-          lastPositionSeconds
+          safePercent,
+          safeWatched,
+          safePosition
         );
 
+      lastSavedCheckpointRef.current = {
+        lessonDbId,
+        percent: safePercent,
+        position: safePosition
+      };
+      if (pendingCheckpointRef.current?.lesson?.dbId === lessonDbId) {
+        pendingCheckpointRef.current = null;
+      }
+
+      const alreadyCompleted = Boolean(completedLessons[lessonDbId]);
       const completed =
-        completionPercent >= 100;
+        alreadyCompleted ||
+        Boolean(result?.completed) ||
+        safePercent >= 100;
 
       /*
        * Store progress using the database ID.
        */
-      setLessonProgress(prev => ({
-        ...prev,
-        [lessonDbId]: {
-          completionPercent,
-          watchedSeconds,
-          lastPositionSeconds,
-          completed
-        }
-      }));
+      setLessonProgress(prev => {
+        const prevEntry = prev[lessonDbId];
+        const prevPercent = Number(prevEntry?.completionPercent ?? 0);
+        const prevWatched = Number(prevEntry?.watchedSeconds ?? 0);
+        return {
+          ...prev,
+          [lessonDbId]: {
+            completionPercent: completed ? 100 : Math.max(prevPercent, safePercent),
+            watchedSeconds: Math.max(prevWatched, safeWatched),
+            lastPositionSeconds: safePosition,
+            completed
+          }
+        };
+      });
 
       if (completed) {
-        setCompletedLessons(prev => ({
-          ...prev,
-          [lessonDbId]: true
-        }));
+        setCompletedLessons(prev => {
+          const updated = {
+            ...prev,
+            [lessonDbId]: true
+          };
+          if (isFoundationCourse) {
+            const count = allLessons.filter(l => Boolean(updated[l?.dbId ?? l?.id])).length;
+            if (totalLessons > 0 && count >= totalLessons) {
+              setEnrollmentStatus('COMPLETED');
+              notifyEnrollmentUpdated({
+                source: 'foundation-course-completed',
+                courseCode: course?.courseId || course?.id
+              });
+            }
+          }
+          return updated;
+        });
       } else {
         setCompletedLessons(prev => ({
           ...prev,
-          [lessonDbId]: false
+          [lessonDbId]: Boolean(prev[lessonDbId])
         }));
       }
 
@@ -747,25 +1315,142 @@ export default function CourseViewer({
         'Failed to save lesson progress:',
         error
       );
-      alert('Lesson progress could not be saved. Please check your connection and try again.');
+      // Queue checkpoint for retry when connectivity recovers
+      pendingCheckpointRef.current = {
+        lesson,
+        completionPercent: safePercent,
+        watchedSeconds: safeWatched,
+        lastPositionSeconds: safePosition
+      };
+      if (!silent) {
+        alert('Lesson progress could not be saved. Please check your connection and try again.');
+      }
       return false;
     } finally {
       setSavingProgress(false);
     }
   };
 
+  // Monitor network connectivity and flush queued progress checkpoint on reconnect
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      const pending = pendingCheckpointRef.current;
+      if (pending && pending.lesson) {
+        pendingCheckpointRef.current = null;
+        youtubeCallbacksRef.current.saveLessonProgress?.(
+          pending.lesson,
+          pending.completionPercent,
+          pending.watchedSeconds,
+          pending.lastPositionSeconds,
+          { silent: true, force: true }
+        );
+      }
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Track fullscreen state changes for HTML5 video wrapper
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setVideoFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   /*
    * ---------------------------------------------------------
-   * VIDEO PROGRESS
+   * HTML5 VIDEO CONTROLS & PROGRESS
    * ---------------------------------------------------------
    */
+  const handleTogglePlayPause = () => {
+    const video = html5VideoRef.current;
+    if (!video) return;
+    if (video.paused || video.ended) {
+      wasManuallyPausedRef.current = false;
+      setAutoplayBlocked(false);
+      video.play().catch(err => {
+        console.warn('Video play blocked:', err);
+      });
+    } else {
+      wasManuallyPausedRef.current = true;
+      video.pause();
+    }
+  };
+
+  const handleToggleMute = () => {
+    const video = html5VideoRef.current;
+    if (!video) return;
+    const nextMuted = !video.muted;
+    video.muted = nextMuted;
+    setVideoMuted(nextMuted);
+  };
+
+  const handleVolumeChange = event => {
+    const nextVol = Math.max(0, Math.min(1, Number(event.target.value)));
+    const video = html5VideoRef.current;
+    setVideoVolume(nextVol);
+    if (video) {
+      video.volume = nextVol;
+      if (nextVol > 0 && video.muted) {
+        video.muted = false;
+        setVideoMuted(false);
+      } else if (nextVol === 0) {
+        setVideoMuted(true);
+      }
+    }
+  };
+
+  const handlePlaybackRateChange = event => {
+    const rate = Number(event.target.value) || 1;
+    setVideoPlaybackRate(rate);
+    const video = html5VideoRef.current;
+    if (video) {
+      video.playbackRate = rate;
+    }
+  };
+
+  const handleToggleFullscreen = () => {
+    const target = videoWrapperRef.current || html5VideoRef.current;
+    if (!target) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    } else {
+      target.requestFullscreen?.().catch(() => {});
+    }
+  };
+
   const handleVideoTimeUpdate = event => {
     const video = event.currentTarget;
+    const currentTime = Number(video.currentTime || 0);
+    const duration = Number(video.duration || 0);
 
-    if (!video.duration) return;
+    setVideoCurrentTime(currentTime);
+    if (duration > 0 && Number.isFinite(duration)) {
+      setVideoDuration(duration);
+    }
+
+    if (!duration || !Number.isFinite(duration)) return;
+
+    const delta = currentTime - lastTimeRef.current;
+    if (delta > 0 && delta <= 2.5 * (video.playbackRate || 1)) {
+      actualWatchTimeRef.current += delta;
+    }
+    lastTimeRef.current = currentTime;
 
     const percent = Math.round(
-      (video.currentTime / video.duration) * 100
+      (currentTime / duration) * 100
     );
 
     /*
@@ -778,17 +1463,24 @@ export default function CourseViewer({
       lessonProgress[activeLessonDbId]
         ?.completionPercent ?? 0;
 
+    const lastPos =
+      lastSavedCheckpointRef.current.lessonDbId === activeLessonDbId
+        ? lastSavedCheckpointRef.current.position
+        : Number(lessonProgress[activeLessonDbId]?.lastPositionSeconds ?? 0);
+
     const checkpoint =
       percent >= 100 ||
-      percent >= previous + 10;
+      percent >= previous + 10 ||
+      Math.abs(Math.floor(currentTime) - lastPos) >= 15;
 
     if (!checkpoint) return;
 
     saveLessonProgress(
       activeLesson,
-      Math.min(percent, 100),
-      Math.floor(video.currentTime),
-      Math.floor(video.currentTime)
+      Math.min(percent, 99),
+      Math.floor(actualWatchTimeRef.current),
+      Math.floor(currentTime),
+      { silent: true }
     );
   };
 
@@ -799,7 +1491,7 @@ export default function CourseViewer({
    */
   const completeLessonAndContinue = async (lesson, watchedSeconds = 0, lastPositionSeconds = 0) => {
     if (!lesson) return;
-    const saved = await saveLessonProgress(lesson, 100, watchedSeconds, lastPositionSeconds);
+    const saved = await saveLessonProgress(lesson, 100, watchedSeconds, lastPositionSeconds, { force: true });
     if (saved !== true) return;
 
     const lessonIndex = allLessons.findIndex(item =>
@@ -822,7 +1514,7 @@ export default function CourseViewer({
       offset += lessons.length;
     }
 
-    if (containingModule && lessonIndex === moduleEndIndex) {
+    if (!isFoundationCourse && containingModule && lessonIndex === moduleEndIndex) {
   const moduleId = getNumericModuleId(containingModule);
 
   const moduleQuiz = moduleId == null
@@ -850,10 +1542,21 @@ export default function CourseViewer({
   /* VIDEO COMPLETED */
   const handleVideoEnded = async event => {
     const video = event.currentTarget;
+    setVideoPlaying(false);
+    const duration = Math.floor(video.duration || 0);
+    const activeLessonDbId = activeLesson?.dbId;
+    const isAlreadyDone = Boolean(completedLessons[activeLessonDbId]);
+
+    // Anti-scrub protection: require at least 70% actual elapsed watch time for videos > 10s
+    if (!isAlreadyDone && duration > 10 && actualWatchTimeRef.current < (0.7 * duration)) {
+      alert(`Please watch the video lessons thoroughly. You have watched ${Math.round(actualWatchTimeRef.current)} seconds of ${duration} seconds (at least 70% required).`);
+      return;
+    }
+
     await completeLessonAndContinue(
       activeLesson,
-      Math.floor(video.duration || video.currentTime || 0),
-      Math.floor(video.duration || video.currentTime || 0)
+      duration,
+      duration
     );
   };
 
@@ -868,31 +1571,160 @@ export default function CourseViewer({
   const activeYoutubeMatch = activeVideoUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   const activeYoutubeVideoId = activeYoutubeMatch?.[1] || null;
 
+  const youtubeCallbacksRef = useRef({
+    lessonProgress,
+    activeLesson,
+    saveLessonProgress,
+    completeLessonAndContinue
+  });
+  youtubeCallbacksRef.current = {
+    lessonProgress,
+    activeLesson,
+    saveLessonProgress,
+    completeLessonAndContinue
+  };
+
   useEffect(() => {
-    if (lessonType !== 'video' || !activeYoutubeVideoId || !youtubeIframeRef.current) return;
+    const container = youtubeIframeRef.current;
+    if (lessonType !== 'video' || !activeYoutubeVideoId || !container) return;
 
     let disposed = false;
     let player = null;
+    let retry = null;
+    let retryTimeout = null;
     youtubeCompletionHandledRef.current = false;
+    setYoutubeLoading(true);
+    setYoutubeBuffering(false);
+    setYoutubeError('');
+
+    const currentLesson = youtubeCallbacksRef.current.activeLesson;
+    const savedPosInitial = Number(
+      youtubeCallbacksRef.current.lessonProgress[currentLesson?.dbId]?.lastPositionSeconds ?? 0
+    );
+    const startParam =
+      savedPosInitial > 0 && Number.isFinite(savedPosInitial)
+        ? `&start=${Math.floor(savedPosInitial)}`
+        : '';
+
+    const iframe = document.createElement('iframe');
+    iframe.id = `youtube-player-${String(currentLesson?.dbId ?? currentLesson?.id ?? currentLessonIndex).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+    iframe.title = currentLesson?.title || 'Training video';
+    iframe.src = `https://www.youtube.com/embed/${activeYoutubeVideoId}?controls=1&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&cc_load_policy=0${startParam}`;
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share';
+    iframe.allowFullscreen = true;
+    iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+    Object.assign(iframe.style, {
+      width: '100%',
+      height: '420px',
+      border: '0',
+      background: '#000'
+    });
+    container.replaceChildren(iframe);
 
     const initializePlayer = () => {
-      if (disposed || player || !window.YT?.Player || !youtubeIframeRef.current) return;
+      if (disposed || player || !window.YT?.Player || !iframe.isConnected) return;
       try {
-        player = new window.YT.Player(youtubeIframeRef.current, {
+        player = new window.YT.Player(iframe, {
           events: {
+            onReady: event => {
+              if (disposed) return;
+              setYoutubeLoading(false);
+              const lesson = youtubeCallbacksRef.current.activeLesson;
+              const savedPos = Number(
+                youtubeCallbacksRef.current.lessonProgress[lesson?.dbId]?.lastPositionSeconds ?? 0
+              );
+              if (savedPos > 0 && Number.isFinite(savedPos)) {
+                try {
+                  event.target.seekTo(savedPos, true);
+                } catch (e) {
+                  console.warn('YouTube seekTo failed:', e);
+                }
+              }
+            },
             onStateChange: async event => {
+              if (disposed) return;
+              setYoutubeLoading(false);
+              // YT.PlayerState: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued
+              if (event.data === 3) {
+                setYoutubeBuffering(true);
+              } else {
+                setYoutubeBuffering(false);
+              }
+
+              if (event.data === 1) {
+                wasManuallyPausedRef.current = false;
+                autoPausedByVisibilityRef.current = false;
+                setAutoplayBlocked(false);
+                if (!youtubeCheckpointIntervalRef.current) {
+                  youtubeCheckpointIntervalRef.current = window.setInterval(() => {
+                    try {
+                      const curTime = Math.floor(Number(event.target?.getCurrentTime?.()) || 0);
+                      const dur = Math.floor(Number(event.target?.getDuration?.()) || 0);
+                      if (curTime > 0 && dur > 0) {
+                        const pct = Math.min(99, Math.round((curTime / dur) * 100));
+                        youtubeCallbacksRef.current.saveLessonProgress(
+                          youtubeCallbacksRef.current.activeLesson,
+                          pct,
+                          curTime,
+                          curTime,
+                          { silent: true }
+                        );
+                      }
+                    } catch {
+                      // ignore
+                    }
+                  }, 10000);
+                }
+              } else {
+                if (event.data === 2) {
+                  // Paused: if not triggered by visibility auto-pause, record as manual pause
+                  if (!autoPausedByVisibilityRef.current && document.visibilityState === 'visible') {
+                    wasManuallyPausedRef.current = true;
+                  }
+                }
+                if (youtubeCheckpointIntervalRef.current) {
+                  window.clearInterval(youtubeCheckpointIntervalRef.current);
+                  youtubeCheckpointIntervalRef.current = null;
+                }
+              }
+
               // YT.PlayerState.ENDED === 0. Guard against duplicate end events.
               if (event.data !== 0 || disposed || youtubeCompletionHandledRef.current) return;
               youtubeCompletionHandledRef.current = true;
+              if (youtubeCheckpointIntervalRef.current) {
+                window.clearInterval(youtubeCheckpointIntervalRef.current);
+                youtubeCheckpointIntervalRef.current = null;
+              }
               const duration = Math.floor(Number(event.target?.getDuration?.()) || 0);
-              await completeLessonAndContinue(activeLesson, duration, duration);
+              await youtubeCallbacksRef.current.completeLessonAndContinue(
+                youtubeCallbacksRef.current.activeLesson,
+                duration,
+                duration
+              );
             },
-            onError: event => console.error('YouTube player error:', event.data)
+            onError: event => {
+              if (disposed) return;
+              setYoutubeLoading(false);
+              setYoutubeBuffering(false);
+              const code = Number(event?.data);
+              let message = 'This training video is currently unavailable. Please try again or contact your trainer.';
+              if (code === 100) {
+                message = 'This YouTube training video was removed or marked private.';
+              } else if (code === 101 || code === 150) {
+                message = 'Playback of this YouTube video on embedded players has been restricted by its owner.';
+              } else if (code === 2 || code === 5) {
+                message = 'The video player encountered a playback error. Please check your connection and reload.';
+              }
+              console.error('YouTube player error:', code);
+              setYoutubeError(message);
+            }
           }
         });
         youtubePlayerRef.current = player;
       } catch (error) {
-        console.error('Could not initialize YouTube Player API:', error);
+        console.error('Could not initialize YouTube Player:', error);
+        setYoutubeLoading(false);
+        setYoutubeError('Unable to initialize the YouTube video player.');
       }
     };
 
@@ -913,19 +1745,244 @@ export default function CourseViewer({
         initializePlayer();
       };
       // Handle API already in flight and ready callback having fired before this effect.
-      const retry = window.setInterval(() => {
+      retry = window.setInterval(() => {
         if (window.YT?.Player) {
           window.clearInterval(retry);
+          retry = null;
           initializePlayer();
         }
       }, 250);
-      window.setTimeout(() => window.clearInterval(retry), 15000);
+      retryTimeout = window.setTimeout(() => {
+        if (retry) {
+          window.clearInterval(retry);
+          retry = null;
+        }
+        if (!disposed && !player) {
+          setYoutubeLoading(false);
+        }
+      }, 15000);
     }
 
     return () => {
       disposed = true;
+      if (retry) window.clearInterval(retry);
+      if (retryTimeout) window.clearTimeout(retryTimeout);
+      if (youtubeCheckpointIntervalRef.current) {
+        window.clearInterval(youtubeCheckpointIntervalRef.current);
+        youtubeCheckpointIntervalRef.current = null;
+      }
       try { player?.destroy?.(); } catch (error) { console.warn('YouTube player cleanup failed:', error); }
+      try { container.replaceChildren(); } catch { /* ignore */ }
       if (youtubePlayerRef.current === player) youtubePlayerRef.current = null;
+    };
+  }, [activeYoutubeVideoId, currentLessonIndex, lessonType]);
+
+  /*
+   * ---------------------------------------------------------
+   * PAGE VISIBILITY API: AUTO PAUSE & RESUME ON TAB SWITCH
+   * ---------------------------------------------------------
+   */
+  const handleResumeFromAutoplayBlock = () => {
+    setAutoplayBlocked(false);
+    wasManuallyPausedRef.current = false;
+    autoPausedByVisibilityRef.current = false;
+
+    if (activeYoutubeVideoId && youtubePlayerRef.current) {
+      try {
+        const yt = youtubePlayerRef.current;
+        if (pausedAtPositionRef.current > 0 && typeof yt.seekTo === 'function') {
+          yt.seekTo(pausedAtPositionRef.current, true);
+        }
+        yt.playVideo?.();
+      } catch (err) {
+        console.warn('YouTube manual resume failed:', err);
+      }
+      return;
+    }
+
+    const video = html5VideoRef.current;
+    if (video) {
+      if (
+        pausedAtPositionRef.current > 0 &&
+        Number.isFinite(pausedAtPositionRef.current) &&
+        Math.abs(video.currentTime - pausedAtPositionRef.current) > 1.5
+      ) {
+        video.currentTime = pausedAtPositionRef.current;
+      }
+      video.play().catch(err => {
+        console.warn('HTML5 video manual resume failed:', err);
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (lessonType !== 'video') return undefined;
+
+    let resumeVerifyTimer = null;
+
+    const handleVisibilityChange = () => {
+      const currentLesson = youtubeCallbacksRef.current.activeLesson;
+
+      if (document.visibilityState === 'hidden') {
+        if (resumeVerifyTimer) {
+          window.clearTimeout(resumeVerifyTimer);
+          resumeVerifyTimer = null;
+        }
+
+        // Case 1: YouTube video lesson
+        if (activeYoutubeVideoId && youtubePlayerRef.current) {
+          const yt = youtubePlayerRef.current;
+          let ytState = -1;
+          try {
+            ytState = typeof yt.getPlayerState === 'function' ? Number(yt.getPlayerState()) : -1;
+          } catch {
+            ytState = -1;
+          }
+
+          // YT.PlayerState.PLAYING === 1, BUFFERING === 3
+          const isYtPlaying = (ytState === 1 || ytState === 3) && !wasManuallyPausedRef.current;
+          if (isYtPlaying) {
+            wasPlayingBeforeHideRef.current = true;
+            autoPausedByVisibilityRef.current = true;
+            let curPos = 0;
+            let dur = 0;
+            try {
+              curPos = Math.floor(Number(yt.getCurrentTime?.()) || 0);
+              dur = Math.floor(Number(yt.getDuration?.()) || 0);
+            } catch {
+              curPos = 0;
+            }
+            pausedAtPositionRef.current = curPos;
+            try {
+              yt.pauseVideo?.();
+            } catch (err) {
+              console.warn('YouTube auto-pause on tab hide failed:', err);
+            }
+            if (curPos > 0) {
+              const prevPct = Number(
+                youtubeCallbacksRef.current.lessonProgress[currentLesson?.dbId]?.completionPercent ?? 0
+              );
+              const pct = dur > 0
+                ? Math.min(99, Math.round((curPos / dur) * 100))
+                : Math.min(99, prevPct);
+              youtubeCallbacksRef.current.saveLessonProgress(
+                currentLesson,
+                pct,
+                curPos,
+                curPos,
+                { silent: true }
+              );
+            }
+          } else {
+            wasPlayingBeforeHideRef.current = false;
+          }
+          return;
+        }
+
+        // Case 2: HTML5 video lesson
+        const video = html5VideoRef.current;
+        if (video) {
+          const isHtml5Playing = !video.paused && !video.ended && !wasManuallyPausedRef.current;
+          if (isHtml5Playing) {
+            wasPlayingBeforeHideRef.current = true;
+            autoPausedByVisibilityRef.current = true;
+            const curPos = Math.floor(Number(video.currentTime) || 0);
+            const dur = Math.floor(Number(video.duration) || 0);
+            pausedAtPositionRef.current = curPos;
+            video.pause();
+            if (curPos > 0) {
+              const prevPct = Number(
+                youtubeCallbacksRef.current.lessonProgress[currentLesson?.dbId]?.completionPercent ?? 0
+              );
+              const pct = dur > 0
+                ? Math.min(99, Math.round((curPos / dur) * 100))
+                : Math.min(99, prevPct);
+              youtubeCallbacksRef.current.saveLessonProgress(
+                currentLesson,
+                pct,
+                Math.floor(actualWatchTimeRef.current || curPos),
+                curPos,
+                { silent: true }
+              );
+            }
+          } else {
+            wasPlayingBeforeHideRef.current = false;
+          }
+        }
+        return;
+      }
+
+      if (document.visibilityState === 'visible') {
+        if (!wasPlayingBeforeHideRef.current) {
+          // Learner had manually paused before leaving the tab — keep paused.
+          return;
+        }
+
+        wasPlayingBeforeHideRef.current = false;
+        autoPausedByVisibilityRef.current = false;
+
+        // Case 1: Resume YouTube video from paused position
+        if (activeYoutubeVideoId && youtubePlayerRef.current) {
+          const yt = youtubePlayerRef.current;
+          try {
+            if (pausedAtPositionRef.current > 0 && typeof yt.seekTo === 'function') {
+              const cur = Number(yt.getCurrentTime?.() || 0);
+              if (Math.abs(cur - pausedAtPositionRef.current) > 1.5) {
+                yt.seekTo(pausedAtPositionRef.current, true);
+              }
+            }
+            yt.playVideo?.();
+            resumeVerifyTimer = window.setTimeout(() => {
+              try {
+                const stateAfter = typeof yt.getPlayerState === 'function' ? Number(yt.getPlayerState()) : -1;
+                if (stateAfter !== 1 && stateAfter !== 3) {
+                  setAutoplayBlocked(true);
+                } else {
+                  setAutoplayBlocked(false);
+                }
+              } catch {
+                setAutoplayBlocked(true);
+              }
+            }, 500);
+          } catch {
+            setAutoplayBlocked(true);
+          }
+          return;
+        }
+
+        // Case 2: Resume HTML5 video from paused position
+        const video = html5VideoRef.current;
+        if (video && !video.ended) {
+          if (
+            pausedAtPositionRef.current > 0 &&
+            Number.isFinite(pausedAtPositionRef.current) &&
+            Math.abs(video.currentTime - pausedAtPositionRef.current) > 1.5
+          ) {
+            video.currentTime = pausedAtPositionRef.current;
+            lastTimeRef.current = pausedAtPositionRef.current;
+          }
+          const playPromise = video.play();
+          if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise
+              .then(() => {
+                setAutoplayBlocked(false);
+              })
+              .catch(() => {
+                // Browser blocked automatic playback upon returning to tab:
+                // show the clean "Resume Video" fallback button without resetting position.
+                setAutoplayBlocked(true);
+              });
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (resumeVerifyTimer) {
+        window.clearTimeout(resumeVerifyTimer);
+      }
     };
   }, [activeYoutubeVideoId, currentLessonIndex, lessonType]);
 
@@ -951,7 +2008,13 @@ export default function CourseViewer({
       currentLessonIndex <
       totalLessons - 1
     ) {
-      setCurrentLessonIndex(prev => prev + 1);
+      const nextIdx = currentLessonIndex + 1;
+      if (!isHrAdmin && !isLessonUnlocked(nextIdx)) {
+        const reason = getLessonLockReason(nextIdx) || 'The next lesson is locked. Complete the current lesson first.';
+        alert(reason);
+        return;
+      }
+      setCurrentLessonIndex(nextIdx);
     }
   };
 
@@ -971,9 +2034,61 @@ export default function CourseViewer({
       index >= 0 &&
       index < totalLessons
     ) {
+      if (!isHrAdmin && !isLessonUnlocked(index)) {
+        const reason = getLessonLockReason(index) || 'This lesson is locked. Complete the previous lessons to unlock it.';
+        alert(reason);
+        return;
+      }
       setCurrentLessonIndex(index);
     }
   };
+
+  /*
+   * ---------------------------------------------------------
+   * RENDER GUARDS
+   * ---------------------------------------------------------
+   */
+  if (!course) {
+    return (
+      <div
+        style={{
+          padding: '2rem',
+          textAlign: 'center'
+        }}
+      >
+        <h2>Unable to load course</h2>
+        <p>Course details are not available.</p>
+        <button
+          className="btn-primary"
+          onClick={onBack}
+          style={{ marginTop: '1rem' }}
+        >
+          Back to Courses
+        </button>
+      </div>
+    );
+  }
+
+  if (allLessons.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '2rem',
+          textAlign: 'center'
+        }}
+      >
+        <h2>No lessons available</h2>
+        <p>This course does not have any lessons loaded yet.</p>
+        <button
+          className="btn-primary"
+          onClick={onBack}
+          style={{ marginTop: '1rem' }}
+        >
+          Back to Courses
+        </button>
+      </div>
+    );
+  }
 
   /*
    * ---------------------------------------------------------
@@ -1038,7 +2153,7 @@ export default function CourseViewer({
                 color: '#0284c7'
               }}
             >
-              {course.id} • {course.category}
+              {course.id} • {course.department || (course.departments && course.departments[0]) || course.category || 'General Logistics'}
             </div>
 
             <h1
@@ -1100,59 +2215,124 @@ export default function CourseViewer({
               : 'Bookmark'}
           </button>
 
-          <button
-            className="btn-primary"
-            disabled={!isHrAdmin && getQuizCooldown(finalQuiz).active}
-            onClick={() => {
-              if (finalQuiz?.id != null && !(!isHrAdmin && getQuizCooldown(finalQuiz).active)) {
-                openQuiz(finalQuiz, false);
-              } else {
-                alert(
-                  quizLoadError ||
-                  'The final assessment database ID could not be loaded. Please refresh and try again.'
-                );
-              }
-            }}
-            style={{
-              background: !isHrAdmin && getQuizCooldown(finalQuiz).active ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)',
-              cursor: !isHrAdmin && getQuizCooldown(finalQuiz).active ? 'not-allowed' : 'pointer',
-              opacity: !isHrAdmin && getQuizCooldown(finalQuiz).active ? 0.8 : 1
-            }}
-          >
-            {!isHrAdmin && getQuizCooldown(finalQuiz).active
-              ? <Lock style={{ width: 18, height: 18 }} />
-              : <Award style={{ width: 18, height: 18 }} />}
-            {!isHrAdmin && getQuizCooldown(finalQuiz).active ? 'Assessment Locked' : 'Take Final Assessment'}
-          </button>
-          {!isHrAdmin && getQuizCooldown(finalQuiz).active && (
-            <div style={{ border: '1px solid #fecaca', background: 'linear-gradient(135deg,#fff7ed,#fff1f2)', borderRadius: 12, padding: '0.85rem', color: '#9f1239' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: '.82rem' }}><Clock3 size={17} /> Retry cooldown active</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', margin: '.35rem 0' }}>{formatCountdown(getQuizCooldown(finalQuiz).remaining)}</div>
-              <div style={{ fontSize: '.75rem', lineHeight: 1.45 }}>You can retry at {formatRetryTime(getQuizCooldown(finalQuiz).retryAt)}. The assessment unlocks automatically when the timer ends.</div>
-            </div>
-          )}
+          {!isFoundationCourse && (() => {
+            const finalState = getFinalAssessmentState();
+            if (!finalState.available) return null;
+            const { quiz: fQuiz, isPassed, isLocked, lockReason, cooldown } = finalState;
 
-          {isHrAdmin && (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                if (finalQuiz?.id != null) {
-                  openQuiz(finalQuiz, true);
-                } else {
-                  alert(
-                    quizLoadError ||
-                    'The final assessment database ID could not be loaded. Please refresh and try again.'
-                  );
-                }
-              }}
-              style={{ border: '1px solid #93c5fd', color: '#1d4ed8', background: '#eff6ff' }}
-            >
-              Preview Final Assessment
-            </button>
-          )}
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <button
+                  className="btn-primary"
+                  disabled={isLocked}
+                  onClick={() => {
+                    if (!isLocked) {
+                      openQuiz(fQuiz, false);
+                    } else if (lockReason) {
+                      alert(lockReason);
+                    }
+                  }}
+                  title={lockReason || (isPassed ? 'Final Assessment Passed' : 'Take Final Assessment')}
+                  style={{
+                    background: isPassed
+                      ? '#16a34a'
+                      : isLocked
+                      ? '#94a3b8'
+                      : 'linear-gradient(135deg, #10b981, #059669)',
+                    cursor: isLocked ? 'not-allowed' : 'pointer',
+                    opacity: isLocked ? 0.8 : 1
+                  }}
+                >
+                  {isPassed ? (
+                    <CheckCircle style={{ width: 18, height: 18 }} />
+                  ) : isLocked ? (
+                    <Lock style={{ width: 18, height: 18 }} />
+                  ) : (
+                    <Award style={{ width: 18, height: 18 }} />
+                  )}
+                  {isPassed ? 'Assessment Passed' : isLocked ? 'Assessment Locked' : 'Take Final Assessment'}
+                </button>
+
+                {isHrAdmin && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => openQuiz(fQuiz, true)}
+                    style={{ border: '1px solid #93c5fd', color: '#1d4ed8', background: '#eff6ff' }}
+                  >
+                    Preview Final Assessment
+                  </button>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
+
+      {(reviewMode || course?.reviewMode) && (
+        <div
+          style={{
+            background: 'linear-gradient(90deg, #ecfdf5 0%, #d1fae5 100%)',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            padding: '0.75rem 1.25rem',
+            borderRadius: '12px',
+            marginBottom: '1rem',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 2px 8px rgba(16, 185, 129, 0.1)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ fontSize: '1.2rem' }}>🎓</span>
+            <span>
+              <strong>Course Completed (Review Mode):</strong> You have successfully finished all curriculum and assessments.
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {!isFoundationCourse && (
+              <button
+                type="button"
+                onClick={handleOpenCertificate}
+                disabled={loadingCertificate}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  background: 'white',
+                  color: '#065f46',
+                  border: '1px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '0.35rem 0.75rem',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                }}
+              >
+                <Award style={{ width: 15, height: 15, color: '#059669' }} />
+                {loadingCertificate ? 'Loading...' : 'View Certificate'}
+              </button>
+            )}
+            <span
+              style={{
+                background: '#059669',
+                color: 'white',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                padding: '0.25rem 0.65rem',
+                borderRadius: '12px',
+                letterSpacing: '0.5px'
+              }}
+            >
+              COMPLETED
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================
           MAIN CONTENT
@@ -1184,6 +2364,7 @@ export default function CourseViewer({
           ================================================== */}
 
           <div
+            ref={videoWrapperRef}
             style={{
               background: '#0f172a',
               borderRadius: '12px',
@@ -1201,32 +2382,435 @@ export default function CourseViewer({
               const youtubeMatch = String(sourceUrl).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
               if (youtubeMatch) {
                 const videoId = youtubeMatch[1];
-                return <iframe
-                  key={activeLesson.dbId ?? activeLesson.id ?? videoId}
-                  ref={youtubeIframeRef}
-                  id={`youtube-player-${String(activeLesson.dbId ?? activeLesson.id ?? currentLessonIndex).replace(/[^a-zA-Z0-9_-]/g, '-')}`}
-                  title={activeLesson.title || 'Training video'}
-                  src={`https://www.youtube.com/embed/${videoId}?controls=1&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&cc_load_policy=0`}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  style={{ width: '100%', height: '420px', border: 0, background: '#000' }}
-                />;
+                return (
+                  <div style={{ position: 'relative', width: '100%', background: '#000' }}>
+                    {youtubeLoading && !youtubeError && (
+                      <div
+                        role="status"
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(15, 23, 42, 0.78)',
+                          color: '#e2e8f0',
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          zIndex: 2,
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        Loading training video…
+                      </div>
+                    )}
+
+                    {youtubeError && (
+                      <div
+                        role="alert"
+                        style={{
+                          padding: '2rem',
+                          textAlign: 'center',
+                          background: '#1e293b',
+                          color: '#fecaca',
+                          borderBottom: '1px solid #334155'
+                        }}
+                      >
+                        <p style={{ fontWeight: 700, marginBottom: '0.35rem' }}>Video Unavailable</p>
+                        <p style={{ fontSize: '0.85rem', color: '#cbd5e1' }}>{youtubeError}</p>
+                      </div>
+                    )}
+
+                    <div
+                      key={`yt-container-${activeLesson.dbId ?? activeLesson.id ?? videoId}`}
+                      ref={youtubeIframeRef}
+                      style={{ width: '100%', height: '420px', border: 0, background: '#000' }}
+                    />
+
+                    {(youtubeBuffering || isOffline) && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.45rem 1rem',
+                          background: '#1e293b',
+                          color: '#e2e8f0',
+                          fontSize: '0.78rem',
+                          borderTop: '1px solid #334155'
+                        }}
+                      >
+                        <span>{youtubeBuffering ? 'Buffering video…' : 'Playing'}</span>
+                        {isOffline && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#fbbf24' }}>
+                            <WifiOff size={14} /> Offline – progress checkpoint queued
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {autoplayBlocked && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          background: 'rgba(15, 23, 42, 0.82)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.75rem',
+                          zIndex: 5,
+                          padding: '1.5rem',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <p style={{ fontSize: '0.92rem', color: '#e2e8f0', fontWeight: 600 }}>
+                          Video paused while you were in another tab ({formatMediaTime(pausedAtPositionRef.current)})
+                        </p>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={handleResumeFromAutoplayBlock}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.6rem 1.25rem',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            background: '#0284c7',
+                            color: '#ffffff',
+                            borderRadius: '8px',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Play size={16} /> Resume Video
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
               }
               if (sourceUrl.trim()) {
-                return <video
-                  key={activeLesson.id}
-                  controls
-                  onLoadedMetadata={event => {
-                    const video = event.currentTarget;
-                    const savedPosition = Number(lessonProgress[activeLesson?.dbId]?.lastPositionSeconds ?? 0);
-                    if (savedPosition > 0 && Number.isFinite(savedPosition) && savedPosition < video.duration) video.currentTime = savedPosition;
-                  }}
-                  onTimeUpdate={handleVideoTimeUpdate}
-                  onEnded={handleVideoEnded}
-                  style={{ width: '100%', maxHeight: '420px', objectFit: 'contain' }}
-                  src={sourceUrl}
-                >Your browser does not support HTML5 video.</video>;
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', width: '100%', background: '#000', position: 'relative' }}>
+                    {videoLoading && !videoError && (
+                      <div
+                        role="status"
+                        style={{
+                          position: 'absolute',
+                          top: '0',
+                          left: '0',
+                          right: '0',
+                          height: '420px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(15, 23, 42, 0.65)',
+                          color: '#e2e8f0',
+                          fontSize: '0.9rem',
+                          fontWeight: 600,
+                          zIndex: 2,
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        Loading video stream…
+                      </div>
+                    )}
+
+                    {videoError && (
+                      <div
+                        role="alert"
+                        style={{
+                          padding: '1.25rem',
+                          background: '#7f1d1d',
+                          color: '#fecaca',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '1rem',
+                          flexWrap: 'wrap'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.86rem', fontWeight: 600 }}>{videoError}</span>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => {
+                            setVideoError('');
+                            const v = html5VideoRef.current;
+                            if (v) {
+                              v.load();
+                            }
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.75rem',
+                            fontSize: '0.78rem',
+                            background: '#ffffff',
+                            color: '#7f1d1d',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: 700
+                          }}
+                        >
+                          <RefreshCw size={14} /> Retry Video
+                        </button>
+                      </div>
+                    )}
+
+                    <video
+                      ref={html5VideoRef}
+                      key={activeLesson.dbId ?? activeLesson.id}
+                      controls
+                      playsInline
+                      onLoadStart={() => {
+                        setVideoLoading(true);
+                        setVideoError('');
+                      }}
+                      onLoadedMetadata={event => {
+                        const video = event.currentTarget;
+                        setVideoLoading(false);
+                        setVideoDuration(Number(video.duration || 0));
+                        video.volume = videoVolume;
+                        video.muted = videoMuted;
+                        video.playbackRate = videoPlaybackRate;
+                        const savedPosition = Number(lessonProgress[activeLesson?.dbId]?.lastPositionSeconds ?? 0);
+                        if (savedPosition > 0 && Number.isFinite(savedPosition) && savedPosition < video.duration) {
+                          video.currentTime = savedPosition;
+                          lastTimeRef.current = savedPosition;
+                          setVideoCurrentTime(savedPosition);
+                        }
+                      }}
+                      onCanPlay={() => {
+                        setVideoLoading(false);
+                        setVideoBuffering(false);
+                      }}
+                      onPlaying={() => {
+                        setVideoPlaying(true);
+                        setVideoLoading(false);
+                        setVideoBuffering(false);
+                        setAutoplayBlocked(false);
+                      }}
+                      onPause={() => {
+                        setVideoPlaying(false);
+                        if (!autoPausedByVisibilityRef.current && document.visibilityState === 'visible') {
+                          wasManuallyPausedRef.current = true;
+                        }
+                      }}
+                      onWaiting={() => {
+                        setVideoBuffering(true);
+                      }}
+                      onStalled={() => {
+                        setVideoBuffering(true);
+                      }}
+                      onVolumeChange={event => {
+                        const video = event.currentTarget;
+                        setVideoVolume(Number(video.volume ?? 1));
+                        setVideoMuted(Boolean(video.muted));
+                      }}
+                      onRateChange={event => {
+                        const video = event.currentTarget;
+                        setVideoPlaybackRate(Number(video.playbackRate || 1));
+                      }}
+                      onError={() => {
+                        setVideoLoading(false);
+                        setVideoBuffering(false);
+                        setVideoPlaying(false);
+                        setVideoError('Video playback encountered a network or media error. Please check your connection and retry.');
+                      }}
+                      onTimeUpdate={handleVideoTimeUpdate}
+                      onEnded={handleVideoEnded}
+                      style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', background: '#000' }}
+                      src={sourceUrl}
+                    >
+                      Your browser does not support HTML5 video.
+                    </video>
+
+                    {autoplayBlocked && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: '48px',
+                          background: 'rgba(15, 23, 42, 0.82)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.75rem',
+                          zIndex: 5,
+                          padding: '1.5rem',
+                          textAlign: 'center'
+                        }}
+                      >
+                        <p style={{ fontSize: '0.92rem', color: '#e2e8f0', fontWeight: 600 }}>
+                          Video paused while you were in another tab ({formatMediaTime(pausedAtPositionRef.current)})
+                        </p>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={handleResumeFromAutoplayBlock}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.6rem 1.25rem',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            background: '#0284c7',
+                            color: '#ffffff',
+                            borderRadius: '8px',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Play size={16} /> Resume Video
+                        </button>
+                      </div>
+                    )}
+
+                    {/* LMS Video Control & Status Bar */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '0.75rem',
+                        padding: '0.55rem 1rem',
+                        background: '#1e293b',
+                        borderTop: '1px solid #334155',
+                        color: '#f8fafc',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={handleTogglePlayPause}
+                          aria-label={videoPlaying ? 'Pause video' : 'Play video'}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            background: '#0284c7',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '0.3rem 0.65rem',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {videoPlaying ? <Pause size={14} /> : <Play size={14} />}
+                          {videoPlaying ? 'Pause' : 'Play'}
+                        </button>
+
+                        <span style={{ fontVariantNumeric: 'tabular-nums', color: '#cbd5e1', fontWeight: 600 }}>
+                          {formatMediaTime(videoCurrentTime)} / {formatMediaTime(videoDuration)}
+                        </span>
+
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button
+                            type="button"
+                            onClick={handleToggleMute}
+                            aria-label={videoMuted ? 'Unmute video' : 'Mute video'}
+                            style={{
+                              background: 'transparent',
+                              color: '#cbd5e1',
+                              border: 'none',
+                              padding: '0.2rem',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center'
+                            }}
+                          >
+                            {videoMuted || videoVolume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                          </button>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            aria-label="Volume"
+                            value={videoMuted ? 0 : videoVolume}
+                            onChange={handleVolumeChange}
+                            style={{ width: '68px', accentColor: '#38bdf8', cursor: 'pointer' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                        {videoBuffering && (
+                          <span style={{ color: '#38bdf8', fontWeight: 600, fontSize: '0.75rem' }}>
+                            Buffering…
+                          </span>
+                        )}
+                        {isOffline && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#fbbf24', fontSize: '0.75rem', fontWeight: 600 }}>
+                            <WifiOff size={13} /> Offline
+                          </span>
+                        )}
+
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#cbd5e1', fontSize: '0.76rem' }}>
+                          Speed:
+                          <select
+                            aria-label="Playback speed"
+                            value={videoPlaybackRate}
+                            onChange={handlePlaybackRateChange}
+                            style={{
+                              background: '#0f172a',
+                              color: '#f8fafc',
+                              border: '1px solid #475569',
+                              borderRadius: '6px',
+                              padding: '0.2rem 0.45rem',
+                              fontSize: '0.76rem',
+                              fontWeight: 600,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {PLAYBACK_SPEEDS.map(rate => (
+                              <option key={rate} value={rate}>
+                                {rate}x
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={handleToggleFullscreen}
+                          aria-label={videoFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            background: '#334155',
+                            color: '#f8fafc',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '0.3rem 0.6rem',
+                            fontSize: '0.76rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {videoFullscreen ? <Minimize size={14} /> : <Maximize size={14} />}
+                          {videoFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
               }
               return <div role="status" style={{ padding: '2rem', textAlign: 'center', color: '#cbd5e1' }}>
                 Video is unavailable because this lesson has no valid video URL.
@@ -1259,24 +2843,31 @@ export default function CourseViewer({
                       {activeLesson?.title || 'Lesson document'}
                     </h3>
                     <p style={{ color: '#64748b', fontSize: '0.82rem', marginTop: '0.25rem' }}>
-                      Private Fairmacs training document
+                      {documentFilename
+                        ? `${documentFilename} • Private Fairmacs training document`
+                        : 'Private Fairmacs training document'}
                     </p>
                   </div>
-                  {documentUrl && (
-                    <a
-                      href={documentUrl}
-                      download={activeLesson?.title || 'Fairmacs-training-document'}
-                      className="btn-secondary"
-                      style={{ textDecoration: 'none' }}
+                  {pdfPageCount > 0 && (
+                    <span
+                      style={{
+                        background: '#f1f5f9',
+                        color: '#334155',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '999px',
+                        padding: '0.25rem 0.75rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 700
+                      }}
                     >
-                      Download document
-                    </a>
+                      {pdfPageCount} {pdfPageCount === 1 ? 'Page' : 'Pages'}
+                    </span>
                   )}
                 </div>
 
-                {documentLoading && (
+                {(documentLoading || pdfRendering) && (
                   <div role="status" style={{ padding: '2rem', textAlign: 'center', color: '#475569' }}>
-                    Loading document securely…
+                    {documentLoading ? 'Loading document securely…' : 'Rendering PDF pages…'}
                   </div>
                 )}
 
@@ -1289,19 +2880,27 @@ export default function CourseViewer({
                   </div>
                 )}
 
-                {!documentLoading && !documentError && documentUrl &&
-                  (documentContentType === 'application/pdf' || lessonType === 'pdf') && (
-                    <iframe
+                {!documentLoading && !documentError && documentBlob &&
+                  (documentContentType === 'application/pdf' ||
+                    lessonType === 'pdf' ||
+                    (lessonType === 'document' && !documentContentType.includes('wordprocessingml.document'))) && (
+                    <div
                       key={documentLessonId}
-                      src={documentUrl}
-                      title={activeLesson?.title || 'Lesson PDF'}
+                      ref={pdfContainerRef}
+                      onContextMenu={event => event.preventDefault()}
+                      aria-label={documentFilename || activeLesson?.title || 'Lesson PDF content'}
                       style={{
                         width: '100%',
-                        height: '70vh',
+                        maxHeight: '72vh',
                         minHeight: '500px',
+                        overflowY: 'auto',
+                        overflowX: 'hidden',
+                        padding: '1rem',
                         border: '1px solid #e2e8f0',
                         borderRadius: '8px',
-                        background: '#ffffff'
+                        background: '#f8fafc',
+                        boxSizing: 'border-box',
+                        userSelect: 'none'
                       }}
                     />
                   )}
@@ -1324,7 +2923,7 @@ export default function CourseViewer({
                     />
                   )}
 
-                {!documentLoading && !documentError && !documentUrl && (
+                {!documentLoading && !documentError && !documentBlob && !documentUrl && (
                   <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
                     No document is attached to this lesson.
                   </div>
@@ -1338,8 +2937,9 @@ export default function CourseViewer({
                       Boolean(completedLessons[activeLesson?.dbId]) ||
                       savingProgress ||
                       documentLoading ||
+                      pdfRendering ||
                       Boolean(documentError) ||
-                      !documentUrl
+                      !documentBlob
                     }
                     style={{
                       display: 'inline-flex',
@@ -1471,35 +3071,6 @@ export default function CourseViewer({
               >
                 Lesson Summary
               </button>
-
-              <button
-                onClick={() =>
-                  setActiveTab('notes')
-                }
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  color:
-                    activeTab === 'notes'
-                      ? '#0284c7'
-                      : '#64748b',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem'
-                }}
-              >
-                <Edit3
-                  style={{
-                    width: 14,
-                    height: 14
-                  }}
-                />
-
-                Personal Notes
-              </button>
             </div>
 
             {activeTab === 'notes' ? (
@@ -1543,8 +3114,7 @@ export default function CourseViewer({
                   lineHeight: 1.5
                 }}
               >
-                {activeLesson?.contentText ||
-                  'This module covers core shipping procedures, documentation validation, and operational risk management.'}
+                {activeLesson?.summary || activeLesson?.contentText || 'No summary authored for this lesson.'}
               </div>
             )}
           </div>
@@ -1670,87 +3240,80 @@ export default function CourseViewer({
                   >
                     {module.lessons.map(
                       lesson => {
-
                         const idxInAll =
                           allLessons.findIndex(
-                            l =>
-                              l.id ===
-                              lesson.id
+                            l => (l.dbId ?? l.id) === (lesson.dbId ?? lesson.id)
                           );
 
                         const isSelected =
-                          currentLessonIndex ===
-                          idxInAll;
+                          currentLessonIndex === idxInAll;
 
-                        /*
-                         * Progress uses the actual
-                         * database lesson ID.
-                         */
                         const lessonDbId =
                           lesson.dbId;
 
                         const isDone =
                           Boolean(
-                            completedLessons[
-                              lessonDbId
-                            ]
+                            completedLessons[lessonDbId]
                           );
+
+                        const unlocked =
+                          isHrAdmin || isLessonUnlocked(idxInAll);
+
+                        const lockReason =
+                          unlocked ? null : getLessonLockReason(idxInAll);
 
                         return (
                           <button
                             key={lesson.id}
+                            type="button"
+                            disabled={!unlocked}
                             onClick={() =>
-                              handleSelectLesson(
-                                idxInAll
-                              )
+                              handleSelectLesson(idxInAll)
                             }
+                            title={lockReason || (isDone ? 'Completed lesson (click to review)' : lesson.title)}
                             style={{
                               display: 'flex',
-                              alignItems:
-                                'center',
-                              justifyContent:
-                                'space-between',
-                              padding:
-                                '0.5rem 0.65rem',
-                              borderRadius:
-                                '6px',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.5rem 0.65rem',
+                              borderRadius: '6px',
                               background:
                                 isSelected
                                   ? '#0f172a'
                                   : isDone
                                   ? '#f0fdf4'
+                                  : !unlocked
+                                  ? '#f8fafc'
                                   : 'white',
                               color:
                                 isSelected
                                   ? 'white'
                                   : isDone
                                   ? '#166534'
+                                  : !unlocked
+                                  ? '#94a3b8'
                                   : '#334155',
                               border:
                                 isSelected
                                   ? '1px solid #0f172a'
                                   : isDone
                                   ? '1px solid #bbf7d0'
+                                  : !unlocked
+                                  ? '1px dashed #cbd5e1'
                                   : '1px solid #e2e8f0',
-                              fontSize:
-                                '0.78rem',
-                              textAlign:
-                                'left',
-                              cursor:
-                                'pointer',
-                              transition:
-                                'all 0.12s ease'
+                              fontSize: '0.78rem',
+                              textAlign: 'left',
+                              cursor: !unlocked ? 'not-allowed' : 'pointer',
+                              opacity: !unlocked ? 0.65 : 1,
+                              transition: 'all 0.12s ease'
                             }}
                           >
                             <div
                               style={{
-                                display:
-                                  'flex',
-                                alignItems:
-                                  'center',
+                                display: 'flex',
+                                alignItems: 'center',
                                 gap: '0.5rem',
-                                overflow:
-                                  'hidden'
+                                overflow: 'hidden'
                               }}
                             >
                               {isDone ? (
@@ -1765,15 +3328,22 @@ export default function CourseViewer({
                                     flexShrink: 0
                                   }}
                                 />
+                              ) : !unlocked ? (
+                                <Lock
+                                  style={{
+                                    width: 14,
+                                    height: 14,
+                                    color: '#94a3b8',
+                                    flexShrink: 0
+                                  }}
+                                />
                               ) : isSelected ? (
                                 <Circle
                                   style={{
                                     width: 14,
                                     height: 14,
-                                    color:
-                                      '#38bdf8',
-                                    fill:
-                                      '#38bdf8',
+                                    color: '#38bdf8',
+                                    fill: '#38bdf8',
                                     flexShrink: 0
                                   }}
                                 />
@@ -1782,8 +3352,7 @@ export default function CourseViewer({
                                   style={{
                                     width: 14,
                                     height: 14,
-                                    color:
-                                      '#94a3b8',
+                                    color: '#94a3b8',
                                     flexShrink: 0
                                   }}
                                 />
@@ -1791,16 +3360,10 @@ export default function CourseViewer({
 
                               <span
                                 style={{
-                                  textOverflow:
-                                    'ellipsis',
-                                  overflow:
-                                    'hidden',
-                                  whiteSpace:
-                                    'nowrap',
-                                  fontWeight:
-                                    isSelected
-                                      ? 700
-                                      : 500
+                                  textOverflow: 'ellipsis',
+                                  overflow: 'hidden',
+                                  whiteSpace: 'nowrap',
+                                  fontWeight: isSelected ? 700 : 500
                                 }}
                               >
                                 {lesson.title}
@@ -1809,14 +3372,12 @@ export default function CourseViewer({
 
                             <span
                               style={{
-                                fontSize:
-                                  '0.7rem',
+                                fontSize: '0.7rem',
                                 opacity: 0.8,
-                                marginLeft:
-                                  'auto'
+                                marginLeft: 'auto'
                               }}
                             >
-                              {lesson.duration}
+                              {!unlocked ? 'Locked' : lesson.duration}
                             </span>
                           </button>
                         );
@@ -1825,40 +3386,56 @@ export default function CourseViewer({
                   </div>
 
                   {(() => {
-                    const moduleNumericId = getNumericModuleId(module);
-                    const moduleQuiz = moduleQuizzes.find(quiz =>
-                      Number(quiz.moduleId) === moduleNumericId &&
-                      String(quiz.type || '').toUpperCase() === 'MODULE'
-                    );
-                    if (!moduleQuiz) return null;
+                    const modState = getModuleQuizState(module);
+                    if (!modState.available) return null;
+                    const { quiz: moduleQuiz, isPassed, isLocked, lockReason, cooldown } = modState;
+
                     return (
                       <div key={`quiz-${moduleQuiz.id || moduleQuiz.quizId}`} style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', marginTop: '0.65rem' }}>
                         <button
                           type="button"
-                          disabled={!isHrAdmin && getQuizCooldown(moduleQuiz).active}
-                          onClick={() => { if (isHrAdmin || !getQuizCooldown(moduleQuiz).active) openQuiz(moduleQuiz, false, module.title); }}
+                          disabled={isLocked}
+                          onClick={() => {
+                            if (!isLocked) {
+                              openQuiz(moduleQuiz, false, module.title);
+                            } else if (lockReason) {
+                              alert(lockReason);
+                            }
+                          }}
+                          title={lockReason || (isPassed ? 'Module Quiz Passed' : 'Take Module Quiz')}
                           style={{
                             width: '100%', padding: '0.7rem 0.75rem',
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             gap: '0.5rem', borderRadius: '8px',
-                            border: `1px solid ${!isHrAdmin && getQuizCooldown(moduleQuiz).active ? '#fecaca' : '#a7f3d0'}`,
-                            background: !isHrAdmin && getQuizCooldown(moduleQuiz).active ? '#fff1f2' : '#ecfdf5',
-                            color: !isHrAdmin && getQuizCooldown(moduleQuiz).active ? '#9f1239' : '#065f46', fontWeight: 800,
-                            cursor: !isHrAdmin && getQuizCooldown(moduleQuiz).active ? 'not-allowed' : 'pointer', textAlign: 'left', opacity: !isHrAdmin && getQuizCooldown(moduleQuiz).active ? 0.9 : 1
+                            border: `1px solid ${isPassed ? '#86efac' : isLocked ? '#fecaca' : '#a7f3d0'}`,
+                            background: isPassed ? '#f0fdf4' : isLocked ? '#fff1f2' : '#ecfdf5',
+                            color: isPassed ? '#15803d' : isLocked ? '#9f1239' : '#065f46',
+                            fontWeight: 800,
+                            cursor: isLocked ? 'not-allowed' : 'pointer',
+                            textAlign: 'left',
+                            opacity: isLocked ? 0.85 : 1
                           }}
                         >
                           <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            {!isHrAdmin && getQuizCooldown(moduleQuiz).active ? <Lock style={{ width: 16, height: 16 }} /> : <Award style={{ width: 16, height: 16 }} />}
-                            { !isHrAdmin && getQuizCooldown(moduleQuiz).active ? 'Quiz Locked · ' : 'Module Quiz · '}{moduleQuiz.title || module.title}
+                            {isPassed ? (
+                              <CheckCircle style={{ width: 16, height: 16, color: '#16a34a' }} />
+                            ) : isLocked ? (
+                              <Lock style={{ width: 16, height: 16 }} />
+                            ) : (
+                              <Award style={{ width: 16, height: 16 }} />
+                            )}
+                            {isPassed ? 'Passed · ' : isLocked ? 'Locked · ' : 'Module Quiz · '}
+                            {moduleQuiz.title || module.title}
                           </span>
-                          {!isHrAdmin && getQuizCooldown(moduleQuiz).active ? <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: '.78rem', whiteSpace: 'nowrap' }}>{formatCountdown(getQuizCooldown(moduleQuiz).remaining)}</span> : <ChevronRight style={{ width: 16, height: 16 }} />}
+                          {cooldown.active ? (
+                            <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: '.78rem', whiteSpace: 'nowrap' }}>
+                              {formatCountdown(cooldown.remaining)}
+                            </span>
+                          ) : (
+                            <ChevronRight style={{ width: 16, height: 16 }} />
+                          )}
                         </button>
-                        {!isHrAdmin && getQuizCooldown(moduleQuiz).active && (
-                          <div style={{ border: '1px solid #fecaca', background: '#fff7f7', color: '#9f1239', borderRadius: 8, padding: '.65rem .75rem', fontSize: '.75rem', lineHeight: 1.45 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, marginBottom: 3 }}><Clock3 size={14} /> Retry available in {formatCountdown(getQuizCooldown(moduleQuiz).remaining)}</div>
-                            <div>Available at {formatRetryTime(getQuizCooldown(moduleQuiz).retryAt)}. You can continue reviewing lessons while you wait.</div>
-                          </div>
-                        )}
+
                         {isHrAdmin && (
                           <button
                             type="button"
@@ -1902,7 +3479,7 @@ export default function CourseViewer({
           borderRadius: '12px',
           padding: '0.85rem 1.5rem',
           border:
-            '1px solid #e2e8f0',
+            '1px solid #3485f0ff',
           display: 'flex',
           justifyContent:
             'space-between',
@@ -1963,15 +3540,25 @@ export default function CourseViewer({
             className="btn-primary"
             onClick={handleNext}
             disabled={
-              currentLessonIndex ===
-              totalLessons - 1
+              currentLessonIndex === totalLessons - 1 ||
+              (!isHrAdmin && !isLessonUnlocked(currentLessonIndex + 1))
+            }
+            title={
+              currentLessonIndex < totalLessons - 1 && !isHrAdmin && !isLessonUnlocked(currentLessonIndex + 1)
+                ? (getLessonLockReason(currentLessonIndex + 1) || 'Next lesson is locked')
+                : 'Next lesson'
             }
             style={{
               opacity:
-                currentLessonIndex ===
-                totalLessons - 1
+                currentLessonIndex === totalLessons - 1 ||
+                (!isHrAdmin && !isLessonUnlocked(currentLessonIndex + 1))
                   ? 0.5
-                  : 1
+                  : 1,
+              cursor:
+                currentLessonIndex === totalLessons - 1 ||
+                (!isHrAdmin && !isLessonUnlocked(currentLessonIndex + 1))
+                  ? 'not-allowed'
+                  : 'pointer'
             }}
           >
             Next
@@ -1985,6 +3572,13 @@ export default function CourseViewer({
           </button>
         </div>
       </div>
+
+      {viewingCertificate && (
+        <CertificateViewer
+          certificate={viewingCertificate}
+          onClose={() => setViewingCertificate(null)}
+        />
+      )}
     </div>
   );
 }

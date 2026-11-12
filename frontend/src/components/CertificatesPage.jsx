@@ -549,14 +549,15 @@ export default function CertificatesPage({
 
               <div
                 key={certificateId}
+                className="glass-card"
                 style={{
-                  background: 'white',
-                  border:
-                    '1px solid #e2e8f0',
-                  borderRadius: '16px',
+                  background: 'rgba(255, 255, 255, 0.78)',
+                  backdropFilter: 'blur(14px)',
+                  WebkitBackdropFilter: 'blur(14px)',
+                  border: '1px solid rgba(255, 255, 255, 0.85)',
+                  borderRadius: '18px',
                   overflow: 'hidden',
-                  boxShadow:
-                    '0 4px 12px rgba(15, 23, 42, 0.05)'
+                  boxShadow: '0 8px 30px rgba(31, 70, 120, 0.07)'
                 }}
               >
 
@@ -567,9 +568,10 @@ export default function CertificatesPage({
                 <div
                   style={{
                     background:
-                      'linear-gradient(135deg, #0b1f38 0%, #12345a 100%)',
+                      'linear-gradient(135deg, rgba(16, 42, 67, 0.95) 0%, rgba(18, 52, 90, 0.92) 100%)',
                     padding: '1.25rem',
-                    color: 'white'
+                    color: 'white',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.15)'
                   }}
                 >
 

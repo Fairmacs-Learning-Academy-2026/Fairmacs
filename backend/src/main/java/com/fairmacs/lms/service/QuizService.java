@@ -1,20 +1,31 @@
 package com.fairmacs.lms.service;
 
+import com.fairmacs.lms.dto.BulkQuestionParseResultDTO;
 import com.fairmacs.lms.dto.CertificateDTO;
 import com.fairmacs.lms.dto.CompleteCourseRequest;
+import com.fairmacs.lms.dto.QuizAuthoringDTO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fairmacs.lms.entity.Course;
 import com.fairmacs.lms.entity.Enrollment;
+import com.fairmacs.lms.entity.EnrollmentStatus;
+import com.fairmacs.lms.entity.EnrollmentType;
 import com.fairmacs.lms.entity.Module;
+import com.fairmacs.lms.entity.NotificationPriority;
+import com.fairmacs.lms.entity.NotificationType;
 import com.fairmacs.lms.entity.Quiz;
 import com.fairmacs.lms.entity.QuizAttempt;
 import com.fairmacs.lms.entity.QuizProgress;
 import com.fairmacs.lms.entity.QuizQuestion;
 import com.fairmacs.lms.entity.QuizType;
+import com.fairmacs.lms.entity.Role;
 import com.fairmacs.lms.entity.User;
+import com.fairmacs.lms.entity.UserStatus;
+import com.fairmacs.lms.repository.CourseRepository;
 import com.fairmacs.lms.repository.EnrollmentRepository;
 import com.fairmacs.lms.repository.LessonProgressRepository;
+import com.fairmacs.lms.repository.LessonRepository;
 import com.fairmacs.lms.repository.ModuleRepository;
 import com.fairmacs.lms.repository.QuizAttemptRepository;
 import com.fairmacs.lms.repository.QuizProgressRepository;
@@ -22,24 +33,35 @@ import com.fairmacs.lms.repository.QuizQuestionRepository;
 import com.fairmacs.lms.repository.QuizRepository;
 import com.fairmacs.lms.repository.UserRepository;
 import com.fairmacs.lms.security.SecurityContextUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.Set;
 
 @Service
 @Transactional
 public class QuizService {
+
+    private static final Logger log = LoggerFactory.getLogger(QuizService.class);
 
     private final QuizRepository quizRepository;
     private final QuizQuestionRepository quizQuestionRepository;
@@ -49,9 +71,13 @@ public class QuizService {
     private final EnrollmentRepository enrollmentRepository;
     private final LessonProgressRepository lessonProgressRepository;
     private final ModuleRepository moduleRepository;
+    private final LessonRepository lessonRepository;
     private final ObjectMapper objectMapper;
     private final EnrollmentService enrollmentService;
     private final SecurityContextUtil securityContextUtil;
+    private NotificationService notificationService;
+    private BulkQuestionParserService bulkQuestionParserService;
+    private CourseRepository courseRepository;
 
     public QuizService(
             QuizRepository quizRepository,
@@ -66,6 +92,39 @@ public class QuizService {
             EnrollmentService enrollmentService,
             SecurityContextUtil securityContextUtil
     ) {
+        this(
+                quizRepository,
+                quizQuestionRepository,
+                quizAttemptRepository,
+                quizProgressRepository,
+                userRepository,
+                enrollmentRepository,
+                lessonProgressRepository,
+                moduleRepository,
+                null,
+                objectMapper,
+                enrollmentService,
+                securityContextUtil,
+                null
+        );
+    }
+
+    @Autowired
+    public QuizService(
+            QuizRepository quizRepository,
+            QuizQuestionRepository quizQuestionRepository,
+            QuizAttemptRepository quizAttemptRepository,
+            QuizProgressRepository quizProgressRepository,
+            UserRepository userRepository,
+            EnrollmentRepository enrollmentRepository,
+            LessonProgressRepository lessonProgressRepository,
+            ModuleRepository moduleRepository,
+            LessonRepository lessonRepository,
+            ObjectMapper objectMapper,
+            EnrollmentService enrollmentService,
+            SecurityContextUtil securityContextUtil,
+            NotificationService notificationService
+    ) {
         this.quizRepository = quizRepository;
         this.quizQuestionRepository = quizQuestionRepository;
         this.quizAttemptRepository = quizAttemptRepository;
@@ -74,9 +133,26 @@ public class QuizService {
         this.enrollmentRepository = enrollmentRepository;
         this.lessonProgressRepository = lessonProgressRepository;
         this.moduleRepository = moduleRepository;
+        this.lessonRepository = lessonRepository;
         this.objectMapper = objectMapper;
         this.enrollmentService = enrollmentService;
         this.securityContextUtil = securityContextUtil;
+        this.notificationService = notificationService;
+    }
+
+    @Autowired(required = false)
+    public void setNotificationService(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+
+    @Autowired(required = false)
+    public void setBulkQuestionParserService(BulkQuestionParserService bulkQuestionParserService) {
+        this.bulkQuestionParserService = bulkQuestionParserService;
+    }
+
+    @Autowired(required = false)
+    public void setCourseRepository(CourseRepository courseRepository) {
+        this.courseRepository = courseRepository;
     }
 
     /**
@@ -91,51 +167,58 @@ public class QuizService {
      * 1. All module quizzes in the course must be passed.
      */
 
-    private static final long FAILED_ATTEMPT_COOLDOWN_HOURS = 12;
+    private static final int DEFAULT_COOLDOWN_MINUTES = 5;
 
-    private Map<String, Object> getCooldownStatus(Long quizId, Long userId) {
+    public Map<String, Object> getCooldownStatus(Long quizId, Long userId) {
         Map<String, Object> result = new LinkedHashMap<>();
 
-    Optional<QuizAttempt> latestAttempt =
-            quizAttemptRepository
-                    .findTopByQuiz_IdAndUser_IdAndCompletedAtIsNotNullOrderByCompletedAtDesc(
-                            quizId, userId
+        Optional<QuizAttempt> latestAttempt =
+                quizAttemptRepository
+                        .findTopByQuiz_IdAndUser_IdAndCompletedAtIsNotNullOrderByCompletedAtDesc(
+                                quizId, userId
+                        );
+
+        LocalDateTime now = LocalDateTime.now();
+
+        Quiz quiz = quizRepository.findById(quizId).orElse(null);
+        int cooldownMinutes = (quiz != null && quiz.getCooldownMinutes() != null && quiz.getCooldownMinutes() > 0)
+                ? quiz.getCooldownMinutes()
+                : DEFAULT_COOLDOWN_MINUTES;
+
+        if (latestAttempt.isPresent()) {
+            QuizAttempt attempt = latestAttempt.get();
+
+            if (Boolean.FALSE.equals(attempt.getPassed())
+                    && attempt.getCompletedAt() != null) {
+
+                LocalDateTime unlockAt =
+                        attempt.getCompletedAt()
+                                .plusMinutes(cooldownMinutes);
+
+                if (now.isBefore(unlockAt)) {
+                    long remainingSeconds =
+                            Duration.between(now, unlockAt).getSeconds();
+
+                    result.put("cooldownActive", true);
+                    result.put("retryAvailableAt", unlockAt.toString());
+                    result.put("remainingSeconds", remainingSeconds);
+                    result.put("cooldownMinutes", cooldownMinutes);
+                    result.put(
+                            "message",
+                            String.format("You failed this assessment. You can retry after %d minutes.", cooldownMinutes)
                     );
-
-    LocalDateTime now = LocalDateTime.now();
-
-    if (latestAttempt.isPresent()) {
-        QuizAttempt attempt = latestAttempt.get();
-
-        if (Boolean.FALSE.equals(attempt.getPassed())
-                && attempt.getCompletedAt() != null) {
-
-            LocalDateTime unlockAt =
-                    attempt.getCompletedAt()
-                            .plusHours(FAILED_ATTEMPT_COOLDOWN_HOURS);
-
-            if (now.isBefore(unlockAt)) {
-                long remainingSeconds =
-                        Duration.between(now, unlockAt).getSeconds();
-
-                result.put("cooldownActive", true);
-                result.put("retryAvailableAt", unlockAt.toString());
-                result.put("remainingSeconds", remainingSeconds);
-                result.put(
-                        "message",
-                        "You failed this assessment. You can retry after 12 hours."
-                );
-                return result;
+                    return result;
+                }
             }
         }
+
+        result.put("cooldownActive", false);
+        result.put("remainingSeconds", 0);
+        result.put("retryAvailableAt", null);
+        result.put("cooldownMinutes", cooldownMinutes);
+
+        return result;
     }
-
-    result.put("cooldownActive", false);
-    result.put("remainingSeconds", 0);
-    result.put("retryAvailableAt", null);
-
-    return result;
-}
 
     private void enforceFailedAttemptCooldown(Long quizId, Long userId) {
         Map<String, Object> status = getCooldownStatus(quizId, userId);
@@ -167,6 +250,71 @@ public class QuizService {
                 .orElseThrow(() ->
                         new IllegalArgumentException("User not found.")
                 );
+
+        if (user.getStatus() != null && user.getStatus() != UserStatus.ACTIVE) {
+            throw new AccessDeniedException("User account is not active.");
+        }
+
+        if (quiz.getCourse() != null && quiz.getCourse().getId() != null) {
+            Enrollment activeCheck = enrollmentRepository
+                    .findByUserIdAndCourseId(userId, quiz.getCourse().getId())
+                    .orElse(null);
+            if (activeCheck != null && activeCheck.getStatus() == EnrollmentStatus.REVOKED) {
+                throw new AccessDeniedException("This course enrollment has been revoked.");
+            }
+        }
+
+        QuizProgress progress =
+                quizProgressRepository
+                        .findByQuiz_IdAndUser_Id(
+                                quizId,
+                                userId
+                        )
+                        .orElse(null);
+
+        int attemptsUsed =
+                progress == null || progress.getAttemptsUsed() == null
+                        ? 0
+                        : progress.getAttemptsUsed();
+
+        Integer maxAttempts = quiz.getMaxAttempts();
+
+        // If the user already completed and passed this quiz, return the passed attempt and results immediately
+        if (progress != null && Boolean.TRUE.equals(progress.getPassed())) {
+            Map<String, Object> passedResponse = new LinkedHashMap<>();
+            passedResponse.put("alreadyPassed", true);
+            passedResponse.put("quizId", quiz.getId());
+            passedResponse.put("quizTitle", quiz.getTitle());
+            passedResponse.put("quizType", quiz.getType() != null ? quiz.getType().name() : "MODULE");
+            passedResponse.put("passingScore", quiz.getPassingScore());
+            passedResponse.put("attemptsUsed", attemptsUsed);
+            passedResponse.put("maxAttempts", maxAttempts);
+            int score = progress.getBestScore() != null ? progress.getBestScore() : 100;
+            passedResponse.put("bestScore", score);
+            passedResponse.put("score", score);
+            passedResponse.put("passed", true);
+            passedResponse.put("totalQuestions", 0);
+            passedResponse.put("correctAnswers", 0);
+            passedResponse.put("wrongAnswers", 0);
+
+            Optional<QuizAttempt> latestAttempt = quizAttemptRepository
+                    .findTopByQuiz_IdAndUser_IdAndCompletedAtIsNotNullOrderByCompletedAtDesc(quizId, userId);
+            if (latestAttempt.isEmpty()) {
+                latestAttempt = quizAttemptRepository
+                        .findTopByQuiz_IdAndUser_IdAndPassedTrueOrderByCompletedAtDesc(quizId, userId);
+            }
+            if (latestAttempt.isPresent()) {
+                QuizAttempt attempt = latestAttempt.get();
+                passedResponse.put("attemptId", attempt.getAttemptId());
+                passedResponse.put("score", attempt.getScore());
+                passedResponse.put("correctAnswers", attempt.getCorrectAnswers());
+                passedResponse.put("wrongAnswers", attempt.getWrongAnswers());
+                passedResponse.put("totalQuestions", attempt.getTotalQuestions());
+                passedResponse.put("completedAt", attempt.getCompletedAt() != null ? attempt.getCompletedAt().toString() : null);
+                passedResponse.put("timeTakenSeconds", attempt.getTimeTakenSeconds());
+            }
+            return passedResponse;
+        }
 
         enforceFailedAttemptCooldown(quizId, userId);
 
@@ -235,13 +383,11 @@ public class QuizService {
                 }
 
                 Quiz previousModuleQuiz =
-                        quizRepository.findByModuleId(module.getId())
-                                .orElseThrow(() ->
-                                        new IllegalStateException(
-                                                "Module quiz is not configured for module: "
-                                                        + module.getTitle()
-                                        )
-                                );
+                        quizRepository.findTopByModuleIdOrderByIdDesc(module.getId())
+                                .orElseGet(() -> quizRepository.findByModuleId(module.getId()).orElse(null));
+                if (previousModuleQuiz == null) {
+                    throw new IllegalStateException("Module quiz is not configured for module: " + module.getTitle());
+                }
 
                 boolean previousQuizPassed =
                         quizProgressRepository
@@ -265,7 +411,7 @@ public class QuizService {
          */
         if (quiz.getType() == QuizType.FINAL) {
 
-            enrollmentRepository
+            Enrollment enrollment = enrollmentRepository
                     .findByUserIdAndCourseId(
                             userId,
                             quiz.getCourse().getId()
@@ -275,6 +421,19 @@ public class QuizService {
                                     "You are not enrolled in this course."
                             )
                     );
+
+            // Require all lessons across all modules to be completed before attempting final quiz
+            List<Module> modules =
+                    moduleRepository.findByCourseIdOrderByOrderIndexAsc(
+                            quiz.getCourse().getId()
+                    );
+            for (Module module : modules) {
+                if (!lessonProgressRepository.areAllLessonsCompleted(enrollment.getId(), module.getId())) {
+                    throw new IllegalStateException(
+                            "Complete all lessons across all modules before attempting the final assessment."
+                    );
+                }
+            }
 
             List<Quiz> moduleQuizzes =
                     quizRepository.findByCourseIdAndType(
@@ -300,8 +459,8 @@ public class QuizService {
             }
 
             boolean allModuleQuizzesPassed =
-                    totalModuleQuizzes > 0
-                            && passedModuleQuizzes == totalModuleQuizzes;
+                    totalModuleQuizzes == 0
+                            || passedModuleQuizzes == totalModuleQuizzes;
 
             if (!allModuleQuizzesPassed) {
                 throw new IllegalStateException(
@@ -316,36 +475,36 @@ public class QuizService {
          * ---------------------------------------------------------
          */
 
-        QuizProgress progress =
-                quizProgressRepository
-                        .findByQuiz_IdAndUser_Id(
-                                quizId,
-                                userId
-                        )
-                        .orElse(null);
+        // Hard attempt cap removed: retakes are governed solely by the 5-minute cooldown system
+        // enforceFailedAttemptCooldown(quizId, userId) was already called above
 
-        int attemptsUsed =
-                progress == null || progress.getAttemptsUsed() == null
-                        ? 0
-                        : progress.getAttemptsUsed();
+        /*
+         * ---------------------------------------------------------
+         * RESUME INCOMPLETE / ABANDONED ATTEMPT IF ONE EXISTS
+         * ---------------------------------------------------------
+         */
+        Optional<QuizAttempt> openAttemptOpt = quizAttemptRepository
+                .findTopByQuiz_IdAndUser_IdAndCompletedAtIsNullOrderByStartedAtDesc(quizId, userId);
 
-        int maxAttempts =
-                quiz.getMaxAttempts() == null
-                        ? 3
-                        : quiz.getMaxAttempts();
-
-        if (progress != null &&
-                Boolean.TRUE.equals(progress.getPassed())) {
-
-            throw new IllegalStateException(
-                    "You have already passed this quiz."
-            );
-        }
-
-        if (attemptsUsed >= maxAttempts) {
-            throw new IllegalStateException(
-                    "Maximum quiz attempts reached."
-            );
+        if (openAttemptOpt.isPresent()) {
+            QuizAttempt openAttempt = openAttemptOpt.get();
+            Integer timeLimit = quiz.getTimeLimitMinutes();
+            boolean isExpired = false;
+            if (timeLimit != null && timeLimit > 0 && openAttempt.getStartedAt() != null) {
+                LocalDateTime expiry = openAttempt.getStartedAt().plusMinutes(timeLimit);
+                if (LocalDateTime.now().isAfter(expiry)) {
+                    isExpired = true;
+                }
+            }
+            if (isExpired) {
+                openAttempt.setCompletedAt(openAttempt.getStartedAt().plusMinutes(timeLimit));
+                openAttempt.setPassed(false);
+                openAttempt.setScore(0);
+                quizAttemptRepository.save(openAttempt);
+                enforceFailedAttemptCooldown(quizId, userId);
+            } else {
+                return buildResumeQuizResponse(openAttempt, quiz);
+            }
         }
 
         /*
@@ -364,25 +523,9 @@ public class QuizService {
         }
 
         int questionsPerAttempt =
-                quiz.getQuestionsPerAttempt() == null
-                        ? 10
-                        : quiz.getQuestionsPerAttempt();
-
-        if (questionsPerAttempt <= 0) {
-            throw new IllegalStateException(
-                    "Questions per attempt must be greater than zero."
-            );
-        }
-
-        if (questionBank.size() < questionsPerAttempt) {
-            throw new IllegalStateException(
-                    "The question bank contains only "
-                            + questionBank.size()
-                            + " questions, but "
-                            + questionsPerAttempt
-                            + " questions are required per attempt."
-            );
-        }
+                (quiz.getQuestionsPerAttempt() == null || quiz.getQuestionsPerAttempt() <= 0)
+                        ? questionBank.size()
+                        : Math.min(quiz.getQuestionsPerAttempt(), questionBank.size());
 
         /*
          * ---------------------------------------------------------
@@ -477,11 +620,9 @@ public class QuizService {
             throw new IllegalStateException("You have already passed this quiz.");
         }
 
-        if (attemptsUsed >= maxAttempts) {
-            throw new IllegalStateException("Maximum quiz attempts reached.");
-        }
-
-        int attemptNumber = attemptsUsed + 1;
+        // Hard attempt cap removed: retakes are governed solely by cooldown
+        int maxExistingAttempt = quizAttemptRepository.findMaxAttemptNumber(quiz.getId(), user.getId());
+        int attemptNumber = Math.max(maxExistingAttempt, attemptsUsed) + 1;
 
         /* CREATE ATTEMPT */
         QuizAttempt attempt = new QuizAttempt();
@@ -558,7 +699,7 @@ public class QuizService {
 
         response.put(
                 "remainingAttempts",
-                maxAttempts - (attemptsUsed + 1)
+                maxAttempts != null ? Math.max(0, maxAttempts - (attemptsUsed + 1)) : null
         );
 
         response.put(
@@ -608,7 +749,7 @@ public class QuizService {
     response.put("quizId", quiz.getId());
     response.put("quizCode", quiz.getQuizId());
     response.put("title", quiz.getTitle());
-    response.put("type", quiz.getType().name());
+    response.put("type", quiz.getType() != null ? quiz.getType().name() : "MODULE");
     response.put("courseId", quiz.getCourse().getId());
     response.put(
             "moduleId",
@@ -693,6 +834,62 @@ public class QuizService {
                 quiz.getType()
         );
 
+        QuizProgress userProgress =
+                quizProgressRepository
+                        .findByQuiz_IdAndUser_Id(
+                                quizId,
+                                userId
+                        )
+                        .orElse(null);
+
+        boolean alreadyPassed = userProgress != null && Boolean.TRUE.equals(userProgress.getPassed());
+        response.put("alreadyPassed", alreadyPassed);
+        response.put("quizPassed", alreadyPassed);
+
+        Optional<QuizAttempt> latestAttemptOpt =
+                quizAttemptRepository
+                        .findTopByQuiz_IdAndUser_IdAndCompletedAtIsNotNullOrderByCompletedAtDesc(
+                                quizId, userId
+                        );
+
+        if (latestAttemptOpt.isEmpty() && alreadyPassed) {
+            latestAttemptOpt = quizAttemptRepository
+                    .findTopByQuiz_IdAndUser_IdAndPassedTrueOrderByCompletedAtDesc(quizId, userId);
+        }
+
+        if (latestAttemptOpt.isPresent()) {
+            QuizAttempt attempt = latestAttemptOpt.get();
+            Map<String, Object> attemptMap = new LinkedHashMap<>();
+            attemptMap.put("attemptId", attempt.getAttemptId());
+            attemptMap.put("score", attempt.getScore());
+            attemptMap.put("passed", attempt.getPassed());
+            attemptMap.put("completedAt", attempt.getCompletedAt() != null ? attempt.getCompletedAt().toString() : null);
+            attemptMap.put("correctAnswers", attempt.getCorrectAnswers());
+            attemptMap.put("wrongAnswers", attempt.getWrongAnswers());
+            attemptMap.put("totalQuestions", attempt.getTotalQuestions());
+            attemptMap.put("timeTakenSeconds", attempt.getTimeTakenSeconds());
+            attemptMap.put("passingScore", quiz.getPassingScore());
+            Integer maxAttempts = quiz.getMaxAttempts();
+            int used = userProgress != null && userProgress.getAttemptsUsed() != null ? userProgress.getAttemptsUsed() : 1;
+            attemptMap.put("maxAttempts", maxAttempts);
+            attemptMap.put("remainingAttempts", maxAttempts != null ? Math.max(0, maxAttempts - used) : null);
+            response.put("latestAttempt", attemptMap);
+        } else if (alreadyPassed) {
+            Map<String, Object> attemptMap = new LinkedHashMap<>();
+            attemptMap.put("attemptId", "ATT-PASSED");
+            attemptMap.put("score", userProgress != null && userProgress.getBestScore() != null ? userProgress.getBestScore() : 100);
+            attemptMap.put("passed", true);
+            attemptMap.put("correctAnswers", 0);
+            attemptMap.put("wrongAnswers", 0);
+            attemptMap.put("totalQuestions", 0);
+            attemptMap.put("passingScore", quiz.getPassingScore());
+            Integer maxAttempts = quiz.getMaxAttempts();
+            int used = userProgress != null && userProgress.getAttemptsUsed() != null ? userProgress.getAttemptsUsed() : 1;
+            attemptMap.put("maxAttempts", maxAttempts);
+            attemptMap.put("remainingAttempts", maxAttempts != null ? Math.max(0, maxAttempts - used) : null);
+            response.put("latestAttempt", attemptMap);
+        }
+
         Map<String, Object> cooldownStatus = getCooldownStatus(quizId, userId);
         response.putAll(cooldownStatus);
         boolean cooldownActive = Boolean.TRUE.equals(cooldownStatus.get("cooldownActive"));
@@ -704,6 +901,24 @@ public class QuizService {
          */
 
         if (quiz.getType() == QuizType.FINAL) {
+
+            Enrollment enrollment = enrollmentRepository
+                    .findByUserIdAndCourseId(userId, quiz.getCourse().getId())
+                    .orElse(null);
+
+            boolean allLessonsCompleted = true;
+            if (enrollment != null) {
+                List<Module> modules =
+                        moduleRepository.findByCourseIdOrderByOrderIndexAsc(quiz.getCourse().getId());
+                for (Module module : modules) {
+                    if (!lessonProgressRepository.areAllLessonsCompleted(enrollment.getId(), module.getId())) {
+                        allLessonsCompleted = false;
+                        break;
+                    }
+                }
+            } else {
+                allLessonsCompleted = false;
+            }
 
             List<Quiz> moduleQuizzes =
                     quizRepository.findByCourseIdAndType(
@@ -731,9 +946,13 @@ public class QuizService {
             }
 
             boolean allModuleQuizzesPassed =
-                    totalModuleQuizzes > 0
-                            && passedModuleQuizzes
-                            == totalModuleQuizzes;
+                    totalModuleQuizzes == 0
+                            || passedModuleQuizzes == totalModuleQuizzes;
+
+            response.put(
+                    "allLessonsCompleted",
+                    allLessonsCompleted
+            );
 
             response.put(
                     "totalModuleQuizzes",
@@ -750,23 +969,27 @@ public class QuizService {
                     allModuleQuizzesPassed
             );
 
-            boolean unlocked = allModuleQuizzesPassed && !cooldownActive;
+            boolean unlocked = (allLessonsCompleted && allModuleQuizzesPassed && !cooldownActive) || alreadyPassed;
             response.put("unlocked", unlocked);
 
-            if (cooldownActive) {
+            if (alreadyPassed) {
+                response.put("reason", "You have already completed and passed the final assessment.");
+            } else if (cooldownActive) {
                 response.put("reason", cooldownStatus.get("message"));
-            } else if (allModuleQuizzesPassed) {
-
+            } else if (!allLessonsCompleted) {
+                response.put(
+                        "reason",
+                        "Complete all lessons across all modules before attempting the final assessment."
+                );
+            } else if (!allModuleQuizzesPassed) {
+                response.put(
+                        "reason",
+                        "Pass all module quizzes before attempting the final assessment."
+                );
+            } else {
                 response.put(
                         "reason",
                         "Final quiz is unlocked."
-                );
-
-            } else {
-
-                response.put(
-                        "reason",
-                        "Pass all module quizzes before attempting the final quiz."
                 );
             }
 
@@ -836,8 +1059,8 @@ public class QuizService {
 
                 Quiz previousQuiz =
                         quizRepository
-                                .findByModuleId(module.getId())
-                                .orElse(null);
+                                .findTopByModuleIdOrderByIdDesc(module.getId())
+                                .orElseGet(() -> quizRepository.findByModuleId(module.getId()).orElse(null));
 
                 if (previousQuiz == null) {
 
@@ -860,9 +1083,10 @@ public class QuizService {
             }
 
             boolean unlocked =
-                    allLessonsCompleted
+                    (allLessonsCompleted
                             && previousModulesPassed
-                            && !cooldownActive;
+                            && !cooldownActive)
+                            || alreadyPassed;
 
             response.put(
                     "moduleId",
@@ -889,7 +1113,11 @@ public class QuizService {
                     unlocked
             );
 
-            if (cooldownActive) {
+            if (alreadyPassed) {
+
+                response.put("reason", "You have already completed and passed this module quiz.");
+
+            } else if (cooldownActive) {
 
                 response.put("reason", cooldownStatus.get("message"));
 
@@ -958,6 +1186,19 @@ public class QuizService {
                 || attempt.getUser() == null
                 || !currentUserId.equals(attempt.getUser().getId())) {
             throw new AccessDeniedException("You are not authorized to submit this quiz attempt.");
+        }
+
+        if (attempt.getUser().getStatus() != null && attempt.getUser().getStatus() != UserStatus.ACTIVE) {
+            throw new AccessDeniedException("User account is not active.");
+        }
+
+        if (attempt.getQuiz() != null && attempt.getQuiz().getCourse() != null && attempt.getQuiz().getCourse().getId() != null) {
+            Enrollment activeCheck = enrollmentRepository
+                    .findByUserIdAndCourseId(currentUserId, attempt.getQuiz().getCourse().getId())
+                    .orElse(null);
+            if (activeCheck != null && activeCheck.getStatus() == EnrollmentStatus.REVOKED) {
+                throw new AccessDeniedException("This course enrollment has been revoked.");
+            }
         }
 
         if (attempt.getCompletedAt() != null) {
@@ -1040,16 +1281,25 @@ public class QuizService {
             String correctAnswer =
                     question.getCorrectAnswer();
 
-            if (submittedAnswer != null &&
-                    correctAnswer != null &&
-                    submittedAnswer.equalsIgnoreCase(
-                            correctAnswer
-                    )) {
+            if (submittedAnswer != null && correctAnswer != null) {
+                Set<String> submittedSet = Arrays.stream(submittedAnswer.split("[,;\\s]+"))
+                        .map(String::trim)
+                        .filter(s -> !s.isBlank())
+                        .map(String::toUpperCase)
+                        .collect(Collectors.toSet());
 
-                correctAnswers++;
+                Set<String> correctSet = Arrays.stream(correctAnswer.split("[,;\\s]+"))
+                        .map(String::trim)
+                        .filter(s -> !s.isBlank())
+                        .map(String::toUpperCase)
+                        .collect(Collectors.toSet());
 
+                if (!correctSet.isEmpty() && correctSet.equals(submittedSet)) {
+                    correctAnswers++;
+                } else {
+                    wrongAnswers++;
+                }
             } else {
-
                 wrongAnswers++;
             }
         }
@@ -1172,6 +1422,17 @@ public class QuizService {
                 progress
         );
 
+        Integer maxAttemptsCount = quiz.getMaxAttempts();
+        Integer remainingAttemptsCount = maxAttemptsCount != null ? Math.max(0, maxAttemptsCount - progress.getAttemptsUsed()) : null;
+        emitQuizSubmissionNotifications(
+                attempt,
+                quiz,
+                score,
+                passingScore,
+                passed,
+                remainingAttemptsCount
+        );
+
         /*
          * ---------------------------------------------------------
          * FINAL QUIZ → COURSE COMPLETION
@@ -1216,6 +1477,52 @@ if (passed &&
 
     completionResult =
             enrollmentService.completeCourse(request);
+}
+
+if (passed && quiz.getType() == QuizType.MODULE && quiz.getCourse() != null) {
+    Enrollment enrollment = enrollmentRepository
+            .findByUserIdAndCourseId(
+                    attempt.getUser().getId(),
+                    quiz.getCourse().getId()
+            )
+            .orElse(null);
+
+    if (enrollment != null) {
+        long totalLessons = lessonRepository.countByModuleCourseId(quiz.getCourse().getId());
+        long completedLessons = lessonProgressRepository.findByEnrollmentId(enrollment.getId()).stream()
+                .filter(lp -> Boolean.TRUE.equals(lp.getCompleted()))
+                .count();
+
+        List<Quiz> moduleQuizzes = quizRepository.findByCourseIdAndType(quiz.getCourse().getId(), QuizType.MODULE);
+        long totalModuleQuizzes = moduleQuizzes.size();
+        long passedModuleQuizzes = 0;
+        for (Quiz mq : moduleQuizzes) {
+            if (quizProgressRepository.existsByQuiz_IdAndUser_IdAndPassedTrue(mq.getId(), attempt.getUser().getId())) {
+                passedModuleQuizzes++;
+            }
+        }
+
+        long totalItems = totalLessons + totalModuleQuizzes;
+        long completedItems = completedLessons + passedModuleQuizzes;
+        int courseProgress = 0;
+        if (totalItems > 0) {
+            courseProgress = (int) Math.round((completedItems * 98.0) / totalItems);
+            courseProgress = Math.min(98, Math.max(0, courseProgress));
+        }
+
+        if (enrollment.getStatus() == EnrollmentStatus.COMPLETED) {
+            courseProgress = 100;
+        }
+
+        if (enrollment.getProgressPercent() == null || courseProgress > enrollment.getProgressPercent()) {
+            enrollment.setProgressPercent(courseProgress);
+        }
+        enrollment.setLastAccessed(LocalDateTime.now());
+        if (enrollment.getStatus() == EnrollmentStatus.NOT_STARTED && courseProgress > 0) {
+            enrollment.setStatus(EnrollmentStatus.IN_PROGRESS);
+        }
+        enrollmentRepository.save(enrollment);
+    }
 }
 
         /*
@@ -1274,22 +1581,14 @@ if (passed &&
 
         response.put(
                 "maxAttempts",
-                quiz.getMaxAttempts() == null
-                        ? 3
-                        : quiz.getMaxAttempts()
+                quiz.getMaxAttempts()
         );
 
         response.put(
                 "remainingAttempts",
-                Math.max(
-                        0,
-                        (
-                                quiz.getMaxAttempts() == null
-                                        ? 3
-                                        : quiz.getMaxAttempts()
-                        )
-                                - progress.getAttemptsUsed()
-                )
+                quiz.getMaxAttempts() != null
+                        ? Math.max(0, quiz.getMaxAttempts() - progress.getAttemptsUsed())
+                        : null
         );
 
         response.put(
@@ -1327,11 +1626,259 @@ if (passed &&
         return response;
     }
 
+    private void emitQuizSubmissionNotifications(
+            QuizAttempt attempt,
+            Quiz quiz,
+            int score,
+            int passingScore,
+            boolean passed,
+            Integer remainingAttempts
+    ) {
+        if (notificationService == null || attempt == null || quiz == null || attempt.getUser() == null) {
+            return;
+        }
+
+        User user = attempt.getUser();
+        Course course = quiz.getCourse();
+        String courseTitle = course != null ? course.getTitle() : "Training Course";
+        String courseCode = course != null && course.getCourseId() != null ? course.getCourseId() : "";
+        String courseActionUrl = !courseCode.isBlank() ? "/courses/" + courseCode + "/learn" : "/progress";
+        boolean isFinal = quiz.getType() == QuizType.FINAL;
+        String assessmentLabel = isFinal ? "Final Assessment" : "Module Quiz";
+
+        if (passed) {
+            String nextStep = isFinal
+                    ? "Your course completion record has been finalized."
+                    : "You may now proceed to the next module or final assessment.";
+
+            Map<String, Object> passedMetadata = new HashMap<>();
+            passedMetadata.put("attemptId", attempt.getAttemptId() != null ? attempt.getAttemptId() : String.valueOf(attempt.getId()));
+            passedMetadata.put("quizId", quiz.getQuizId() != null ? quiz.getQuizId() : String.valueOf(quiz.getId()));
+            passedMetadata.put("courseId", courseCode);
+            passedMetadata.put("score", score);
+            passedMetadata.put("passingScore", passingScore);
+            passedMetadata.put("passed", true);
+            if (remainingAttempts != null) {
+                passedMetadata.put("remainingAttempts", remainingAttempts);
+            }
+
+            notificationService.createNotificationSafely(
+                    user.getId(),
+                    assessmentLabel + " Passed: " + quiz.getTitle(),
+                    String.format(
+                            "You passed \"%s\" in course \"%s\" (%s) with a score of %d%% (Required: %d%%). %s",
+                            quiz.getTitle(),
+                            courseTitle,
+                            courseCode,
+                            score,
+                            passingScore,
+                            nextStep
+                    ),
+                    NotificationType.ASSESSMENT_RESULT,
+                    NotificationPriority.NORMAL,
+                    "COURSE_CODE",
+                    courseCode,
+                    courseActionUrl,
+                    "ASSESSMENT_RESULT:ATTEMPT:" + attempt.getAttemptId(),
+                    passedMetadata
+            );
+
+            // If this was a MODULE quiz and all module quizzes are now passed, notify learner that Final Assessment is unlocked
+            if (!isFinal && course != null && course.getId() != null) {
+                List<Quiz> moduleQuizzes = quizRepository.findByCourseIdAndType(course.getId(), QuizType.MODULE);
+                boolean allModPassed = !moduleQuizzes.isEmpty() && moduleQuizzes.stream().allMatch(
+                        mq -> quizProgressRepository.existsByQuiz_IdAndUser_IdAndPassedTrue(mq.getId(), user.getId())
+                );
+                if (allModPassed) {
+                    List<Quiz> finalQuizzes = quizRepository.findByCourseIdAndType(course.getId(), QuizType.FINAL);
+                    for (Quiz finalQuiz : finalQuizzes) {
+                        notificationService.createNotificationSafely(
+                                user.getId(),
+                                "Final Assessment Unlocked: " + courseTitle,
+                                String.format(
+                                        "All module quizzes for \"%s\" (%s) are complete! The Final Assessment \"%s\" is now unlocked.",
+                                        courseTitle,
+                                        courseCode,
+                                        finalQuiz.getTitle()
+                                ),
+                                NotificationType.QUIZ_AVAILABLE,
+                                NotificationPriority.NORMAL,
+                                "COURSE_CODE",
+                                courseCode,
+                                courseActionUrl,
+                                String.format("QUIZ_AVAILABLE:USER:%d:QUIZ:%d", user.getId(), finalQuiz.getId()),
+                                Map.of(
+                                        "courseId", courseCode,
+                                        "quizId", finalQuiz.getQuizId() != null ? finalQuiz.getQuizId() : String.valueOf(finalQuiz.getId()),
+                                        "quizType", "FINAL"
+                                )
+                        );
+                    }
+                }
+            }
+        } else {
+            int cooldownMin = quiz.getCooldownMinutes() != null ? quiz.getCooldownMinutes() : 5;
+            String retryInfo = String.format("You can retake this assessment after the %d-minute review cooldown.", cooldownMin);
+
+            String priority = isFinal
+                    ? NotificationPriority.HIGH
+                    : NotificationPriority.NORMAL;
+
+            Map<String, Object> failedMetadata = new HashMap<>();
+            failedMetadata.put("attemptId", attempt.getAttemptId() != null ? attempt.getAttemptId() : String.valueOf(attempt.getId()));
+            failedMetadata.put("quizId", quiz.getQuizId() != null ? quiz.getQuizId() : String.valueOf(quiz.getId()));
+            failedMetadata.put("courseId", courseCode);
+            failedMetadata.put("score", score);
+            failedMetadata.put("passingScore", passingScore);
+            failedMetadata.put("passed", false);
+            if (remainingAttempts != null) {
+                failedMetadata.put("remainingAttempts", remainingAttempts);
+            }
+
+            notificationService.createNotificationSafely(
+                    user.getId(),
+                    assessmentLabel + " Not Passed: " + quiz.getTitle(),
+                    String.format(
+                            "You scored %d%% on \"%s\" in course \"%s\" (%s) (Passing score: %d%%). %s",
+                            score,
+                            quiz.getTitle(),
+                            courseTitle,
+                            courseCode,
+                            passingScore,
+                            retryInfo
+                    ),
+                    NotificationType.ASSESSMENT_FAILED,
+                    priority,
+                    "COURSE_CODE",
+                    courseCode,
+                    courseActionUrl,
+                    "ASSESSMENT_FAILED:ATTEMPT:" + attempt.getAttemptId(),
+                    failedMetadata
+            );
+
+            // Escalate when a learner exhausts all attempts on a mandatory course
+            if (remainingAttempts != null && remainingAttempts == 0 && course != null && course.getId() != null) {
+                Enrollment enrollment = enrollmentRepository
+                        .findByUserIdAndCourseId(user.getId(), course.getId())
+                        .orElse(null);
+
+                if (enrollment != null && enrollment.getEnrollmentType() == EnrollmentType.MANDATORY) {
+                    if (user.getDepartment() != null) {
+                        notificationService.notifyDepartmentManagers(
+                                user.getDepartment(),
+                                "Assessment Attempts Exhausted: " + user.getName(),
+                                String.format(
+                                        "Team member %s (%s) has used all allowed attempts on \"%s\" in mandatory course \"%s\" (%s) (Latest score: %d%%).",
+                                        user.getName(),
+                                        user.getEmployeeId(),
+                                        quiz.getTitle(),
+                                        courseTitle,
+                                        courseCode,
+                                        score
+                                ),
+                                NotificationType.TEAM_COMPLIANCE,
+                                NotificationPriority.HIGH,
+                                "COURSE_CODE",
+                                courseCode,
+                                "/manager",
+                                String.format("MGR_EXHAUSTED:USER:%d:QUIZ:%d", user.getId(), quiz.getId()),
+                                Map.of(
+                                        "employeeId", user.getEmployeeId(),
+                                        "courseId", courseCode,
+                                        "quizTitle", quiz.getTitle()
+                                )
+                        );
+                    }
+                    notificationService.notifyHrAdmins(
+                            "Mandatory Assessment Attempts Exhausted: " + user.getName(),
+                            String.format(
+                                    "Employee %s (%s) exhausted all attempts on \"%s\" in mandatory course \"%s\" (%s).",
+                                    user.getName(),
+                                    user.getEmployeeId(),
+                                    quiz.getTitle(),
+                                    courseTitle,
+                                    courseCode
+                            ),
+                            NotificationType.HR_ADMIN_ALERT,
+                            NotificationPriority.HIGH,
+                            "COURSE_CODE",
+                            courseCode,
+                            "/hr",
+                            String.format("HR_EXHAUSTED:USER:%d:QUIZ:%d", user.getId(), quiz.getId()),
+                            Map.of(
+                                    "employeeId", user.getEmployeeId(),
+                                    "courseId", courseCode
+                            )
+                    );
+                }
+            }
+        }
+    }
+
     /**
      * Builds the question object sent to the frontend.
      *
      * Correct answers are NEVER exposed.
      */
+    private Map<String, Object> buildResumeQuizResponse(QuizAttempt attempt, Quiz quiz) {
+        List<Long> questionIds = new ArrayList<>();
+        Map<String, List<String>> optionOrder = new LinkedHashMap<>();
+
+        try {
+            if (attempt.getQuestionIds() != null && !attempt.getQuestionIds().isBlank()) {
+                questionIds = objectMapper.readValue(
+                        attempt.getQuestionIds(),
+                        new com.fasterxml.jackson.core.type.TypeReference<List<Long>>() {}
+                );
+            }
+            if (attempt.getOptionOrderJson() != null && !attempt.getOptionOrderJson().isBlank()) {
+                optionOrder = objectMapper.readValue(
+                        attempt.getOptionOrderJson(),
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, List<String>>>() {}
+                );
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse stored attempt questions for attemptId={}: {}", attempt.getAttemptId(), e.getMessage());
+        }
+
+        List<QuizQuestion> questionsList;
+        if (!questionIds.isEmpty()) {
+            Map<Long, QuizQuestion> qMap = quizQuestionRepository.findAllById(questionIds).stream()
+                    .collect(Collectors.toMap(QuizQuestion::getId, q -> q));
+            questionsList = questionIds.stream()
+                    .map(qMap::get)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        } else {
+            questionsList = quizQuestionRepository.findByQuiz_Id(quiz.getId());
+        }
+
+        final Map<String, List<String>> finalOptionOrder = optionOrder;
+        List<Map<String, Object>> questionResponses = questionsList.stream()
+                .map(q -> {
+                    List<String> order = finalOptionOrder.get(String.valueOf(q.getId()));
+                    if (order == null || order.isEmpty()) {
+                        order = List.of("A", "B", "C", "D");
+                    }
+                    return buildQuestionResponse(q, order);
+                })
+                .collect(Collectors.toList());
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("attemptId", attempt.getAttemptId());
+        response.put("attemptNumber", attempt.getAttemptNumber());
+        response.put("totalQuestions", questionsList.size());
+        response.put("maxAttempts", quiz.getMaxAttempts());
+        response.put("attemptsUsed", attempt.getAttemptNumber());
+        response.put("remainingAttempts", quiz.getMaxAttempts() != null ? Math.max(0, quiz.getMaxAttempts() - attempt.getAttemptNumber()) : null);
+        response.put("passingScore", quiz.getPassingScore());
+        response.put("timeLimitMinutes", quiz.getTimeLimitMinutes());
+        response.put("questions", questionResponses);
+        response.put("resumed", true);
+
+        return response;
+    }
+
     private Map<String, Object> buildQuestionResponse(
             QuizQuestion question,
             List<String> optionOrder
@@ -1417,5 +1964,274 @@ if (passed &&
         );
 
         return response;
+    }
+
+    // =========================================================================
+    // QUIZ AUTHORING & QUESTION MANAGEMENT (HR_ADMIN & TRAINER ONLY)
+    // =========================================================================
+
+    public void requireQuizAuthoringPermission() {
+        if (securityContextUtil == null) return;
+        String role = securityContextUtil.getCurrentUserRole();
+        if (role == null || (!Role.HR_ADMIN.name().equalsIgnoreCase(role) && !Role.TRAINER.name().equalsIgnoreCase(role))) {
+            throw new AccessDeniedException("Only HR Admin and Trainer roles are authorized to manage quiz questions.");
+        }
+    }
+
+    @Transactional
+    public Map<String, Object> createQuiz(Long courseId, Long moduleId, QuizAuthoringDTO dto) {
+        requireQuizAuthoringPermission();
+        if (dto == null) {
+            throw new IllegalArgumentException("Quiz payload is required.");
+        }
+
+        Course course = null;
+        if (courseId != null && courseRepository != null) {
+            course = courseRepository.findById(courseId).orElse(null);
+        }
+        if (course != null && Boolean.TRUE.equals(course.getFoundation())) {
+            throw new IllegalStateException("Foundation courses cannot have quizzes or final assessments.");
+        }
+        Module module = null;
+        if (moduleId != null && moduleRepository != null) {
+            module = moduleRepository.findById(moduleId).orElse(null);
+        }
+
+        Quiz quiz = new Quiz();
+        quiz.setQuizId(dto.getQuizId() != null && !dto.getQuizId().isBlank()
+                ? dto.getQuizId()
+                : "QUIZ-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
+        quiz.setTitle(dto.getTitle() != null && !dto.getTitle().isBlank() ? dto.getTitle().trim() : "Assessment");
+
+        QuizType qType = QuizType.MODULE;
+        if (dto.getType() != null && "FINAL".equalsIgnoreCase(dto.getType())) {
+            qType = QuizType.FINAL;
+        }
+        quiz.setType(qType);
+        quiz.setCourse(course);
+        quiz.setModule(module);
+        quiz.setPassingScore(dto.getPassingScore() != null ? dto.getPassingScore() : 70);
+        quiz.setTimeLimitMinutes(dto.getTimeLimitMinutes());
+        quiz.setMaxAttempts(dto.getMaxAttempts());
+        quiz.setQuestionsPerAttempt(dto.getQuestions() != null ? dto.getQuestions().size() : 0);
+        quiz.setRandomizeQuestions(dto.getRandomizeQuestions() == null || dto.getRandomizeQuestions());
+        quiz.setRandomizeOptions(dto.getRandomizeOptions() == null || dto.getRandomizeOptions());
+        quiz.setActive(dto.getActive() == null || dto.getActive());
+
+        Quiz savedQuiz = quizRepository.save(quiz);
+
+        if (dto.getQuestions() != null && !dto.getQuestions().isEmpty()) {
+            for (int i = 0; i < dto.getQuestions().size(); i++) {
+                addQuestionInternal(savedQuiz, dto.getQuestions().get(i), i + 1);
+            }
+        }
+
+        return getQuizDetail(savedQuiz.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getQuizDetail(Long quizId) {
+        requireQuizAuthoringPermission();
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new IllegalArgumentException("Quiz not found with ID: " + quizId));
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", quiz.getId());
+        map.put("quizId", quiz.getQuizId());
+        map.put("title", quiz.getTitle());
+        map.put("type", quiz.getType() != null ? quiz.getType().name() : "MODULE");
+        map.put("courseId", quiz.getCourse() != null ? quiz.getCourse().getId() : null);
+        map.put("moduleId", quiz.getModule() != null ? quiz.getModule().getId() : null);
+        map.put("passingScore", quiz.getPassingScore());
+        map.put("timeLimitMinutes", quiz.getTimeLimitMinutes());
+        map.put("maxAttempts", quiz.getMaxAttempts());
+        map.put("questionsPerAttempt", quiz.getQuestionsPerAttempt());
+        map.put("randomizeQuestions", quiz.getRandomizeQuestions());
+        map.put("randomizeOptions", quiz.getRandomizeOptions());
+        map.put("active", quiz.getActive());
+
+        List<QuizQuestion> questions = quizQuestionRepository.findByQuiz_IdOrderByOrderIndexAsc(quiz.getId());
+        List<Map<String, Object>> qList = new ArrayList<>();
+        for (QuizQuestion q : questions) {
+            Map<String, Object> qMap = new LinkedHashMap<>();
+            qMap.put("id", q.getId());
+            qMap.put("questionId", q.getQuestionId());
+            qMap.put("questionText", q.getQuestionText());
+            qMap.put("questionType", q.getQuestionType());
+            qMap.put("optionA", q.getOptionA());
+            qMap.put("optionB", q.getOptionB());
+            qMap.put("optionC", q.getOptionC());
+            qMap.put("optionD", q.getOptionD());
+            qMap.put("correctAnswer", q.getCorrectAnswer());
+            qMap.put("explanation", q.getExplanation());
+            qMap.put("orderIndex", q.getOrderIndex());
+            qList.add(qMap);
+        }
+        map.put("questions", qList);
+        return map;
+    }
+
+    @Transactional
+    public Map<String, Object> updateQuiz(Long quizId, QuizAuthoringDTO dto) {
+        requireQuizAuthoringPermission();
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new IllegalArgumentException("Quiz not found with ID: " + quizId));
+
+        if (dto.getTitle() != null && !dto.getTitle().isBlank()) {
+            quiz.setTitle(dto.getTitle().trim());
+        }
+        if (dto.getPassingScore() != null) {
+            quiz.setPassingScore(dto.getPassingScore());
+        }
+        if (dto.getTimeLimitMinutes() != null) {
+            quiz.setTimeLimitMinutes(dto.getTimeLimitMinutes());
+        }
+        quiz.setMaxAttempts(dto.getMaxAttempts());
+        if (dto.getRandomizeQuestions() != null) {
+            quiz.setRandomizeQuestions(dto.getRandomizeQuestions());
+        }
+        if (dto.getRandomizeOptions() != null) {
+            quiz.setRandomizeOptions(dto.getRandomizeOptions());
+        }
+        if (dto.getActive() != null) {
+            quiz.setActive(dto.getActive());
+        }
+
+        quizRepository.save(quiz);
+        return getQuizDetail(quiz.getId());
+    }
+
+    @Transactional
+    public void deleteQuiz(Long quizId) {
+        requireQuizAuthoringPermission();
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new IllegalArgumentException("Quiz not found with ID: " + quizId));
+
+        if (quizAttemptRepository.existsByQuizId(quizId)) {
+            throw new IllegalStateException("Cannot delete quiz because it already contains employee attempt records.");
+        }
+
+        quizQuestionRepository.deleteByQuizId(quizId);
+        quizRepository.delete(quiz);
+    }
+
+    @Transactional
+    public Map<String, Object> addQuestion(Long quizId, QuizAuthoringDTO.QuizQuestionDTO dto) {
+        requireQuizAuthoringPermission();
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new IllegalArgumentException("Quiz not found with ID: " + quizId));
+
+        int nextOrder = quizQuestionRepository.findByQuiz_Id(quizId).size() + 1;
+        QuizQuestion q = addQuestionInternal(quiz, dto, nextOrder);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", q.getId());
+        result.put("questionId", q.getQuestionId());
+        result.put("questionText", q.getQuestionText());
+        result.put("questionType", q.getQuestionType());
+        result.put("correctAnswer", q.getCorrectAnswer());
+        result.put("orderIndex", q.getOrderIndex());
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> updateQuestion(Long questionId, QuizAuthoringDTO.QuizQuestionDTO dto) {
+        requireQuizAuthoringPermission();
+        QuizQuestion q = quizQuestionRepository.findById(questionId)
+                .orElseThrow(() -> new IllegalArgumentException("Question not found with ID: " + questionId));
+
+        if (dto.getQuestionText() != null && !dto.getQuestionText().isBlank()) {
+            q.setQuestionText(dto.getQuestionText().trim());
+        }
+        if (dto.getQuestionType() != null && !dto.getQuestionType().isBlank()) {
+            q.setQuestionType(dto.getQuestionType().trim().toUpperCase(Locale.ROOT));
+        }
+        if (dto.getOptionA() != null) q.setOptionA(dto.getOptionA());
+        if (dto.getOptionB() != null) q.setOptionB(dto.getOptionB());
+        if (dto.getOptionC() != null) q.setOptionC(dto.getOptionC());
+        if (dto.getOptionD() != null) q.setOptionD(dto.getOptionD());
+        if (dto.getCorrectAnswer() != null && !dto.getCorrectAnswer().isBlank()) {
+            q.setCorrectAnswer(normalizeAnswerString(dto.getCorrectAnswer()));
+        }
+        if (dto.getExplanation() != null) {
+            q.setExplanation(dto.getExplanation());
+        }
+        if (dto.getOrderIndex() != null) {
+            q.setOrderIndex(dto.getOrderIndex());
+        }
+
+        quizQuestionRepository.save(q);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", q.getId());
+        result.put("questionId", q.getQuestionId());
+        result.put("questionText", q.getQuestionText());
+        result.put("questionType", q.getQuestionType());
+        result.put("correctAnswer", q.getCorrectAnswer());
+        return result;
+    }
+
+    @Transactional
+    public void deleteQuestion(Long questionId) {
+        requireQuizAuthoringPermission();
+        QuizQuestion q = quizQuestionRepository.findById(questionId)
+                .orElseThrow(() -> new IllegalArgumentException("Question not found with ID: " + questionId));
+        quizQuestionRepository.delete(q);
+    }
+
+    public BulkQuestionParseResultDTO parseBulkQuestions(MultipartFile file, String pastedText) {
+        requireQuizAuthoringPermission();
+        if (bulkQuestionParserService == null) {
+            bulkQuestionParserService = new BulkQuestionParserService();
+        }
+        if (file != null && !file.isEmpty()) {
+            return bulkQuestionParserService.parseUploadedFile(file);
+        }
+        if (pastedText != null && !pastedText.isBlank()) {
+            return bulkQuestionParserService.parsePastedText(pastedText);
+        }
+        throw new IllegalArgumentException("Either an uploaded file or pasted text must be provided.");
+    }
+
+    private QuizQuestion addQuestionInternal(Quiz quiz, QuizAuthoringDTO.QuizQuestionDTO dto, int orderIndex) {
+        if (dto.getQuestionText() == null || dto.getQuestionText().isBlank()) {
+            throw new IllegalArgumentException("Question text is required.");
+        }
+        if (dto.getCorrectAnswer() == null || dto.getCorrectAnswer().isBlank()) {
+            throw new IllegalArgumentException("Correct answer is required.");
+        }
+
+        QuizQuestion q = new QuizQuestion();
+        q.setQuestionId(dto.getQuestionId() != null && !dto.getQuestionId().isBlank()
+                ? dto.getQuestionId()
+                : "Q-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.ROOT));
+        q.setQuestionText(dto.getQuestionText().trim());
+        String qType = dto.getQuestionType() != null && !dto.getQuestionType().isBlank()
+                ? dto.getQuestionType().trim().toUpperCase(Locale.ROOT)
+                : "SINGLE_CHOICE";
+        q.setQuestionType(qType);
+        q.setOptionA(dto.getOptionA());
+        q.setOptionB(dto.getOptionB());
+        q.setOptionC(dto.getOptionC());
+        q.setOptionD(dto.getOptionD());
+        q.setCorrectAnswer(normalizeAnswerString(dto.getCorrectAnswer()));
+        q.setExplanation(dto.getExplanation());
+        q.setOrderIndex(dto.getOrderIndex() != null ? dto.getOrderIndex() : orderIndex);
+        q.setQuiz(quiz);
+
+        return quizQuestionRepository.save(q);
+    }
+
+    private String normalizeAnswerString(String ans) {
+        if (ans == null || ans.isBlank()) return "A";
+        Set<String> valid = Set.of("A", "B", "C", "D");
+        List<String> list = Arrays.stream(ans.split("[,;\\s]+"))
+                .map(String::trim)
+                .map(s -> s.toUpperCase(Locale.ROOT))
+                .filter(valid::contains)
+                .distinct()
+                .sorted()
+                .toList();
+        return list.isEmpty() ? "A" : String.join(",", list);
     }
 }

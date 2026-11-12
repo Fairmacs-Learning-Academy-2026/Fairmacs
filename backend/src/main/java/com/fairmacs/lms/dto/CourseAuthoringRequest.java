@@ -17,8 +17,14 @@ public class CourseAuthoringRequest {
     private Integer passingScore = 70;
     private Boolean foundation = false;
     private Boolean publish = false;
+    private Boolean certificateEligible = true;
+    private List<String> learningOutcomes = new ArrayList<>();
 
-    // Assignment configuration
+    // Explicit Course Owning Department
+    private Long departmentId;
+
+    // Department-wise Assignment configuration
+    private List<DepartmentAssignmentInput> departmentAssignments = new ArrayList<>();
     private List<String> targetDepartments = new ArrayList<>();
     private List<Long> targetEmployeeIds = new ArrayList<>();
     private LocalDate dueDate;
@@ -36,8 +42,14 @@ public class CourseAuthoringRequest {
     public String getCategorySlug() { return categorySlug; }
     public void setCategorySlug(String categorySlug) { this.categorySlug = categorySlug; }
 
+    public Long getDepartmentId() { return departmentId; }
+    public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
+
     public String getLevel() { return level; }
     public void setLevel(String level) { this.level = level; }
+
+    public String getPosition() { return level; }
+    public void setPosition(String position) { this.level = position; }
 
     public String getDuration() { return duration; }
     public void setDuration(String duration) { this.duration = duration; }
@@ -57,17 +69,28 @@ public class CourseAuthoringRequest {
     public Boolean getFoundation() { return foundation; }
     public void setFoundation(Boolean foundation) { this.foundation = foundation; }
 
+    public Boolean getCertificateEligible() { return certificateEligible; }
+    public void setCertificateEligible(Boolean certificateEligible) { this.certificateEligible = certificateEligible; }
+
+    public List<String> getLearningOutcomes() { return learningOutcomes; }
+    public void setLearningOutcomes(List<String> learningOutcomes) { this.learningOutcomes = learningOutcomes; }
+
     public Boolean getPublish() { return publish; }
     public void setPublish(Boolean publish) { this.publish = publish; }
 
+    public List<DepartmentAssignmentInput> getDepartmentAssignments() { return departmentAssignments; }
+    public void setDepartmentAssignments(List<DepartmentAssignmentInput> departmentAssignments) {
+        this.departmentAssignments = departmentAssignments != null ? departmentAssignments : new ArrayList<>();
+    }
+
     public List<String> getTargetDepartments() { return targetDepartments; }
     public void setTargetDepartments(List<String> targetDepartments) {
-        this.targetDepartments = targetDepartments;
+        this.targetDepartments = targetDepartments != null ? targetDepartments : new ArrayList<>();
     }
 
     public List<Long> getTargetEmployeeIds() { return targetEmployeeIds; }
     public void setTargetEmployeeIds(List<Long> targetEmployeeIds) {
-        this.targetEmployeeIds = targetEmployeeIds;
+        this.targetEmployeeIds = targetEmployeeIds != null ? targetEmployeeIds : new ArrayList<>();
     }
 
     public LocalDate getDueDate() { return dueDate; }
@@ -81,6 +104,34 @@ public class CourseAuthoringRequest {
 
     public QuizInput getFinalQuiz() { return finalQuiz; }
     public void setFinalQuiz(QuizInput finalQuiz) { this.finalQuiz = finalQuiz; }
+
+    public static class DepartmentAssignmentInput {
+        private Long departmentId;
+        private String departmentName;
+        private String assignmentType = "MANDATORY";
+        private LocalDate dueDate;
+
+        public DepartmentAssignmentInput() {}
+
+        public DepartmentAssignmentInput(Long departmentId, String departmentName, String assignmentType, LocalDate dueDate) {
+            this.departmentId = departmentId;
+            this.departmentName = departmentName;
+            this.assignmentType = assignmentType;
+            this.dueDate = dueDate;
+        }
+
+        public Long getDepartmentId() { return departmentId; }
+        public void setDepartmentId(Long departmentId) { this.departmentId = departmentId; }
+
+        public String getDepartmentName() { return departmentName; }
+        public void setDepartmentName(String departmentName) { this.departmentName = departmentName; }
+
+        public String getAssignmentType() { return assignmentType; }
+        public void setAssignmentType(String assignmentType) { this.assignmentType = assignmentType; }
+
+        public LocalDate getDueDate() { return dueDate; }
+        public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
+    }
 
     public static class ModuleInput {
         private String title;
@@ -106,11 +157,19 @@ public class CourseAuthoringRequest {
         private String type;
         private String contentUrl;
         private String duration;
+        private String summary;
+
+        public String getSummary() { return summary; }
+        public void setSummary(String summary) { this.summary = summary; }
         private Integer orderIndex;
         private String workdriveFileId;
 
         public String getWorkdriveFileId() {return workdriveFileId;}
         public void setWorkdriveFileId(String workdriveFileId) {this.workdriveFileId = workdriveFileId;}
+
+        private String workdriveFileName;
+        public String getWorkdriveFileName() { return workdriveFileName; }
+        public void setWorkdriveFileName(String workdriveFileName) { this.workdriveFileName = workdriveFileName; }
 
         public String getTitle() { return title; }
         public void setTitle(String title) { this.title = title; }
@@ -132,7 +191,7 @@ public class CourseAuthoringRequest {
         private String title;
         private Integer passingScore = 70;
         private Integer timeLimitMinutes;
-        private Integer maxAttempts = 3;
+        private Integer maxAttempts;
         private Integer questionsPerAttempt;
         private Boolean randomizeQuestions = true;
         private Boolean randomizeOptions = true;

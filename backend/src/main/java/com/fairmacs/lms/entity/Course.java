@@ -39,7 +39,7 @@ public class Course {
     private String quizJson;
 
     @Column
-    private Double durationHours = 1.0;
+    private Double durationHours;
 
     @Column
     private String level;
@@ -72,6 +72,13 @@ public class Course {
     @JoinColumn(name = "created_by", foreignKey = @ForeignKey(name = "fk_courses_created_by"))
     private User createdBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id", foreignKey = @ForeignKey(name = "fk_courses_department_id"))
+    private Department owningDepartment;
+
+    @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<CourseDepartmentAssignment> departmentAssignments = new java.util.ArrayList<>();
+
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Module> modules;
 
@@ -83,8 +90,30 @@ public class Course {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
+
+    @Column(name = "learning_outcomes", columnDefinition = "TEXT")
+    private String learningOutcomes;
+
     @Column(name = "certificate_eligible", nullable = false)
     private Boolean certificateEligible = false;
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public void setPublishedAt(LocalDateTime publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public String getLearningOutcomes() {
+        return learningOutcomes;
+    }
+
+    public void setLearningOutcomes(String learningOutcomes) {
+        this.learningOutcomes = learningOutcomes;
+    }
 
     public Boolean getCertificateEligible() {
         return certificateEligible;
@@ -122,6 +151,9 @@ public class Course {
 
     public String getLevel() { return level; }
     public void setLevel(String level) { this.level = level; }
+
+    public String getPosition() { return level; }
+    public void setPosition(String position) { this.level = position; }
 
     public String getDuration() { return duration; }
     public void setDuration(String duration) { this.duration = duration; }
@@ -161,4 +193,20 @@ public class Course {
 
     public String getDraftPayload() { return draftPayload; }
     public void setDraftPayload(String draftPayload) { this.draftPayload = draftPayload; }
+
+    public Department getOwningDepartment() { return owningDepartment; }
+    public void setOwningDepartment(Department owningDepartment) { this.owningDepartment = owningDepartment; }
+
+    public List<CourseDepartmentAssignment> getDepartmentAssignments() { return departmentAssignments; }
+    public void setDepartmentAssignments(List<CourseDepartmentAssignment> departmentAssignments) {
+        if (this.departmentAssignments == null) {
+            this.departmentAssignments = new java.util.ArrayList<>();
+        }
+        if (this.departmentAssignments != departmentAssignments) {
+            this.departmentAssignments.clear();
+            if (departmentAssignments != null) {
+                this.departmentAssignments.addAll(departmentAssignments);
+            }
+        }
+    }
 }

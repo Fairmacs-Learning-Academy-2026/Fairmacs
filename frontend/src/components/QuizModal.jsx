@@ -24,6 +24,7 @@ import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 import { useEnrollmentStore } from '../stores/enrollmentStore';
 import quizService from '../services/quizService';
+import { notifyEnrollmentUpdated } from '../utils/enrollmentSync';
 
 export default function QuizModal({
   quiz,
@@ -53,6 +54,14 @@ export default function QuizModal({
   const [cooldownStatus, setCooldownStatus] = useState(null);
   const [cooldownNow, setCooldownNow] = useState(Date.now());
   const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
+  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+
+  const cleanOptionText = (text) => {
+    if (!text) return '';
+    return String(text)
+      .replace(/^(?:\[?[A-Da-d1-4]\]?[.:)\-]\s*|(?:option\s*[A-Da-d1-4][:.)]?\s*))/i, '')
+      .trim();
+  };
 
   const [generatingCert, setGeneratingCert] = useState(false);
   const [previewData, setPreviewData] = useState(null);
@@ -63,6 +72,7 @@ export default function QuizModal({
   const answersRef = useRef({});
   const submittedRef = useRef(false);
   const attemptStartedAtRef = useRef(null);
+  const isStartingRef = useRef(false);
 
   const userId =
     user?.id ??
@@ -140,7 +150,10 @@ export default function QuizModal({
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${hours}h ${minutes}m ${secs}s`;
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`;
+    }
+    return `${minutes}m ${secs}s`;
   };
 
   const resetAttemptState = useCallback(() => {
@@ -162,6 +175,9 @@ export default function QuizModal({
       setLoadingQuiz(false);
       return;
     }
+
+    if (isStartingRef.current) return;
+    isStartingRef.current = true;
 
     try {
       setLoadingQuiz(true);
@@ -217,6 +233,7 @@ export default function QuizModal({
       console.error('Load quiz preview error:', err);
       setError(err?.message || 'Unable to load quiz preview.');
     } finally {
+      isStartingRef.current = false;
       setLoadingQuiz(false);
     }
   }, [quizId]);
@@ -224,7 +241,7 @@ export default function QuizModal({
   const startQuiz = useCallback(async () => {
     if (!quizId) {
       setError(
-        'This assessment is not linked to a valid quiz ID.'
+        'quiz is unavailable. Please contact your administrator.'
       );
       setLoadingQuiz(false);
       return;
@@ -247,9 +264,16 @@ export default function QuizModal({
 
       const data = await quizService.startQuiz(quizId);
 
+      if (data?.alreadyPassed) {
+        setResult(data);
+        setSubmitted(true);
+        setLoadingQuiz(false);
+        return;
+      }
+
       if (!data?.attemptId || !Array.isArray(data?.questions)) {
         throw new Error(
-          'The quiz server returned an invalid attempt.'
+          'Invaild attempt! Please refresh and try again.'
         );
       }
 
@@ -275,7 +299,7 @@ export default function QuizModal({
         setMaxAttemptsReached(true);
         const status = await loadCooldownStatus();
         if (status?.cooldownActive) {
-          setError(status.message || 'You have reached the attempt limit. Please wait until the retry time.');
+          setError(status.message || 'You have reached the attempt limit. Please wait and try again.');
         } else {
           setError(message);
         }
@@ -294,7 +318,7 @@ export default function QuizModal({
       loadCooldownStatus().then((status) => {
         if (status && !status.cooldownActive) {
           setMaxAttemptsReached(false);
-          setError('Cooldown ended. You can try starting the assessment again.');
+          setError('Cooldown ended. You can try starting the assessment now.');
         }
       });
     }, 15000);
@@ -306,9 +330,25 @@ export default function QuizModal({
       loadQuizPreview();
     } else {
       loadCooldownStatus().then((status) => {
-        if (status?.cooldownActive) {
+        if (status?.alreadyPassed) {
+          const attemptData = status.latestAttempt || {
+            score: status.bestScore ?? status.score ?? 100,
+            passed: true,
+            totalQuestions: status.totalQuestions ?? 0,
+            correctAnswers: status.correctAnswers ?? 0,
+            wrongAnswers: status.wrongAnswers ?? 0,
+            passingScore: status.passingScore ?? 70,
+          };
+          setResult({
+            ...attemptData,
+            quizType: status.quizType,
+            alreadyPassed: true,
+          });
+          setSubmitted(true);
+          setLoadingQuiz(false);
+        } else if (status?.cooldownActive) {
           setMaxAttemptsReached(true);
-          setError(status.message || 'Maximum quiz attempts reached. Please wait until the retry time.');
+          setError(status.message || 'Maximum quiz attempts reached. Please wait and try again.');
           setLoadingQuiz(false);
         } else {
           startQuiz();
@@ -361,6 +401,21 @@ export default function QuizModal({
 
         setResult(serverResult);
         setSubmitted(true);
+
+        const isCompletedOnBackend =
+          Boolean(serverResult?.courseCompleted) ||
+          (Boolean(serverResult?.passed) &&
+            (quiz?.type === 'FINAL' ||
+              quiz?.quizType === 'FINAL' ||
+              quiz?.isFinal ||
+              quiz?.isFinalQuiz));
+
+        if (isCompletedOnBackend) {
+          notifyEnrollmentUpdated({
+            source: 'quiz-final-assessment-completed',
+            courseCompleted: true,
+          });
+        }
 
         if (serverResult?.passed) {
           confetti({
@@ -450,10 +505,34 @@ export default function QuizModal({
   ) => {
     if (submitted || submitting) return;
 
+    const currentQuestion = (attempt?.questions || []).find(
+      (q) => String(q.id) === String(questionId)
+    );
+    const isMultiSelect = currentQuestion?.questionType === 'MULTI_SELECT';
+
     setAnswers((prev) => {
+      let nextValue;
+      if (isMultiSelect) {
+        const existing = (prev[questionId] || '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const exists = existing.includes(optionValue);
+        let updated;
+        if (exists) {
+          updated = existing.filter((v) => v !== optionValue);
+        } else {
+          updated = [...existing, optionValue];
+        }
+        updated.sort();
+        nextValue = updated.join(',');
+      } else {
+        nextValue = optionValue;
+      }
+
       const next = {
         ...prev,
-        [questionId]: optionValue,
+        [questionId]: nextValue,
       };
 
       answersRef.current = next;
@@ -478,6 +557,14 @@ export default function QuizModal({
 
   const isPassed = Boolean(result?.passed);
 
+  const isFinalQuiz =
+    quiz?.type === 'FINAL' ||
+    quiz?.quizType === 'FINAL' ||
+    result?.quizType === 'FINAL' ||
+    cooldownStatus?.quizType === 'FINAL' ||
+    Boolean(quiz?.isFinal) ||
+    Boolean(quiz?.isFinalQuiz);
+
   const passingScore =
     Number(
       result?.passingScore ??
@@ -488,7 +575,7 @@ export default function QuizModal({
 
   const handleGenerateCertificate =
     async () => {
-      if (!isPassed) return;
+      if (!isPassed || !isFinalQuiz) return;
 
       setGeneratingCert(true);
 
@@ -690,13 +777,13 @@ export default function QuizModal({
               }}
             >
               {cooldownIsActive
-                ? 'Maximum quiz attempts reached. You can try again when the cooldown ends.'
+                ? 'You did not pass this assessment. Try again after 5-minute.'
                 : error}
             </p>
 
             {cooldownIsActive && (
               <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 12, padding: '1rem', margin: '0 auto 1.5rem', maxWidth: 360 }}>
-                <div style={{ color: '#9f1239', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Retry available in</div>
+                <div style={{ color: '#9f1239', fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Quiz available in</div>
                 <div aria-live="polite" style={{ color: '#be123c', fontSize: '1.8rem', fontWeight: 900, margin: '0.35rem 0' }}>{formatCooldown(cooldownSecondsRemaining)}</div>
                 {cooldownStatus?.retryAvailableAt && (
                   <div style={{ color: '#881337', fontSize: '0.8rem' }}>Available at: {new Date(cooldownStatus.retryAvailableAt).toLocaleString()}</div>
@@ -752,7 +839,7 @@ export default function QuizModal({
                 fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8',
                 textTransform: 'uppercase', letterSpacing: '1px'
               }}>
-                HR/Admin · Read-only preview
+                Read-only preview
               </div>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0.25rem 0 0' }}>
                 {previewData?.title || quiz?.title || 'Quiz Preview'}
@@ -782,7 +869,7 @@ export default function QuizModal({
                   Time limit: {previewData.timeLimitMinutes ?? '—'} min
                 </span>
                 <span style={{ background: '#f1f5f9', padding: '0.4rem 0.65rem', borderRadius: 7 }}>
-                  Max attempts: {previewData.maxAttempts ?? '—'}
+                  Retake policy: 5-minute cooldown
                 </span>
               </div>
             )}
@@ -813,7 +900,10 @@ export default function QuizModal({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {optionEntries.map(([key, value]) => {
                       const optionKey = String(key ?? '').trim().toUpperCase();
-                      const isCorrect = optionKey === correctAnswer;
+                      const isCorrect = correctAnswer
+                        .split(',')
+                        .map((s) => s.trim().toUpperCase())
+                        .includes(optionKey);
                       return (
                         <div key={optionKey} style={{
                           display: 'flex', alignItems: 'center', gap: '0.65rem',
@@ -822,8 +912,7 @@ export default function QuizModal({
                           background: isCorrect ? '#f0fdf4' : '#f8fafc',
                           color: isCorrect ? '#166534' : '#334155'
                         }}>
-                          <span style={{ fontWeight: 800, minWidth: 22 }}>{optionKey}.</span>
-                          <span style={{ flex: 1 }}>{value ?? '—'}</span>
+                          <span style={{ flex: 1 }}>{cleanOptionText(value) ?? '—'}</span>
                           {isCorrect && <span style={{ fontSize: '0.75rem', fontWeight: 800, whiteSpace: 'nowrap' }}>✓ Correct answer</span>}
                         </div>
                       );
@@ -1070,6 +1159,12 @@ export default function QuizModal({
                   {currentQ?.question}
                 </div>
 
+                {currentQ?.questionType === 'MULTI_SELECT' && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: '#0369a1', background: '#e0f2fe', padding: '4px 9px', borderRadius: 6, fontWeight: 700, marginBottom: '0.75rem', width: 'fit-content' }}>
+                    Multiple Answers (Select all that apply)
+                  </div>
+                )}
+
                 <div
                   style={{
                     display: 'flex',
@@ -1079,9 +1174,11 @@ export default function QuizModal({
                 >
                   {(currentQ?.options || []).map(
                     (opt) => {
-                      const isSelected =
-                        answers[currentQ.id] ===
-                        opt.value;
+                      const isMultiSelect = currentQ?.questionType === 'MULTI_SELECT';
+                      const selectedValues = isMultiSelect
+                        ? (answers[currentQ.id] || '').split(',').map((s) => s.trim()).filter(Boolean)
+                        : [answers[currentQ.id]];
+                      const isSelected = selectedValues.includes(opt.value);
 
                       return (
                         <button
@@ -1122,18 +1219,25 @@ export default function QuizModal({
                             style={{
                               width: 22,
                               height: 22,
-                              borderRadius: '50%',
+                              borderRadius: isMultiSelect ? 4 : '50%',
                               border: isSelected
-                                ? '7px solid #0284c7'
+                                ? (isMultiSelect ? 'none' : '7px solid #0284c7')
                                 : '2px solid #cbd5e1',
-                              background: 'white',
-                              display: 'inline-block',
+                              background: isSelected && isMultiSelect ? '#0284c7' : 'white',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'white',
+                              fontSize: '0.85rem',
+                              fontWeight: 900,
                               flexShrink: 0,
                             }}
-                          />
+                          >
+                            {isSelected && isMultiSelect ? '✓' : ''}
+                          </span>
 
-                          <span>
-                            {opt.value}. {opt.text}
+                          <span style={{ flex: 1 }}>
+                            {cleanOptionText(opt.text)}
                           </span>
                         </button>
                       );
@@ -1200,7 +1304,7 @@ export default function QuizModal({
                   <button
                     className="btn-primary"
                     onClick={() =>
-                      submitCurrentAttempt(false)
+                      setShowConfirmSubmit(true)
                     }
                     disabled={
                       submitting ||
@@ -1232,7 +1336,7 @@ export default function QuizModal({
                         Submitting...
                       </span>
                     ) : (
-                      'Submit Final Assessment'
+                      'Submit'
                     )}
                   </button>
                 )}
@@ -1324,8 +1428,8 @@ export default function QuizModal({
                 }}
               >
                 {isPassed
-                  ? `You passed the assessment. The required passing score is ${passingScore}%.`
-                  : `You need ${passingScore}% to pass this assessment.`}
+                  ? ``
+                  : `You need atleast ${passingScore}% to pass this assessment.`}
               </p>
 
               <div
@@ -1439,7 +1543,7 @@ export default function QuizModal({
                       color: '#2563eb',
                     }}
                   >
-                    {result?.remainingAttempts ?? 0}
+                    {result?.attemptsUsed ?? 1}
                   </div>
                   <div
                     style={{
@@ -1447,7 +1551,7 @@ export default function QuizModal({
                       color: '#64748b',
                     }}
                   >
-                    Attempts Left
+                    Attempt Count
                   </div>
                 </div>
               </div>
@@ -1461,59 +1565,84 @@ export default function QuizModal({
                 }}
               >
                 {isPassed ? (
-                  <button
-                    className="btn-primary"
-                    disabled={
-                      generatingCert ||
-                      isLoading
-                    }
-                    onClick={
-                      handleGenerateCertificate
-                    }
-                    style={{
-                      background:
-                        'linear-gradient(135deg, #10b981, #059669)',
-                      padding:
-                        '0.75rem 1.5rem',
-                      fontSize: '0.95rem',
-                    }}
-                  >
-                    {generatingCert ||
-                    isLoading ? (
-                      <span
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        <Loader2
-                          className="animate-spin"
+                  isFinalQuiz ? (
+                    <button
+                      className="btn-primary"
+                      disabled={
+                        generatingCert ||
+                        isLoading
+                      }
+                      onClick={
+                        handleGenerateCertificate
+                      }
+                      style={{
+                        background:
+                          'linear-gradient(135deg, #10b981, #059669)',
+                        padding:
+                          '0.75rem 1.5rem',
+                        fontSize: '0.95rem',
+                      }}
+                    >
+                      {generatingCert ||
+                      isLoading ? (
+                        <span
                           style={{
-                            width: 20,
-                            height: 20,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
                           }}
-                        />
-                        Generating Credential...
-                      </span>
-                    ) : (
-                      <span
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                        }}
-                      >
-                        <Award
+                        >
+                          <Loader2
+                            className="animate-spin"
+                            style={{
+                              width: 20,
+                              height: 20,
+                            }}
+                          />
+                          Generating Credential...
+                        </span>
+                      ) : (
+                        <span
                           style={{
-                            width: 20,
-                            height: 20,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
                           }}
-                        />
-                        View & Download Certificate
-                      </span>
-                    )}
-                  </button>
+                        >
+                          <Award
+                            style={{
+                              width: 20,
+                              height: 20,
+                            }}
+                          />
+                          View & Download Certificate
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn-primary"
+                      onClick={onClose}
+                      style={{
+                        background:
+                          'linear-gradient(135deg, #10b981, #059669)',
+                        padding:
+                          '0.75rem 1.5rem',
+                        fontSize: '0.95rem',
+                      }}
+                    >
+                      <CheckCircle
+                        style={{
+                          width: 20,
+                          height: 20,
+                          marginRight: '0.5rem',
+                          display: 'inline-block',
+                          verticalAlign: 'middle',
+                        }}
+                      />
+                      Module Quiz Passed — Continue Course
+                    </button>
+                  )
                 ) : (
                   <button
                     className="btn-secondary"
@@ -1521,9 +1650,7 @@ export default function QuizModal({
                     disabled={
                       loadingQuiz ||
                       submitting ||
-                      Number(
-                        result?.remainingAttempts ?? 0
-                      ) <= 0
+                      cooldownIsActive
                     }
                     style={{
                       padding:
@@ -1536,11 +1663,9 @@ export default function QuizModal({
                         height: 16,
                       }}
                     />
-                    {Number(
-                      result?.remainingAttempts ?? 0
-                    ) > 0
-                      ? 'Retake Assessment'
-                      : 'No Attempts Remaining'}
+                    {cooldownIsActive
+                      ? `Cooldown Active (${formatCooldown(cooldownSecondsRemaining)})`
+                      : 'Retake Assessment'}
                   </button>
                 )}
 
@@ -1555,6 +1680,114 @@ export default function QuizModal({
           )}
         </div>
       </div>
+
+      {showConfirmSubmit && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '1rem',
+            backdropFilter: 'blur(3px)',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '16px',
+              maxWidth: '460px',
+              width: '100%',
+              padding: '1.75rem',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08)',
+              border: '1px solid #e2e8f0',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '50%',
+                backgroundColor: '#eff6ff',
+                color: '#2563eb',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1rem auto',
+              }}
+            >
+              <AlertCircle size={28} />
+            </div>
+
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
+              Submit Assessment?
+            </h3>
+
+            <p style={{ fontSize: '0.88rem', color: '#64748b', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              You have answered <strong>{questions.filter(q => (answers[q.id] || []).length > 0).length}</strong> of <strong>{questions.length}</strong> questions.
+            </p>
+
+            {questions.length - questions.filter(q => (answers[q.id] || []).length > 0).length > 0 && (
+              <div
+                style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fef3c7',
+                  borderRadius: '8px',
+                  padding: '0.75rem 1rem',
+                  color: '#b45309',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  textAlign: 'left',
+                }}
+              >
+                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                <span>
+                  You have {questions.length - questions.filter(q => (answers[q.id] || []).length > 0).length} unanswered question(s). Unanswered questions will receive 0 marks.
+                </span>
+              </div>
+            )}
+
+            <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginBottom: '1.5rem', lineHeight: 1.4 }}>
+              Once submitted, your answers will be evaluated by the server. If you do not pass, a 5-minute cooldown period applies before retrying.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button
+                className="btn-secondary"
+                onClick={() => setShowConfirmSubmit(false)}
+                style={{ flex: 1, padding: '0.65rem 1rem', fontWeight: 600 }}
+              >
+                Return to Quiz
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setShowConfirmSubmit(false);
+                  submitCurrentAttempt(false);
+                }}
+                disabled={submitting}
+                style={{
+                  flex: 1,
+                  padding: '0.65rem 1rem',
+                  fontWeight: 600,
+                  backgroundColor: '#059669',
+                  borderColor: '#059669',
+                }}
+              >
+                {submitting ? 'Submitting...' : 'Yes, Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

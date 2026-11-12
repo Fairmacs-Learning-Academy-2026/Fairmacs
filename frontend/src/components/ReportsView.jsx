@@ -52,7 +52,7 @@ const API_BASE_URL =
 
 
 
-const ReportsView = ({ currentRole }) => {
+const ReportsView = ({ currentRole, embedded = false }) => {
 
   const { user, token } = useAuth();
 
@@ -84,6 +84,8 @@ const ReportsView = ({ currentRole }) => {
 
   const isManager = role.includes('MANAGER');
   const isHR = role === 'HR_ADMIN' || role === 'ADMIN';
+  const isTrainer = role.includes('TRAINER');
+  const isAnalyticsRole = isHR || isTrainer;
 
 
 
@@ -104,6 +106,12 @@ const ReportsView = ({ currentRole }) => {
   const [hrReport, setHrReport] = useState(null);
   const [hrLoading, setHrLoading] = useState(false);
   const [hrError, setHrError] = useState('');
+
+  const [courseSearch, setCourseSearch] = useState('');
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('ALL');
+  const [selectedDateRange, setSelectedDateRange] = useState('ALL');
+  const [courseSortBy, setCourseSortBy] = useState('COMPLETION_DESC');
+  const [learnerSearch, setLearnerSearch] = useState('');
 
 
 
@@ -233,15 +241,35 @@ const ReportsView = ({ currentRole }) => {
   // ============================================================
 
   useEffect(() => {
-    if (!isHR || !token) return;
+    if (!isManager && !isAnalyticsRole && user && token) {
+      const currentEmployee = {
+        userId: user.id || user.userId,
+        id: user.id || user.userId,
+        name: user.name || user.fullName || 'Employee',
+        employeeId: user.employeeId || 'EMP',
+        department: user.department || 'General',
+        designation: user.designation || 'Learner',
+        email: user.email || ''
+      };
+      setSelectedEmployee(currentEmployee);
+      loadEmployeeTranscript(currentEmployee);
+    }
+  }, [isManager, isAnalyticsRole, user, token]);
 
-    const loadHrReport = async () => {
+  useEffect(() => {
+    if (!isAnalyticsRole || !token) return;
+
+    const loadAnalyticsReport = async () => {
       setHrLoading(true);
       setHrError('');
 
+      const endpoint = isHR
+        ? `${API_BASE_URL}/hr/reports/training`
+        : `${API_BASE_URL}/trainer/reports`;
+
       try {
         const response = await fetch(
-          `${API_BASE_URL}/hr/reports/training`,
+          endpoint,
           {
             method: 'GET',
             headers: {
@@ -253,23 +281,23 @@ const ReportsView = ({ currentRole }) => {
 
         if (!response.ok) {
           throw new Error(
-            `Failed to load HR reports (${response.status})`
+            `Failed to load training reports (${response.status})`
           );
         }
 
         setHrReport(await response.json());
       } catch (err) {
-        console.error('HR reports error:', err);
+        console.error('Training reports error:', err);
         setHrError(
-          err.message || 'Unable to load HR reports.'
+          err.message || 'Unable to load training reports.'
         );
       } finally {
         setHrLoading(false);
       }
     };
 
-    loadHrReport();
-  }, [isHR, token]);
+    loadAnalyticsReport();
+  }, [isAnalyticsRole, isHR, token]);
 
 
 
@@ -676,6 +704,80 @@ const exportHrReportToExcel = async () => {
   }
 };
 
+const exportHrReportToPdf = async () => {
+  if (!hrReport) {
+    alert('HR report data is not available.');
+    return;
+  }
+
+  try {
+    const doc = createPdfDocument(
+      'HR Training Reports & Analytics',
+      'Organization-wide training progress, compliance, employee status, and department performance'
+    );
+
+    addPdfTable(doc, ['Executive Metric', 'Value'], [
+      ['Total Employees', hrReport.totalEmployees ?? 0],
+      ['Active Employees', hrReport.activeEmployees ?? 0],
+      ['Total Training Assignments', hrReport.totalAssignments ?? 0],
+      ['Completed Assignments', hrReport.completedAssignments ?? 0],
+      ['In Progress Assignments', hrReport.inProgressAssignments ?? 0],
+      ['Not Started Assignments', hrReport.notStartedAssignments ?? 0],
+      ['Overdue Assignments', hrReport.overdueAssignments ?? 0],
+      ['Mandatory Assignments', hrReport.mandatoryAssignments ?? 0],
+      ['Mandatory Completed', hrReport.mandatoryCompleted ?? 0],
+      ['Mandatory Compliance Rate', `${hrReport.mandatoryComplianceRate ?? 0}%`],
+      ['Average Training Progress', `${hrReport.averageProgress ?? 0}%`],
+      ['Average Assessment Score', `${hrReport.averageScore ?? 0}%`],
+      ['Certificates Issued', hrReport.certificatesIssued ?? 0]
+    ]);
+
+    const departments = Array.isArray(hrReport.departmentReports) ? hrReport.departmentReports : [];
+    if (departments.length) {
+      addPdfTable(
+        doc,
+        ['Department', 'Employees', 'Assignments', 'Completed', 'Completion Rate', 'Mandatory Rate', 'Overdue'],
+        departments.map((d) => [
+          d.department || '—',
+          d.employeeCount ?? 0,
+          d.totalAssignments ?? 0,
+          d.completedAssignments ?? 0,
+          `${d.completionRate ?? 0}%`,
+          `${d.mandatoryComplianceRate ?? 0}%`,
+          d.overdueAssignments ?? 0
+        ]),
+        (doc.lastAutoTable ? doc.lastAutoTable.finalY : 35) + 8
+      );
+    }
+
+    const employees = Array.isArray(hrReport.employeeReports) ? hrReport.employeeReports : [];
+    if (employees.length) {
+      addPdfTable(
+        doc,
+        ['Employee ID', 'Name', 'Department', 'Assigned', 'Completed', 'In Progress', 'Progress', 'Mandatory', 'Overdue'],
+        employees.map((e) => [
+          e.employeeId || '—',
+          e.name || '—',
+          e.department || '—',
+          e.assignedCourses ?? 0,
+          e.completedCourses ?? 0,
+          e.inProgressCourses ?? 0,
+          `${e.averageProgress ?? 0}%`,
+          `${e.mandatoryCompleted ?? 0} / ${e.mandatoryCourses ?? 0}`,
+          e.overdueCourses ?? 0
+        ]),
+        (doc.lastAutoTable ? doc.lastAutoTable.finalY : 35) + 8
+      );
+    }
+
+    downloadPdfDocument(doc, `Fairmacs_HR_Training_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  } catch (err) {
+    console.error('HR PDF export error:', err);
+    alert(err.message || 'Unable to export HR report PDF.');
+  }
+};
+
+
 
 const exportEmployeeReportToExcel = async (employee) => {
   const employeeUserId = employee?.userId ?? employee?.id;
@@ -925,19 +1027,17 @@ const exportEmployeeReportToExcel = async (employee) => {
 
 
       if (!response.ok) {
-
         const text = await response.text();
-
-
-
-        throw new Error(
-
-          text ||
-
-            `Failed to load employee transcript (${response.status})`
-
-        );
-
+        let errorMessage = text || `Failed to load employee transcript (${response.status})`;
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && typeof parsed.message === 'string' && parsed.message.trim()) {
+            errorMessage = parsed.message.trim();
+          }
+        } catch {
+          // Non-JSON response text; preserve raw message
+        }
+        throw new Error(errorMessage);
       }
 
 
@@ -2409,17 +2509,17 @@ const exportEmployeeReportToExcel = async (employee) => {
 
   
   // ============================================================
-  // HR ADMIN REPORTS
+  // HR ADMIN & TRAINER ANALYTICS REPORTS
   // ============================================================
 
-  if (isHR && hrLoading) {
+  if (isAnalyticsRole && hrLoading) {
     return (
       <div style={{
-        minHeight: '500px',
+        minHeight: embedded ? '300px' : '500px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f8fafc'
+        background: embedded ? 'transparent' : '#f8fafc'
       }}>
         <div style={{
           display: 'flex',
@@ -2430,17 +2530,17 @@ const exportEmployeeReportToExcel = async (employee) => {
           <Loader2 size={20} style={{
             animation: 'spin 1s linear infinite'
           }} />
-          Loading HR reports...
+          {isTrainer ? 'Loading Trainer course analytics...' : 'Loading HR reports...'}
         </div>
       </div>
     );
   }
 
-  if (isHR && hrError) {
+  if (isAnalyticsRole && hrError) {
     return (
       <div style={{
-        padding: '40px 56px',
-        background: '#f8fafc',
+        padding: embedded ? '1rem 0' : '40px 56px',
+        background: embedded ? 'transparent' : '#f8fafc',
         minHeight: '100%'
       }}>
         <div style={{
@@ -2450,23 +2550,98 @@ const exportEmployeeReportToExcel = async (employee) => {
           padding: '24px',
           color: '#be123c'
         }}>
-          <strong>Unable to load HR reports</strong>
+          <strong>{isTrainer ? 'Unable to load Trainer course analytics' : 'Unable to load HR reports'}</strong>
           <div style={{ marginTop: '8px' }}>{hrError}</div>
         </div>
       </div>
     );
   }
 
-  if (isHR) {
-    const employees = Array.isArray(hrReport?.employeeReports)
+  if (isAnalyticsRole) {
+    const allEmployees = Array.isArray(hrReport?.employeeReports)
       ? hrReport.employeeReports : [];
-    const departments = Array.isArray(hrReport?.departmentReports)
+    const allDepartments = Array.isArray(hrReport?.departmentReports)
       ? hrReport.departmentReports : [];
+    const allCourses = Array.isArray(hrReport?.courseReports)
+      ? hrReport.courseReports
+      : (Array.isArray(hrReport?.courseBreakdown) ? hrReport.courseBreakdown : []);
+
+    const availableDepartments = Array.from(
+      new Set([
+        ...allDepartments.map((d) => d.department).filter(Boolean),
+        ...allCourses.map((c) => c.department || c.category).filter(Boolean)
+      ])
+    ).sort((a, b) => String(a).localeCompare(String(b)));
+
+    const nowMs = Date.now();
+    const currentYear = new Date().getFullYear();
+
+    const filteredCourses = allCourses
+      .filter((course) => {
+        if (selectedDepartmentFilter !== 'ALL') {
+          const dept = String(course.department || course.category || '');
+          if (dept.toLowerCase() !== selectedDepartmentFilter.toLowerCase()) {
+            return false;
+          }
+        }
+        if (selectedDateRange !== 'ALL') {
+          const rawDate = course.publishedAt || course.createdAt;
+          if (rawDate) {
+            const parsed = new Date(rawDate);
+            if (!Number.isNaN(parsed.getTime())) {
+              const diffDays = (nowMs - parsed.getTime()) / (1000 * 60 * 60 * 24);
+              if (selectedDateRange === 'LAST_30_DAYS' && diffDays > 30) return false;
+              if (selectedDateRange === 'LAST_90_DAYS' && diffDays > 90) return false;
+              if (selectedDateRange === 'THIS_YEAR' && parsed.getFullYear() !== currentYear) return false;
+            }
+          }
+        }
+        if (courseSearch.trim()) {
+          const q = courseSearch.trim().toLowerCase();
+          const hay = `${course.title || ''} ${course.courseId || ''} ${course.category || ''} ${course.department || ''}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      })
+      .slice()
+      .sort((a, b) => {
+        if (courseSortBy === 'ENROLLED_DESC') {
+          return (Number(b.enrolledCount ?? b.totalAssignments) || 0) - (Number(a.enrolledCount ?? a.totalAssignments) || 0);
+        }
+        if (courseSortBy === 'SCORE_DESC') {
+          return (Number(b.averageScore) || 0) - (Number(a.averageScore) || 0);
+        }
+        if (courseSortBy === 'OVERDUE_DESC') {
+          return (Number(b.overdueAssignments ?? b.overdueCount) || 0) - (Number(a.overdueAssignments ?? a.overdueCount) || 0);
+        }
+        if (courseSortBy === 'TITLE_ASC') {
+          return String(a.title || '').localeCompare(String(b.title || ''));
+        }
+        return (Number(b.completionRateExact ?? b.completionRate) || 0) - (Number(a.completionRateExact ?? a.completionRate) || 0);
+      });
+
+    const departments = selectedDepartmentFilter === 'ALL'
+      ? allDepartments
+      : allDepartments.filter((d) => String(d.department || '').toLowerCase() === selectedDepartmentFilter.toLowerCase());
+
+    const employees = allEmployees.filter((emp) => {
+      if (selectedDepartmentFilter !== 'ALL') {
+        if (String(emp.department || '').toLowerCase() !== selectedDepartmentFilter.toLowerCase()) {
+          return false;
+        }
+      }
+      if (learnerSearch.trim()) {
+        const q = learnerSearch.trim().toLowerCase();
+        const hay = `${emp.name || ''} ${emp.employeeId || ''} ${emp.department || ''} ${emp.designation || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
 
     return (
       <div style={{
-        padding: '40px 56px',
-        background: '#f8fafc',
+        padding: embedded ? '0' : '40px 56px',
+        background: embedded ? 'transparent' : '#f8fafc',
         minHeight: '100%',
         boxSizing: 'border-box'
       }}>
@@ -2484,7 +2659,7 @@ const exportEmployeeReportToExcel = async (employee) => {
               fontWeight: 750,
               color: '#172033'
             }}>
-              HR Training Reports
+              {isTrainer ? 'Trainer Course & Training Analytics' : 'HR Training Reports'}
             </h1>
 
             <p style={{
@@ -2493,33 +2668,59 @@ const exportEmployeeReportToExcel = async (employee) => {
               color: '#71809a',
               fontSize: '15px'
             }}>
-              Organization-wide training progress, compliance,
-              employee status, and department performance.
+              {isTrainer
+                ? 'Authorized course completion, enrollment, learner progress, assessment performance, and compliance analytics.'
+                : 'Organization-wide training progress, compliance, employee status, and department performance.'}
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={exportHrReportToExcel}
-            style={{
-              border: 0,
-              borderRadius: '10px',
-              padding: '12px 18px',
-              background: '#0798d1',
-              color: '#fff',
-              fontSize: '14px',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 4px 12px rgba(7, 152, 209, 0.18)'
-            }}
-          >
-            <Download size={17} />
-            Export Excel
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={exportHrReportToPdf}
+              style={{
+                border: '1px solid #cbd5e1',
+                borderRadius: '10px',
+                padding: '12px 18px',
+                background: '#ffffff',
+                color: '#334155',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)'
+              }}
+            >
+              <Download size={17} />
+              Export PDF
+            </button>
+
+            <button
+              type="button"
+              onClick={exportHrReportToExcel}
+              style={{
+                border: 0,
+                borderRadius: '10px',
+                padding: '12px 18px',
+                background: '#0798d1',
+                color: '#fff',
+                fontSize: '14px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                whiteSpace: 'nowrap',
+                boxShadow: '0 4px 12px rgba(7, 152, 209, 0.18)'
+              }}
+            >
+              <Download size={17} />
+              Export Excel
+            </button>
+          </div>
         </div>
 
         <div style={{
@@ -2531,14 +2732,14 @@ const exportEmployeeReportToExcel = async (employee) => {
           <MetricCard icon={<Users size={21} />}
             iconBackground="#e0f2fe" iconColor="#0284c7"
             value={hrReport?.totalEmployees ?? 0}
-            label="Total Employees" />
+            label={isTrainer ? 'Enrolled Learners' : 'Total Employees'} />
           <MetricCard icon={<CheckCircle2 size={21} />}
             iconBackground="#dcfce7" iconColor="#16a34a"
-            value={hrReport?.activeEmployees ?? 0}
-            label="Active Employees" />
+            value={isTrainer ? (hrReport?.activeLearners ?? hrReport?.activeEmployees ?? 0) : (hrReport?.activeEmployees ?? 0)}
+            label={isTrainer ? 'Active Learners' : 'Active Employees'} />
           <MetricCard icon={<BookOpen size={21} />}
             iconBackground="#eff8ff" iconColor="#0798d1"
-            value={hrReport?.totalAssignments ?? 0}
+            value={hrReport?.totalAssignments ?? hrReport?.totalEnrollments ?? 0}
             label="Training Assignments" />
           <MetricCard icon={<Award size={21} />}
             iconBackground="#fef3c7" iconColor="#d97706"
@@ -2599,7 +2800,7 @@ const exportEmployeeReportToExcel = async (employee) => {
                   margin: '5px 0 0',
                   fontSize: '13px',
                   color: '#71809a'
-                }}>Organization-wide training health.</p>
+                }}>{isTrainer ? 'Authorized training scope health.' : 'Organization-wide training health.'}</p>
               </div>
             </div>
 
@@ -2643,29 +2844,244 @@ const exportEmployeeReportToExcel = async (employee) => {
             </div>
 
             <StatusRow label="Completed"
-              value={hrReport?.completedAssignments ?? 0}
-              total={hrReport?.totalAssignments ?? 0}
+              value={hrReport?.completedAssignments ?? hrReport?.completedEnrollments ?? 0}
+              total={hrReport?.totalAssignments ?? hrReport?.totalEnrollments ?? 0}
               valueColor="#16a34a" />
             <StatusRow label="In Progress"
               value={hrReport?.inProgressAssignments ?? 0}
-              total={hrReport?.totalAssignments ?? 0}
+              total={hrReport?.totalAssignments ?? hrReport?.totalEnrollments ?? 0}
               valueColor="#0284c7" />
             <StatusRow label="Not Started"
               value={hrReport?.notStartedAssignments ?? 0}
-              total={hrReport?.totalAssignments ?? 0}
+              total={hrReport?.totalAssignments ?? hrReport?.totalEnrollments ?? 0}
               valueColor="#64748b" />
             <StatusRow label="Overdue"
               value={hrReport?.overdueAssignments ?? 0}
-              total={hrReport?.totalAssignments ?? 0}
+              total={hrReport?.totalAssignments ?? hrReport?.totalEnrollments ?? 0}
               valueColor="#e11d48" />
           </section>
         </div>
+
+        {/* ======================================================
+            SHARED COURSE ANALYTICS & REPORTS (HR & TRAINER)
+        ====================================================== */}
+        <section style={{
+          background: '#fff',
+          border: '1px solid #e2e8f0',
+          borderRadius: '16px',
+          padding: '22px',
+          marginBottom: '24px',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            gap: '14px',
+            marginBottom: '18px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <IconBox><BookOpen size={20} /></IconBox>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '18px', color: '#172033' }}>
+                  Course Analytics & Reports
+                </h2>
+                <p style={{ margin: '5px 0 0', fontSize: '13px', color: '#71809a' }}>
+                  Course-level enrollments, completion rates, learner progress, assessment scores, and compliance.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="text"
+                value={courseSearch}
+                onChange={(e) => setCourseSearch(e.target.value)}
+                placeholder="Search courses..."
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '9px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  color: '#1e293b',
+                  minWidth: '180px'
+                }}
+              />
+              <select
+                value={selectedDepartmentFilter}
+                onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '9px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  color: '#1e293b',
+                  background: '#fff'
+                }}
+              >
+                <option value="ALL">All Departments / Categories</option>
+                {availableDepartments.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+              <select
+                value={selectedDateRange}
+                onChange={(e) => setSelectedDateRange(e.target.value)}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '9px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  color: '#1e293b',
+                  background: '#fff'
+                }}
+              >
+                <option value="ALL">All Time</option>
+                <option value="LAST_30_DAYS">Last 30 Days</option>
+                <option value="LAST_90_DAYS">Last 90 Days</option>
+                <option value="THIS_YEAR">This Year</option>
+              </select>
+              <select
+                value={courseSortBy}
+                onChange={(e) => setCourseSortBy(e.target.value)}
+                style={{
+                  padding: '9px 12px',
+                  borderRadius: '9px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '13px',
+                  color: '#1e293b',
+                  background: '#fff'
+                }}
+              >
+                <option value="COMPLETION_DESC">Sort: Completion Rate</option>
+                <option value="ENROLLED_DESC">Sort: Most Enrolled</option>
+                <option value="SCORE_DESC">Sort: Highest Avg Score</option>
+                <option value="OVERDUE_DESC">Sort: Most Overdue</option>
+                <option value="TITLE_ASC">Sort: Course Title (A–Z)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {[
+                    'Course',
+                    'Category / Dept',
+                    'Enrolled',
+                    'Completed',
+                    'In Progress',
+                    'Completion Rate',
+                    'Avg Progress',
+                    'Avg Score',
+                    'Mandatory',
+                    'Overdue',
+                    'Certificates'
+                  ].map((col) => (
+                    <th
+                      key={col}
+                      style={{
+                        textAlign: 'left',
+                        padding: '12px 14px',
+                        background: '#f8fafc',
+                        color: '#66758f',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {col}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCourses.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} style={{ padding: '35px', textAlign: 'center', color: '#64748b' }}>
+                      No courses match the selected filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCourses.map((course) => {
+                    const cEnrolled = course.totalAssignments ?? course.enrolledCount ?? 0;
+                    const cCompleted = course.completedAssignments ?? course.completedCount ?? 0;
+                    const cInProgress = course.inProgressAssignments ?? course.inProgressCount ?? 0;
+                    const cRate = Number(course.completionRateExact ?? course.completionRate) || 0;
+                    const cProgress = Number(course.averageProgress ?? cRate) || 0;
+                    const cScore = Number(course.averageScore) || 0;
+                    const cMandatory = course.mandatoryAssignments ?? 0;
+                    const cMandatoryDone = course.mandatoryCompleted ?? 0;
+                    const cOverdue = course.overdueAssignments ?? course.overdueCount ?? 0;
+                    const cCerts = course.certificatesIssued ?? 0;
+
+                    return (
+                      <tr key={course.id || course.courseId || course.title}>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7' }}>
+                          <div style={{ fontWeight: 700, color: '#172033', fontSize: '13px' }}>
+                            {course.title || 'Untitled Course'}
+                          </div>
+                          <div style={{ marginTop: '3px', fontSize: '11px', color: '#71809a' }}>
+                            {course.courseId || '—'}
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontSize: '13px', color: '#475569', whiteSpace: 'nowrap' }}>
+                          {course.department || course.category || 'General'}
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontWeight: 650, color: '#172033' }}>
+                          {cEnrolled}
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontWeight: 700, color: '#16a34a' }}>
+                          {cCompleted}
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontWeight: 650, color: '#0284c7' }}>
+                          {cInProgress}
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', minWidth: '130px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '11px', fontWeight: 700, color: '#334155' }}>
+                            <span>{cRate}%</span>
+                          </div>
+                          <div style={{ height: '6px', borderRadius: '999px', background: '#e2e8f0', overflow: 'hidden' }}>
+                            <div style={{
+                              width: `${Math.min(100, Math.max(0, cRate))}%`,
+                              height: '100%',
+                              borderRadius: '999px',
+                              background: cRate >= 100 ? '#16a34a' : cRate >= 70 ? '#0798d1' : '#f59e0b'
+                            }} />
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontWeight: 650, color: '#334155' }}>
+                          {cProgress}%
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontWeight: 700, color: '#7c3aed' }}>
+                          {cScore}%
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontSize: '12px', fontWeight: 650, color: '#475569', whiteSpace: 'nowrap' }}>
+                          {cMandatoryDone} / {cMandatory}
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontWeight: 700, color: Number(cOverdue) > 0 ? '#e11d48' : '#64748b' }}>
+                          {cOverdue}
+                        </td>
+                        <td style={{ padding: '14px', borderTop: '1px solid #edf2f7', fontWeight: 700, color: '#d97706' }}>
+                          {cCerts}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         <ReportTable
           title="Department Performance"
           icon={<BarChart3 size={20} />}
           columns={[
-            'Department', 'Employees', 'Assignments',
+            'Department', isTrainer ? 'Learners' : 'Employees', 'Assignments',
             'Completion', 'Mandatory', 'Overdue'
           ]}
           rows={departments.map(d => [
@@ -2687,29 +3103,50 @@ const exportEmployeeReportToExcel = async (employee) => {
         }}>
           <div style={{
             display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
+            flexWrap: 'wrap',
             gap: '12px',
             marginBottom: '22px'
           }}>
-            <IconBox>
-              <Users size={20} />
-            </IconBox>
-            <div>
-              <h2 style={{
-                margin: 0,
-                fontSize: '18px',
-                color: '#172033'
-              }}>
-                Employee Training Status
-              </h2>
-              <p style={{
-                margin: '5px 0 0',
-                fontSize: '13px',
-                color: '#71809a'
-              }}>
-                Employee-wise training progress and compliance.
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <IconBox>
+                <Users size={20} />
+              </IconBox>
+              <div>
+                <h2 style={{
+                  margin: 0,
+                  fontSize: '18px',
+                  color: '#172033'
+                }}>
+                  {isTrainer ? 'Enrolled Learner Training Status' : 'Employee Training Status'}
+                </h2>
+                <p style={{
+                  margin: '5px 0 0',
+                  fontSize: '13px',
+                  color: '#71809a'
+                }}>
+                  {isTrainer
+                    ? 'Learner-wise progress and compliance across your authorized courses.'
+                    : 'Employee-wise training progress and compliance.'}
+                </p>
+              </div>
             </div>
+
+            <input
+              type="text"
+              value={learnerSearch}
+              onChange={(e) => setLearnerSearch(e.target.value)}
+              placeholder="Search learners..."
+              style={{
+                padding: '9px 12px',
+                borderRadius: '9px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                color: '#1e293b',
+                minWidth: '200px'
+              }}
+            />
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{
@@ -2772,11 +3209,18 @@ const exportEmployeeReportToExcel = async (employee) => {
                 borderTop: '1px solid #edf2f7',
                 whiteSpace: 'nowrap'
               }}>
-                <div style={{
-                  fontWeight: 700,
-                  color: '#172033',
-                  fontSize: '13px'
-                }}>
+                <div
+                  onClick={() => loadEmployeeTranscript(employee)}
+                  style={{
+                    fontWeight: 700,
+                    color: '#0284c7',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '2px'
+                  }}
+                  title="Click to view detailed employee transcript"
+                >
                   {employee.name || '—'}
                 </div>
 
@@ -2907,30 +3351,55 @@ const exportEmployeeReportToExcel = async (employee) => {
                 padding: '15px 14px',
                 borderTop: '1px solid #edf2f7'
               }}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    exportEmployeeReportToExcel(employee)
-                  }
-                  style={{
-                    border: '1px solid #bae6fd',
-                    borderRadius: '8px',
-                    padding: '8px 11px',
-                    background: '#f0f9ff',
-                    color: '#0284c7',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    whiteSpace: 'nowrap'
-                  }}
-                  title="Export employee training report"
-                >
-                  <Download size={14} />
-                  Export
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => loadEmployeeTranscript(employee)}
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      padding: '8px 11px',
+                      background: '#ffffff',
+                      color: '#334155',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title="View employee learning transcript"
+                  >
+                    <FileText size={13} />
+                    Transcript
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      exportEmployeeReportToExcel(employee)
+                    }
+                    style={{
+                      border: '1px solid #bae6fd',
+                      borderRadius: '8px',
+                      padding: '8px 11px',
+                      background: '#f0f9ff',
+                      color: '#0284c7',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title="Export employee training report"
+                  >
+                    <Download size={13} />
+                    Export
+                  </button>
+                </div>
               </td>
 
             </tr>
@@ -2940,35 +3409,115 @@ const exportEmployeeReportToExcel = async (employee) => {
     </table>
   </div>
 </section>
+
+        {/* ======================================================
+            EMPLOYEE TRANSCRIPT MODAL (HR DRILLDOWN)
+        ====================================================== */}
+        {selectedEmployee && (
+          <TranscriptModal
+            transcript={transcript}
+            employee={selectedEmployee}
+            loading={transcriptLoading}
+            error={transcriptError}
+            onClose={closeTranscript}
+            onExportExcel={() =>
+              exportEmployeeReportToExcel(selectedEmployee)
+            }
+            onExportPdf={exportEmployeeReportToPdf}
+          />
+        )}
       </div>
     );
   }
 
 
-// FALLBACK FOR OTHER ROLES
-
+// EMPLOYEE & LEARNER TRANSCRIPT VIEW
   // ============================================================
 
-
-
   return (
-
     <div
-
       style={{
-
-        padding: '40px',
-
-        color: '#64748b'
-
+        padding: embedded ? '1rem 0' : '40px 56px',
+        maxWidth: '1200px',
+        margin: '0 auto'
       }}
-
     >
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: '#172033' }}>
+          My Course History & Training Transcript
+        </h1>
+        <p style={{ margin: '6px 0 0', fontSize: '14px', color: '#64748b' }}>
+          View and export your verified training records, quiz scores, and course completion certificates.
+        </p>
+      </div>
 
-      Reports are available for your role.
+      {transcriptLoading && (
+        <div style={{ padding: '60px 20px', textAlign: 'center', color: '#64748b' }}>
+          <Loader2 className="animate-spin" size={28} style={{ margin: '0 auto 12px', color: '#0798d1' }} />
+          Loading your learning history...
+        </div>
+      )}
 
+      {transcriptError && (
+        <div style={{ padding: '20px', borderRadius: '12px', background: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c', marginBottom: '20px' }}>
+          <strong>Unable to load transcript:</strong> {transcriptError}
+        </div>
+      )}
+
+      {!transcriptLoading && !transcriptError && (
+        <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '28px', textAlign: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '16px', background: '#eff8ff', color: '#0798d1', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <Award size={28} />
+          </div>
+          <h2 style={{ fontSize: '18px', fontWeight: 750, color: '#172033', margin: '0 0 8px' }}>
+            Personal Training Transcript
+          </h2>
+          <p style={{ color: '#64748b', fontSize: '13px', maxWidth: '480px', margin: '0 auto 20px' }}>
+            Access all courses assigned to you, track your module quiz scores, and download completion certificates.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              const currentEmployee = {
+                userId: user?.id || user?.userId,
+                id: user?.id || user?.userId,
+                name: user?.name || user?.fullName || 'Employee',
+                employeeId: user?.employeeId || 'EMP',
+                department: user?.department || 'General',
+                designation: user?.designation || 'Learner',
+                email: user?.email || ''
+              };
+              setSelectedEmployee(currentEmployee);
+              loadEmployeeTranscript(currentEmployee);
+            }}
+            style={{
+              padding: '10px 24px',
+              borderRadius: '10px',
+              background: '#0798d1',
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: '14px',
+              border: 0,
+              cursor: 'pointer'
+            }}
+          >
+            View Complete Transcript
+          </button>
+        </div>
+      )}
+
+      {selectedEmployee && (
+        <TranscriptModal
+          transcript={transcript}
+          employee={selectedEmployee}
+          loading={transcriptLoading}
+          error={transcriptError}
+          onClose={closeTranscript}
+          onExportExcel={() => exportEmployeeReportToExcel(selectedEmployee)}
+          onExportPdf={exportEmployeeReportToPdf}
+        />
+      )}
     </div>
-
   );
 
 };
@@ -2984,45 +3533,27 @@ const exportEmployeeReportToExcel = async (employee) => {
 
 
 const MetricCard = ({
-
   icon,
-
   iconBackground,
-
   iconColor,
-
   value,
-
   label
-
 }) => (
-
   <div
-
+    className="stat-card"
     style={{
-
-      background: '#fff',
-
-      border: '1px solid #e2e8f0',
-
-      borderRadius: '15px',
-
+      background: 'rgba(255, 255, 255, 0.78)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255, 255, 255, 0.85)',
+      borderRadius: '16px',
       padding: '22px',
-
       display: 'flex',
-
       alignItems: 'center',
-
       gap: '16px',
-
       minHeight: '94px',
-
-      boxShadow:
-
-        '0 2px 8px rgba(15, 23, 42, 0.04)'
-
+      boxShadow: '0 8px 30px rgba(31, 70, 120, 0.06)'
     }}
-
   >
 
     <div
@@ -3474,6 +4005,19 @@ const TranscriptModal = ({
   onExportExcel,
   onExportPdf
 }) => {
+
+  const [courseFilter, setCourseFilter] = useState('ALL');
+
+  const allCourses = Array.isArray(transcript?.courses) ? transcript.courses : [];
+  const filteredCourses = allCourses.filter((course) => {
+    if (courseFilter === 'MANDATORY') {
+      return course.assignmentType === 'Mandatory' || String(course.enrollmentType || '').toUpperCase() === 'MANDATORY';
+    }
+    if (courseFilter === 'RECOMMENDED') {
+      return course.assignmentType === 'Recommended' || String(course.enrollmentType || '').toUpperCase() === 'RECOMMENDED' || String(course.enrollmentType || '').toUpperCase() === 'SELF_SELECTED';
+    }
+    return true;
+  });
 
   const formatDate = (value) => {
 
@@ -4641,610 +5185,211 @@ const TranscriptModal = ({
 
 
 
-                  {Array.isArray(
-
-                    transcript.courses
-
-                  ) &&
-
-                  transcript.courses.length > 0 ? (
-
-                    <div
-
-                      style={{
-
-                        overflowX: 'auto'
-
-                      }}
-
-                    >
-
-                      <div
-
-                        style={{
-
-                          minWidth:
-
-                            '900px'
-
-                        }}
-
-                      >
-
-                        {/* TABLE HEADER */}
-
-
-
-                        <div
-
+                  {/* FILTER CONTROLS */}
+                  <div
+                    style={{
+                      padding: '14px 20px',
+                      borderBottom: '1px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                      background: '#fcfdfe'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748b' }}>Filter:</span>
+                      {['ALL', 'MANDATORY', 'RECOMMENDED'].map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setCourseFilter(f)}
                           style={{
-
-                            display: 'grid',
-
-                            gridTemplateColumns:
-
-                              '2fr 1fr 0.9fr 1fr 1fr 1.2fr 1.2fr',
-
-                            gap: '12px',
-
-                            padding:
-
-                              '12px 18px',
-
-                            background:
-
-                              '#f8fafc',
-
-                            color:
-
-                              '#66758f',
-
-                            fontSize:
-
-                              '10px',
-
+                            padding: '5px 12px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
                             fontWeight: 700,
-
-                            textTransform:
-
-                              'uppercase'
-
+                            cursor: 'pointer',
+                            border: '1px solid',
+                            borderColor: courseFilter === f ? '#0798d1' : '#cbd5e1',
+                            background: courseFilter === f ? '#0798d1' : '#fff',
+                            color: courseFilter === f ? '#fff' : '#64748b',
+                            transition: 'all 0.15s ease'
                           }}
-
                         >
+                          {f === 'ALL' ? 'All Courses' : f === 'MANDATORY' ? 'Mandatory' : 'Recommended'}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      Showing {filteredCourses.length} of {allCourses.length} training records
+                    </div>
+                  </div>
 
-                          <div>
-
-                            Course
-
-                          </div>
-
-                          <div>
-
-                            Type
-
-                          </div>
-
-                          <div>
-
-                            Progress
-
-                          </div>
-
-                          <div>
-
-                            Score
-
-                          </div>
-
-                          <div>
-
-                            Status
-
-                          </div>
-
-                          <div>
-
-                            Due Date
-
-                          </div>
-
-                          <div>
-
-                            Certificate
-
-                          </div>
-
+                  {allCourses.length > 0 ? (
+                    filteredCourses.length > 0 ? (
+                    <div
+                      style={{
+                        overflowX: 'auto'
+                      }}
+                    >
+                      <div
+                        style={{
+                          minWidth: '950px'
+                        }}
+                      >
+                        {/* TABLE HEADER */}
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '2fr 1.1fr 1.1fr 1fr 0.9fr 0.8fr 1fr 1.1fr 1.1fr',
+                            gap: '12px',
+                            padding: '12px 18px',
+                            background: '#f8fafc',
+                            color: '#66758f',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          <div>Course</div>
+                          <div>Owning Dept</div>
+                          <div>Employee Dept</div>
+                          <div>Assignment</div>
+                          <div>Progress</div>
+                          <div>Score</div>
+                          <div>Status</div>
+                          <div>Completion / Due</div>
+                          <div>Certificate</div>
                         </div>
 
-
-
                         {/* COURSE ROWS */}
-
-
-
-                        {transcript.courses.map(
-
-                          (course) => {
-
-                            const courseStatus =
-
-                              getCourseStatusStyle(
-
-                                course.status
-
-                              );
-
-
-
-                            return (
-
-                              <div
-
-                                key={
-
-                                  course.enrollmentId
-
-                                }
-
-                                style={{
-
-                                  display:
-
-                                    'grid',
-
-                                  gridTemplateColumns:
-
-                                    '2fr 1fr 0.9fr 1fr 1fr 1.2fr 1.2fr',
-
-                                  gap: '12px',
-
-                                  alignItems:
-
-                                    'center',
-
-                                  padding:
-
-                                    '16px 18px',
-
-                                  borderTop:
-
-                                    '1px solid #edf2f7'
-
-                                }}
-
-                              >
-
-                                {/* COURSE */}
-
-
-
-                                <div>
-
-                                  <div
-
-                                    style={{
-
-                                      fontSize:
-
-                                        '13px',
-
-                                      fontWeight:
-
-                                        700,
-
-                                      color:
-
-                                        '#172033'
-
-                                    }}
-
-                                  >
-
-                                    {course.courseTitle ||
-
-                                      'Untitled Course'}
-
-                                  </div>
-
-
-
-                                  <div
-
-                                    style={{
-
-                                      marginTop:
-
-                                        '4px',
-
-                                      fontSize:
-
-                                        '11px',
-
-                                      color:
-
-                                        '#71809a'
-
-                                    }}
-
-                                  >
-
-                                    {course.courseId ||
-
-                                      '—'}
-
-                                  </div>
-
+                        {filteredCourses.map((course) => {
+                          const courseStatus = getCourseStatusStyle(course.status);
+                          const isMandatory = course.assignmentType === 'Mandatory' || String(course.enrollmentType || '').toUpperCase() === 'MANDATORY';
+                          return (
+                            <div
+                              key={course.enrollmentId || course.courseId}
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: '2fr 1.1fr 1.1fr 1fr 0.9fr 0.8fr 1fr 1.1fr 1.1fr',
+                                gap: '12px',
+                                alignItems: 'center',
+                                padding: '16px 18px',
+                                borderTop: '1px solid #edf2f7'
+                              }}
+                            >
+                              {/* COURSE */}
+                              <div>
+                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#172033' }}>
+                                  {course.courseTitle || 'Untitled Course'}
                                 </div>
-
-
-
-                                {/* TYPE */}
-
-
-
-                                <div
-
-                                  style={{
-
-                                    fontSize:
-
-                                      '11px',
-
-                                    fontWeight:
-
-                                      650,
-
-                                    color:
-
-                                      '#475569'
-
-                                  }}
-
-                                >
-
-                                  {course.enrollmentType ||
-
-                                    '—'}
-
+                                <div style={{ marginTop: '4px', fontSize: '11px', color: '#71809a' }}>
+                                  {course.courseId || '—'}
                                 </div>
-
-
-
-                                {/* PROGRESS */}
-
-
-
-                                <div>
-
-                                  <div
-
-                                    style={{
-
-                                      fontSize:
-
-                                        '12px',
-
-                                      fontWeight:
-
-                                        700,
-
-                                      marginBottom:
-
-                                        '5px',
-
-                                      color:
-
-                                        '#172033'
-
-                                    }}
-
-                                  >
-
-                                    {course.progressPercent ??
-
-                                      0}
-
-                                    %
-
-                                  </div>
-
-
-
-                                  <div
-
-                                    style={{
-
-                                      height:
-
-                                        '6px',
-
-                                      background:
-
-                                        '#e2e8f0',
-
-                                      borderRadius:
-
-                                        '999px',
-
-                                      overflow:
-
-                                        'hidden'
-
-                                    }}
-
-                                  >
-
-                                    <div
-
-                                      style={{
-
-                                        height:
-
-                                          '100%',
-
-                                        width: `${Math.min(
-
-                                          100,
-
-                                          Math.max(
-
-                                            0,
-
-                                            Number(
-
-                                              course.progressPercent
-
-                                            ) || 0
-
-                                          )
-
-                                        )}%`,
-
-                                        background:
-
-                                          '#0798d1'
-
-                                      }}
-
-                                    />
-
-                                  </div>
-
-                                </div>
-
-
-
-                                {/* SCORE */}
-
-
-
-                                <div
-
-                                  style={{
-
-                                    fontWeight:
-
-                                      700,
-
-                                    color:
-
-                                      course.score !=
-
-                                      null
-
-                                        ? '#172033'
-
-                                        : '#94a3b8'
-
-                                  }}
-
-                                >
-
-                                  {course.score !=
-
-                                  null
-
-                                    ? `${course.score}%`
-
-                                    : '—'}
-
-                                </div>
-
-
-
-                                {/* STATUS */}
-
-
-
-                                <div>
-
-                                  <span
-
-                                    style={{
-
-                                      display:
-
-                                        'inline-flex',
-
-                                      padding:
-
-                                        '6px 9px',
-
-                                      borderRadius:
-
-                                        '999px',
-
-                                      background:
-
-                                        courseStatus.background,
-
-                                      color:
-
-                                        courseStatus.color,
-
-                                      fontSize:
-
-                                        '10px',
-
-                                      fontWeight:
-
-                                        700,
-
-                                      whiteSpace:
-
-                                        'nowrap'
-
-                                    }}
-
-                                  >
-
-                                    {String(
-
-                                      course.status ||
-
-                                        '—'
-
-                                    ).replace(
-
-                                      /_/g,
-
-                                      ' '
-
-                                    )}
-
-                                  </span>
-
-                                </div>
-
-
-
-                                {/* DUE DATE */}
-
-
-
-                                <div
-
-                                  style={{
-
-                                    display:
-
-                                      'flex',
-
-                                    alignItems:
-
-                                      'center',
-
-                                    gap: '5px',
-
-                                    fontSize:
-
-                                      '11px',
-
-                                    color:
-
-                                      '#64748b'
-
-                                  }}
-
-                                >
-
-                                  <CalendarDays
-
-                                    size={13}
-
-                                  />
-
-
-
-                                  {formatDate(
-
-                                    course.dueDate
-
-                                  )}
-
-                                </div>
-
-
-
-                                {/* CERTIFICATE */}
-
-
-
-                                <div
-
-                                  style={{
-
-                                    fontSize:
-
-                                      '11px',
-
-                                    fontWeight:
-
-                                      course.certificateId
-
-                                        ? 650
-
-                                        : 400,
-
-                                    color:
-
-                                      course.certificateId
-
-                                        ? '#15803d'
-
-                                        : '#94a3b8',
-
-                                    wordBreak:
-
-                                      'break-word'
-
-                                  }}
-
-                                >
-
-                                  {course.certificateId ||
-
-                                    'Not issued'}
-
-                                </div>
-
                               </div>
 
-                            );
+                              {/* OWNING DEPARTMENT */}
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>
+                                {course.courseDepartment || course.category || 'General'}
+                              </div>
 
-                          }
+                              {/* EMPLOYEE DEPARTMENT */}
+                              <div style={{ fontSize: '12px', fontWeight: 500, color: '#64748b' }}>
+                                {course.employeeDepartment || transcript.department || employee?.department || '—'}
+                              </div>
 
-                        )}
+                              {/* ASSIGNMENT TYPE BADGE */}
+                              <div>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    padding: '4px 9px',
+                                    borderRadius: '999px',
+                                    fontSize: '10px',
+                                    fontWeight: 750,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.04em',
+                                    background: isMandatory ? '#fef2f2' : '#f0fdf4',
+                                    color: isMandatory ? '#b91c1c' : '#15803d',
+                                    border: `1px solid ${isMandatory ? '#fecaca' : '#bbf7d0'}`
+                                  }}
+                                >
+                                  {course.assignmentType || (isMandatory ? 'Mandatory' : 'Recommended')}
+                                </span>
+                              </div>
 
+                              {/* PROGRESS */}
+                              <div>
+                                <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '5px', color: '#172033' }}>
+                                  {course.progressPercent ?? 0}%
+                                </div>
+                                <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '999px', overflow: 'hidden' }}>
+                                  <div
+                                    style={{
+                                      height: '100%',
+                                      width: `${Math.min(100, Math.max(0, Number(course.progressPercent) || 0))}%`,
+                                      background: '#0798d1'
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* SCORE */}
+                              <div style={{ fontWeight: 700, color: course.score != null ? '#172033' : '#94a3b8' }}>
+                                {course.score != null ? `${course.score}%` : '—'}
+                              </div>
+
+                              {/* STATUS */}
+                              <div>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    padding: '6px 9px',
+                                    borderRadius: '999px',
+                                    background: courseStatus.background,
+                                    color: courseStatus.color,
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {String(course.status || '—').replace(/_/g, ' ')}
+                                </span>
+                              </div>
+
+                              {/* DUE / COMPLETION DATE */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: '#64748b' }}>
+                                <CalendarDays size={13} />
+                                {course.completedDate ? formatDate(course.completedDate) : (course.dueDate ? `Due ${formatDate(course.dueDate)}` : '—')}
+                              </div>
+
+                              {/* CERTIFICATE */}
+                              <div
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: course.certificateId ? 650 : 400,
+                                  color: course.certificateId ? '#15803d' : '#94a3b8',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
+                                {course.certificateId || 'Not issued'}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-
                     </div>
-
+                    ) : (
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+                        No courses found matching the <strong>{courseFilter.toLowerCase()}</strong> filter.
+                      </div>
+                    )
                   ) : (
-
-                    <div
-
-                      style={{
-
-                        padding: '50px 20px',
-
-                        textAlign:
-
-                          'center',
-
-                        color: '#64748b'
-
-                      }}
-
-                    >
-
-                      No training records found
-
-                      for this employee.
-
+                    <div style={{ padding: '50px 20px', textAlign: 'center', color: '#64748b' }}>
+                      No training records found for this employee.
                     </div>
-
                   )}
 
                 </div>

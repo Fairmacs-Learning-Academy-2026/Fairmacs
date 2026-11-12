@@ -17,6 +17,9 @@ public class Department {
     @Column(unique = true, nullable = false)
     private String name;
 
+    @Column(name = "short_code")
+    private String shortCode;
+
     // Parent department relationship
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_department_id")
@@ -57,6 +60,14 @@ public class Department {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getShortCode() {
+        return shortCode;
+    }
+
+    public void setShortCode(String shortCode) {
+        this.shortCode = shortCode;
     }
 
     public Department getParentDepartment() {

@@ -2,6 +2,7 @@ package com.fairmacs.lms.controller;
 
 import com.fairmacs.lms.dto.TrainingCalendarEmployeeDTO;
 import com.fairmacs.lms.dto.TrainingSessionRequest;
+import com.fairmacs.lms.dto.UpcomingSessionDTO;
 import com.fairmacs.lms.entity.TrainingSession;
 import com.fairmacs.lms.service.TrainingSessionService;
 import org.springframework.http.HttpStatus;
@@ -12,13 +13,20 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/training-calendar")
-@CrossOrigin
 public class TrainingSessionController {
     private final TrainingSessionService service;
     public TrainingSessionController(TrainingSessionService service) { this.service = service; }
 
     @GetMapping
     public List<TrainingSession> getSessions() { return service.getVisibleSessions(); }
+
+    @GetMapping("/upcoming")
+    @PreAuthorize("hasAnyRole('EMPLOYEE','MANAGER','TRAINER','HR_ADMIN')")
+    public List<UpcomingSessionDTO> getUpcomingSessions(
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return service.getUpcomingSessions(limit);
+    }
 
     @GetMapping("/employees")
     @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER','MANAGER')")

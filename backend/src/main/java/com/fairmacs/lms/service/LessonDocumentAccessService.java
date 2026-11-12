@@ -25,16 +25,28 @@ public class LessonDocumentAccessService {
     private final EnrollmentRepository enrollmentRepository;
     private final SecurityContextUtil securityContextUtil;
     private final ZohoWorkDriveDownloadService downloadService;
+    private final LessonProgressService lessonProgressService;
 
     public LessonDocumentAccessService(
             LessonRepository lessonRepository,
             EnrollmentRepository enrollmentRepository,
             SecurityContextUtil securityContextUtil,
             ZohoWorkDriveDownloadService downloadService) {
+        this(lessonRepository, enrollmentRepository, securityContextUtil, downloadService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public LessonDocumentAccessService(
+            LessonRepository lessonRepository,
+            EnrollmentRepository enrollmentRepository,
+            SecurityContextUtil securityContextUtil,
+            ZohoWorkDriveDownloadService downloadService,
+            LessonProgressService lessonProgressService) {
         this.lessonRepository = lessonRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.securityContextUtil = securityContextUtil;
         this.downloadService = downloadService;
+        this.lessonProgressService = lessonProgressService;
     }
 
     @Transactional(readOnly = true)
@@ -49,7 +61,7 @@ public class LessonDocumentAccessService {
                     "Authentication is required.");
         }
 
-        if (user.getStatus() != UserStatus.ACTIVE) {
+        if (user.getStatus() != null && user.getStatus() != UserStatus.ACTIVE) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Your account is not active.");
@@ -95,6 +107,12 @@ public class LessonDocumentAccessService {
                 throw new ResponseStatusException(
                         HttpStatus.FORBIDDEN,
                         "This course is not currently available.");
+            }
+
+            if (lessonProgressService != null && !lessonProgressService.isLessonUnlocked(enrollment.getId(), lesson.getId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "Lesson is locked. You must complete the previous lesson before accessing this document.");
             }
         }
 

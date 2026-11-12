@@ -13,6 +13,8 @@ import {
 
 import { enrollmentService } from '../services/enrollmentService';
 import { useAuth } from '../context/AuthContext';
+import CourseThumbnailImage from './CourseThumbnailImage';
+import { getCourseBanner, handleBannerError } from '../utils/courseBanner';
 
 function normalizeStatus(course) {
   const status = String(
@@ -291,23 +293,26 @@ export default function MyLearning({
     >
       {/* Header */}
       <div
+        className="glass-panel"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '1rem',
-          background: 'white',
+          background: 'rgba(255, 255, 255, 0.78)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
           padding: '1.25rem 1.5rem',
-          borderRadius: 12,
-          border: '1px solid #e2e8f0',
-          boxShadow: 'var(--shadow-sm)',
+          borderRadius: 16,
+          border: '1px solid rgba(255, 255, 255, 0.85)',
+          boxShadow: '0 8px 30px rgba(31, 70, 120, 0.06)',
         }}
       >
         <div>
           <div
             style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
+              fontSize: '0.74rem',
+              fontWeight: 750,
               color: '#0284c7',
               textTransform: 'uppercase',
               letterSpacing: 1,
@@ -318,10 +323,11 @@ export default function MyLearning({
 
           <h1
             style={{
-              fontSize: '1.4rem',
+              fontSize: '1.45rem',
               fontWeight: 800,
-              color: '#0f172a',
+              color: 'var(--deep-navy)',
               margin: '0.15rem 0 0',
+              letterSpacing: '-0.3px',
             }}
           >
             My Learning & Progress Hub
@@ -331,7 +337,7 @@ export default function MyLearning({
         <div
           style={{
             display: 'flex',
-            gap: '0.6rem',
+            gap: '0.65rem',
             alignItems: 'center',
           }}
         >
@@ -356,10 +362,11 @@ export default function MyLearning({
             className="btn-secondary"
             onClick={onOpenCertificates}
             style={{
-              background: '#f0fdf4',
-              color: '#166534',
-              border: '1px solid #bbf7d0',
+              background: 'rgba(236, 253, 245, 0.75)',
+              color: '#047857',
+              border: '1px solid rgba(167, 243, 208, 0.85)',
               fontWeight: 700,
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.1)',
             }}
           >
             <Award style={{ width: 16, height: 16 }} />
@@ -370,16 +377,20 @@ export default function MyLearning({
 
       {/* Filters */}
       <div
+        className="glass-panel"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: '1rem',
           flexWrap: 'wrap',
-          background: 'white',
+          background: 'rgba(255, 255, 255, 0.76)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
           padding: '0.75rem 1.25rem',
-          borderRadius: 12,
-          border: '1px solid #e2e8f0',
+          borderRadius: 16,
+          border: '1px solid rgba(255, 255, 255, 0.85)',
+          boxShadow: '0 4px 20px rgba(31, 70, 120, 0.04)',
         }}
       >
         <div
@@ -504,18 +515,14 @@ export default function MyLearning({
               }
               className="course-card"
             >
-              <div style={{ position: 'relative' }}>
-                <img
-                  src={
-                    course.banner ||
-                    '/fairmacs-logo.png'
-                  }
+              <div
+                style={{ position: 'relative', height: '160px', overflow: 'hidden', cursor: 'pointer' }}
+                onClick={() => onOpenCourseDetails?.(course)}
+              >
+                <CourseThumbnailImage
+                  course={course}
                   alt={course.title}
                   className="course-banner"
-                  onError={(event) => {
-                    event.currentTarget.src =
-                      '/fairmacs-logo.png';
-                  }}
                 />
 
                 <span
@@ -674,7 +681,7 @@ export default function MyLearning({
                   <div
                     style={{
                       height: 8,
-                      background: '#e2e8f0',
+                      background: '#a2afc0ff',
                       borderRadius: 999,
                       overflow: 'hidden',
                       margin: '0.45rem 0 1rem',

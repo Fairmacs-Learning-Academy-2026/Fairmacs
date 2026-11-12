@@ -3,6 +3,7 @@ package com.fairmacs.lms.service;
 import com.fairmacs.lms.dto.EmployeeTrainingTranscriptDTO;
 import com.fairmacs.lms.entity.Enrollment;
 import com.fairmacs.lms.entity.EnrollmentStatus;
+import com.fairmacs.lms.entity.EnrollmentType;
 import com.fairmacs.lms.entity.User;
 import com.fairmacs.lms.repository.EnrollmentRepository;
 import com.fairmacs.lms.repository.UserRepository;
@@ -169,10 +170,25 @@ public class ManagerReportsService {
                     enrollment.getCourse().getCategory()
             );
 
+            String courseDept = enrollment.getCourse().getOwningDepartment() != null
+                    ? enrollment.getCourse().getOwningDepartment().getName()
+                    : (enrollment.getCourse().getCatalogCategory() != null && !enrollment.getCourse().getCatalogCategory().getName().equalsIgnoreCase("Uncategorized")
+                            ? enrollment.getCourse().getCatalogCategory().getName()
+                            : (enrollment.getCourse().getCategory() != null && !enrollment.getCourse().getCategory().isBlank() && !enrollment.getCourse().getCategory().equalsIgnoreCase("Uncategorized")
+                                    ? enrollment.getCourse().getCategory()
+                                    : "General"));
+            dto.setCourseDepartment(courseDept);
+            dto.setOwningDepartmentId(enrollment.getCourse().getOwningDepartment() != null ? enrollment.getCourse().getOwningDepartment().getId() : null);
+
             dto.setDurationHours(
                     enrollment.getCourse().getDurationHours()
             );
         }
+
+        String assignType = enrollment.getEnrollmentType() == EnrollmentType.MANDATORY
+                ? "Mandatory"
+                : (enrollment.getEnrollmentType() == EnrollmentType.RECOMMENDED ? "Recommended" : "Self-Selected");
+        dto.setAssignmentType(assignType);
 
         dto.setEnrollmentType(
                 enrollment.getEnrollmentType() != null
@@ -186,9 +202,15 @@ public class ManagerReportsService {
                         : null
         );
 
-        dto.setProgressPercent(
-                enrollment.getProgressPercent()
-        );
+        Integer progress = enrollment.getProgressPercent();
+        if (enrollment.getStatus() != EnrollmentStatus.COMPLETED && progress != null && progress >= 100) {
+            progress = 98;
+        }
+        dto.setProgressPercent(progress);
+
+        if (enrollment.getUser() != null) {
+            dto.setEmployeeDepartment(enrollment.getUser().getDepartment());
+        }
 
         dto.setScore(
                 enrollment.getScore()

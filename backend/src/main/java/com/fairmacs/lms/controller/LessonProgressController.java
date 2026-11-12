@@ -9,7 +9,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/progress")
-@CrossOrigin
+
 public class LessonProgressController {
 
     private final LessonProgressService lessonProgressService;

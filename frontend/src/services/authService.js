@@ -1,12 +1,14 @@
 // Authentication Service
 // Handles login, logout, token management, and user authentication
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  'http://localhost:8080/api';
-
-const TOKEN_KEY = 'fairmacs_token';
-const USER_KEY = 'fairmacs_user';
+import {
+  API_BASE_URL,
+  TOKEN_KEY,
+  USER_KEY,
+  getAuthToken,
+  clearAuthTokens,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
 async function safeParseJson(response) {
   const text = await response.text();
@@ -32,17 +34,12 @@ export const authService = {
   /*
    * LOGIN
    *
-   * Authentication is performed only by
-   * Spring Boot + MySQL.
-   *
+   * Authentication is performed strictly by the Spring Boot backend.
    * There is NO mock/fallback login.
    */
   login: async (loginId, password) => {
-
     try {
-
-      const cleanLoginId =
-        String(loginId || '').trim();
+      const cleanLoginId = String(loginId || '').trim();
 
       if (!cleanLoginId) {
         return {
@@ -58,53 +55,35 @@ export const authService = {
         };
       }
 
-      const response =
-        await fetch(
-          `${API_BASE_URL}/auth/login`,
-          {
-            method: 'POST',
+      const response = await fetch(
+        `${API_BASE_URL}/auth/login`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            loginId: cleanLoginId,
+            password
+          })
+        }
+      );
 
-            headers: {
-              'Content-Type':
-                'application/json',
+      const envelope = await safeParseJson(response);
 
-              'Accept':
-                'application/json'
-            },
-
-            body: JSON.stringify({
-              loginId: cleanLoginId,
-              password
-            })
-          }
-        );
-
-      const envelope =
-        await safeParseJson(response);
-
-      if (
-        !response.ok ||
-        !envelope ||
-        !envelope.success
-      ) {
-
-        let message =
-          envelope?.message;
+      if (!response.ok || !envelope || !envelope.success) {
+        let message = envelope?.message;
 
         if (!message) {
-
           if (response.status === 401) {
-            message =
-              'Invalid Employee ID / Email or Password.';
+            message = 'Invalid Employee ID / Email or Password.';
           } else if (response.status === 403) {
-            message =
-              'Access denied. Please contact HR Admin.';
+            message = 'Access denied. Please contact HR Admin.';
           } else if (response.status >= 500) {
-            message =
-              'Authentication server error. Please try again.';
+            message = 'Authentication server error. Please try again.';
           } else {
-            message =
-              `Login failed (HTTP ${response.status}).`;
+            message = `Login failed (HTTP ${response.status}).`;
           }
         }
 
@@ -114,60 +93,27 @@ export const authService = {
         };
       }
 
-      const payload =
-        envelope.data || {};
+      const payload = envelope.data || {};
+      const token = payload.token;
 
-      const token =
-        payload.token;
-
-      /*
-       * LoginResponse itself is the user object.
-       */
       const user = {
-        ...payload
+        ...payload,
+        mustChangePassword: Boolean(payload.mustChangePassword)
       };
 
-      /*
-       * A successful login MUST contain
-       * a real JWT.
-       */
       if (!token) {
-
-        console.error(
-          'Backend login succeeded but no JWT was returned.'
-        );
-
+        console.error('Backend login succeeded but no JWT was returned.');
         return {
           success: false,
-          error:
-            'Authentication succeeded but no access token was returned.'
+          error: 'Authentication succeeded but no access token was returned.'
         };
       }
 
-      /*
-       * Store only the canonical authentication
-       * keys.
-       */
-      localStorage.setItem(
-        TOKEN_KEY,
-        token
-      );
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
 
-      localStorage.setItem(
-        USER_KEY,
-        JSON.stringify(user)
-      );
-
-      /*
-       * Remove legacy authentication keys.
-       */
-      localStorage.removeItem(
-        'fairmacs_lms_token'
-      );
-
-      localStorage.removeItem(
-        'fairmacs_lms_user'
-      );
+      localStorage.removeItem('fairmacs_lms_token');
+      localStorage.removeItem('fairmacs_lms_user');
 
       return {
         success: true,
@@ -176,393 +122,170 @@ export const authService = {
       };
 
     } catch (error) {
-
-      console.error(
-        'Login error:',
-        error
-      );
-
+      console.error('Login error:', error);
       return {
         success: false,
-        error:
-          error.message ||
-          'Unable to connect to the authentication server.'
+        error: error.message || 'Unable to connect to the authentication server.'
       };
     }
   },
-
 
   /*
    * LOGOUT
    */
   logout: () => {
-
-    localStorage.removeItem(
-      TOKEN_KEY
-    );
-
-    localStorage.removeItem(
-      USER_KEY
-    );
-
-    /*
-     * Remove legacy authentication data too.
-     */
-    localStorage.removeItem(
-      'fairmacs_lms_token'
-    );
-
-    localStorage.removeItem(
-      'fairmacs_lms_user'
-    );
+    clearAuthTokens();
   },
 
-
   /*
-   * GET CURRENT USER
-   *
-   * This method is kept for compatibility
-   * with the rest of the application.
+   * GET CURRENT USER (/api/auth/me)
    */
   getCurrentUser: async () => {
-
-    const token =
-      localStorage.getItem(
-        TOKEN_KEY
-      );
+    const token = getAuthToken();
 
     if (!token) {
       return null;
     }
 
     try {
-
-      const response =
-        await fetch(
-          `${API_BASE_URL}/auth/me`,
-          {
-            headers: {
-              'Authorization':
-                `Bearer ${token}`,
-
-              'Accept':
-                'application/json'
-            }
+      const response = await fetch(
+        `${API_BASE_URL}/auth/me`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
           }
-        );
+        }
+      );
 
       if (!response.ok) {
-
-        /*
-         * Invalid/expired token.
-         */
-        if (
-          response.status === 401 ||
-          response.status === 403
-        ) {
-
-          authService.logout();
+        if (response.status === 401) {
+          handleUnauthorized(false);
         }
-
         return null;
       }
 
-      const envelope =
-        await safeParseJson(response);
-
-      return (
-        envelope?.data ||
-        envelope?.user ||
-        envelope ||
-        null
-      );
+      const envelope = await safeParseJson(response);
+      return envelope?.data || envelope?.user || envelope || null;
 
     } catch (error) {
-
-      console.error(
-        'Get current user error:',
-        error
-      );
-
+      console.error('Get current user error:', error);
       return null;
     }
   },
 
-
   /*
    * CHECK AUTHENTICATION
-   *
-   * Only the real JWT counts.
    */
   isAuthenticated: () => {
-
-    return Boolean(
-      localStorage.getItem(
-        TOKEN_KEY
-      )
-    );
+    return Boolean(getAuthToken());
   },
-
 
   /*
    * GET AUTH TOKEN
    */
   getToken: () => {
-
-    return (
-      localStorage.getItem(
-        TOKEN_KEY
-      ) || ''
-    );
+    return getAuthToken();
   },
-
 
   /*
    * REFRESH TOKEN
-   *
-   * Kept for compatibility.
    */
   refreshToken: async () => {
-
-    const token =
-      localStorage.getItem(
-        TOKEN_KEY
-      );
+    const token = getAuthToken();
 
     if (!token) {
       return null;
     }
 
     try {
-
-      const response =
-        await fetch(
-          `${API_BASE_URL}/auth/refresh`,
-          {
-            method: 'POST',
-
-            headers: {
-              'Authorization':
-                `Bearer ${token}`,
-
-              'Accept':
-                'application/json'
-            }
+      const response = await fetch(
+        `${API_BASE_URL}/auth/refresh`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
           }
-        );
-
-      if (!response.ok) {
-
-        authService.logout();
-
-        return null;
-      }
-
-      const envelope =
-        await safeParseJson(response);
-
-      const newToken =
-        envelope?.data?.token ||
-        envelope?.token;
-
-      if (!newToken) {
-
-        authService.logout();
-
-        return null;
-      }
-
-      localStorage.setItem(
-        TOKEN_KEY,
-        newToken
+        }
       );
 
+      if (!response.ok) {
+        handleUnauthorized(false);
+        return null;
+      }
+
+      const envelope = await safeParseJson(response);
+      const newToken = envelope?.data?.token || envelope?.token;
+
+      if (!newToken) {
+        handleUnauthorized(false);
+        return null;
+      }
+
+      localStorage.setItem(TOKEN_KEY, newToken);
       return newToken;
 
     } catch (error) {
-
-      console.error(
-        'Token refresh error:',
-        error
-      );
-
-      authService.logout();
-
+      console.error('Token refresh error:', error);
+      handleUnauthorized(false);
       return null;
     }
   },
-
-
-  /*
-   * VERIFY CURRENT PASSWORD
-   *
-   * This only verifies the current password.
-   * It does NOT change the password.
-   */
-  verifyCurrentPassword: async (
-    currentPassword
-  ) => {
-
-    const token =
-      localStorage.getItem(
-        TOKEN_KEY
-      );
-
-    if (!token) {
-
-      return {
-        success: false,
-        error:
-          'You are not authenticated.'
-      };
-    }
-
-    try {
-
-      const response =
-        await fetch(
-          `${API_BASE_URL}/auth/verify-current-password`,
-          {
-            method: 'POST',
-
-            headers: {
-              'Content-Type':
-                'application/json',
-
-              'Authorization':
-                `Bearer ${token}`,
-
-              'Accept':
-                'application/json'
-            },
-
-            body: JSON.stringify({
-              currentPassword
-            })
-          }
-        );
-
-      const envelope =
-        await safeParseJson(response);
-
-      if (
-        !response.ok ||
-        !envelope?.success
-      ) {
-
-        return {
-          success: false,
-          error:
-            envelope?.message ||
-            `Password verification failed (HTTP ${response.status}).`
-        };
-      }
-
-      return {
-        success: true,
-        valid:
-          envelope.data === true,
-        message:
-          envelope.message
-      };
-
-    } catch (error) {
-
-      console.error(
-        'Current password verification error:',
-        error
-      );
-
-      return {
-        success: false,
-        error:
-          error.message ||
-          'Unable to verify current password.'
-      };
-    }
-  },
-
 
   /*
    * CHANGE PASSWORD
    *
-   * This API actually changes the password.
+   * Verifies currentPassword and updates to newPassword in a single
+   * authenticated request, rotating the active JWT on success.
    */
-  changePassword: async (
-    currentPassword,
-    newPassword
-  ) => {
-
-    const token =
-      localStorage.getItem(
-        TOKEN_KEY
-      );
+  changePassword: async (currentPassword, newPassword) => {
+    const token = localStorage.getItem(TOKEN_KEY);
 
     if (!token) {
-
       return {
         success: false,
-        error:
-          'You are not authenticated.'
+        error: 'You are not authenticated.'
       };
     }
 
     try {
+      const response = await fetch(
+        `${API_BASE_URL}/auth/change-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            currentPassword,
+            newPassword
+          })
+        }
+      );
 
-      const response =
-        await fetch(
-          `${API_BASE_URL}/auth/change-password`,
-          {
-            method: 'POST',
+      const envelope = await safeParseJson(response);
 
-            headers: {
-              'Content-Type':
-                'application/json',
-
-              'Authorization':
-                `Bearer ${token}`,
-
-              'Accept':
-                'application/json'
-            },
-
-            body: JSON.stringify({
-              currentPassword,
-              newPassword
-            })
-          }
-        );
-
-      const envelope =
-        await safeParseJson(response);
-
-      if (
-        !response.ok ||
-        !envelope?.success
-      ) {
-
+      if (!response.ok || !envelope?.success) {
         return {
           success: false,
-          error:
-            envelope?.message ||
-            `Password change failed (HTTP ${response.status}).`
+          error: envelope?.message || `Password change failed (HTTP ${response.status}).`
         };
+      }
+
+      if (envelope.data?.token) {
+        localStorage.setItem(TOKEN_KEY, envelope.data.token);
       }
 
       return envelope;
 
     } catch (error) {
-
-      console.error(
-        'Change password error:',
-        error
-      );
-
+      console.error('Change password error:', error);
       return {
         success: false,
-        error:
-          error.message ||
-          'Unable to change password.'
+        error: error.message || 'Unable to change password.'
       };
     }
   }

@@ -1,19 +1,24 @@
 // Assessment Service
 // Handles quiz/assessment-related API calls
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import {
+  API_BASE_URL,
+  getAuthHeaders,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
 export const assessmentService = {
   // Get assessment by course ID
   getAssessmentByCourse: async (courseId) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/assessments/course/${courseId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return null;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch assessment');
@@ -28,17 +33,17 @@ export const assessmentService = {
 
   // Submit assessment attempt
   submitAssessment: async (assessmentId, answers) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/assessments/${assessmentId}/submit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ answers }),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to submit assessment');
@@ -53,14 +58,15 @@ export const assessmentService = {
 
   // Get assessment attempts for user
   getUserAttempts: async (userId, assessmentId) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/assessments/${assessmentId}/attempts/user/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch attempts');
@@ -75,17 +81,17 @@ export const assessmentService = {
 
   // Create assessment (Trainer/HR only)
   createAssessment: async (assessmentData) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/assessments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(assessmentData),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to create assessment');
@@ -100,17 +106,17 @@ export const assessmentService = {
 
   // Update assessment (Trainer/HR only)
   updateAssessment: async (assessmentId, assessmentData) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/assessments/${assessmentId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(assessmentData),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to update assessment');

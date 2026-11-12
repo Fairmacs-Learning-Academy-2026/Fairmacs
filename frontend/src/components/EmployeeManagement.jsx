@@ -9,6 +9,7 @@ import {
   MapPin,
   CalendarDays,
   Upload,
+  Download,
   Pencil,
   Trash2,
   RefreshCw,
@@ -27,25 +28,36 @@ const ROLE_OPTIONS = [
 ];
 
 const DEPARTMENT_OPTIONS = [
-  "Human Resource",
+  "People Operations",
   "Accounts",
   "Admin",
   "Operations",
   "Documentation",
   "Customer Service",
   "Pricing",
-  "IT & Technology",
+  "Information Technology",
   "Sales",
-  "General / Common",
+  "General",
 ];
 
-const LEVEL_OPTIONS = [
-  { value: "L0", label: "L0 — Trainee" },
-  { value: "L1", label: "L1 — Assistant" },
-  { value: "L2", label: "L2 — Executive / Senior Executive" },
-  { value: "L3", label: "L3 — Assistant Manager / Manager / Senior Manager" },
-  { value: "L4", label: "L4 — Vice President" },
+function formatPosition(pos) {
+  if (!pos) return "";
+  const s = String(pos).trim().toUpperCase();
+  if (s.startsWith("L") && s.length === 2 && ["0", "1", "2", "3", "4"].includes(s[1])) {
+    return "P" + s[1];
+  }
+  return s;
+}
+
+const POSITION_OPTIONS = [
+  { value: "P0", label: "P0 — Trainee" },
+  { value: "P1", label: "P1 — Assistant" },
+  { value: "P2", label: "P2 — Executive / Senior Executive" },
+  { value: "P3", label: "P3 — Assistant Manager / Manager / Senior Manager" },
+  { value: "P4", label: "P4 — Vice President" },
 ];
+
+const LEVEL_OPTIONS = POSITION_OPTIONS;
 
 const STATUS_OPTIONS = [
   { value: "ACTIVE", label: "Active" },
@@ -61,11 +73,45 @@ const DEFAULT_FORM = {
   role: "EMPLOYEE",
   department: "Operations",
   designation: "",
-  level: "L2",
+  level: "P2",
+  position: "P2",
   branch: "Corporate HQ",
   joiningDate: new Date().toISOString().slice(0, 10),
   status: "ACTIVE",
+  temporaryPassword: "",
 };
+
+function generateClientTemporaryPassword() {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const digits = "23456789";
+  const special = "!@#$%^&*_-+=";
+  const all = upper + lower + digits + special;
+  const randomBytes = new Uint32Array(14);
+  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(randomBytes);
+  } else {
+    for (let i = 0; i < randomBytes.length; i += 1) {
+      randomBytes[i] = Math.floor(Math.random() * 0xffffffff);
+    }
+  }
+  const chars = [
+    upper[randomBytes[0] % upper.length],
+    lower[randomBytes[1] % lower.length],
+    digits[randomBytes[2] % digits.length],
+    special[randomBytes[3] % special.length],
+  ];
+  for (let i = 4; i < 14; i += 1) {
+    chars.push(all[randomBytes[i] % all.length]);
+  }
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = randomBytes[i] % (i + 1);
+    const tmp = chars[i];
+    chars[i] = chars[j];
+    chars[j] = tmp;
+  }
+  return chars.join("");
+}
 
 const styles = {
   page: { display: "flex", flexDirection: "column", gap: 18, color: "#172033" },
@@ -206,13 +252,20 @@ export default function EmployeeManagement() {
     };
   }, [usersList]);
 
-  const DESIGNATION_OPTIONS_BY_LEVEL = {
+  const DESIGNATION_OPTIONS_BY_POSITION = {
+    P0: ["Trainee"],
+    P1: ["Assistant"],
+    P2: ["Executive", "Senior Executive"],
+    P3: ["Assistant Manager", "Manager", "Senior Manager"],
+    P4: ["Vice President"],
     L0: ["Trainee"],
     L1: ["Assistant"],
     L2: ["Executive", "Senior Executive"],
     L3: ["Assistant Manager", "Manager", "Senior Manager"],
     L4: ["Vice President"],
   };
+
+  const DESIGNATION_OPTIONS_BY_LEVEL = DESIGNATION_OPTIONS_BY_POSITION;
 
   const setField = (field, value) => {
     setFormData((current) => {
@@ -221,13 +274,18 @@ export default function EmployeeManagement() {
       if (field === "role") {
         if (value === "TRAINER") {
           next.level = "";
-        } else if (!next.level) {
-          next.level = "L2";
+          next.position = "";
+        } else if (!next.position && !next.level) {
+          next.level = "P2";
+          next.position = "P2";
         }
       }
 
-      if (field === "level") {
-        const allowedDesignations = DESIGNATION_OPTIONS_BY_LEVEL[value] || [];
+      if (field === "level" || field === "position") {
+        const normPos = formatPosition(value);
+        next.level = normPos;
+        next.position = normPos;
+        const allowedDesignations = DESIGNATION_OPTIONS_BY_POSITION[normPos] || [];
         if (!allowedDesignations.includes(next.designation)) {
           next.designation = allowedDesignations[0] || "";
         }
@@ -243,12 +301,16 @@ export default function EmployeeManagement() {
 
   const openAddModal = () => {
     setEditingEmployee(null);
-    setFormData({ ...DEFAULT_FORM });
+    setFormData({
+      ...DEFAULT_FORM,
+      temporaryPassword: generateClientTemporaryPassword(),
+    });
     setFormError("");
     setShowModal(true);
   };
 
   const openEditModal = (employee) => {
+    const rawPos = formatPosition(employee.position || employee.level) || "P2";
     setEditingEmployee(employee);
     setFormData({
       ...DEFAULT_FORM,
@@ -258,7 +320,8 @@ export default function EmployeeManagement() {
       role: String(employee.role || "EMPLOYEE").toUpperCase(),
       department: DEPARTMENT_OPTIONS.includes(employee.department) ? employee.department : "Operations",
       designation: employee.designation || "",
-      level: String(employee.role || "").toUpperCase() === "TRAINER" ? "" : (employee.level || "L2"),
+      level: String(employee.role || "").toUpperCase() === "TRAINER" ? "" : rawPos,
+      position: String(employee.role || "").toUpperCase() === "TRAINER" ? "" : rawPos,
       branch: employee.branch || "Corporate HQ",
       joiningDate: employee.joiningDate ? String(employee.joiningDate).slice(0, 10) : "",
       status: normaliseStatus(employee),
@@ -287,14 +350,15 @@ export default function EmployeeManagement() {
       setFormError("Please enter an Employee ID.");
       return;
     }
-    if (!isTrainer && !formData.level) {
-      setFormError("Select a level for this role. Trainers do not have a level.");
+    const empPos = formatPosition(formData.position || formData.level);
+    if (!isTrainer && !empPos) {
+      setFormError("Select a position for this role. Trainers do not have a position.");
       return;
     }
 
-    const designationOptions = DESIGNATION_OPTIONS_BY_LEVEL[formData.level] || [];
+    const designationOptions = DESIGNATION_OPTIONS_BY_POSITION[empPos] || [];
     if (!isTrainer && !designationOptions.includes(formData.designation)) {
-      setFormError("Select a designation that matches the employee level.");
+      setFormError("Select a designation that matches the employee position.");
       return;
     }
 
@@ -306,12 +370,17 @@ export default function EmployeeManagement() {
       role: formData.role,
       department: formData.department,
       designation: formData.designation.trim(),
-      level: isTrainer ? null : formData.level,
+      level: isTrainer ? null : empPos,
+      position: isTrainer ? null : empPos,
       branch: formData.branch.trim() || "Corporate HQ",
       joiningDate: formData.joiningDate || null,
       status: formData.status,
     };
-    if (!editingEmployee) payload.password = "Employee@123";
+    if (!editingEmployee) {
+      if (formData.temporaryPassword && formData.temporaryPassword.trim()) {
+        payload.password = formData.temporaryPassword.trim();
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -321,7 +390,10 @@ export default function EmployeeManagement() {
         setNotice({ type: "success", message: "Employee details updated successfully." });
       } else {
         await createEmployee(payload);
-        setNotice({ type: "success", message: "Employee account created successfully." });
+        setNotice({
+          type: "success",
+          message: "Employee account created with mandatory first-login password change.",
+        });
       }
       setShowModal(false);
       setEditingEmployee(null);
@@ -377,11 +449,31 @@ export default function EmployeeManagement() {
   };
 
   const handleStatusChange = async (employee, status) => {
+    const currentStatus = normaliseStatus(employee);
+    if (status === currentStatus) return;
+
+    let reason = "Administrative status update";
+    if (typeof window !== "undefined" && typeof window.prompt === "function") {
+      const enteredReason = window.prompt(
+        `Provide a mandatory reason for changing ${employee.name || "employee"}'s status to ${statusLabel(status)}:`,
+        "Administrative status update"
+      );
+      if (enteredReason === null) {
+        // Cancelled by user
+        return;
+      }
+      if (!enteredReason.trim()) {
+        setNotice({ type: "error", message: "A reason is mandatory for changing employment status." });
+        return;
+      }
+      reason = enteredReason.trim();
+    }
+
     const id = getEmployeeId(employee);
     setBusyEmployee(id);
     setNotice(null);
     try {
-      await changeEmployeeStatus(id, status);
+      await changeEmployeeStatus(id, status, reason);
       if (typeof loadEmployees === "function") await loadEmployees();
       setNotice({ type: "success", message: `${employee.name || "Employee"} status changed to ${statusLabel(status)}.` });
     } catch (error) {
@@ -393,12 +485,23 @@ export default function EmployeeManagement() {
 
   const handleResetPassword = async (employee) => {
     const id = getEmployeeId(employee);
-    if (!window.confirm(`Reset the password for ${employee.name || id}?`)) return;
+    const suggestedTemp = generateClientTemporaryPassword();
+    const enteredTemp = window.prompt(
+      `Enter or copy the one-time temporary password for ${employee.name || id}.\n(The employee will be required to change this password on their next login):`,
+      suggestedTemp
+    );
+    if (enteredTemp === null) return;
     setBusyEmployee(id);
     setNotice(null);
     try {
-      await resetUserPassword(id, "Reset@123");
-      setNotice({ type: "success", message: `Password reset completed for ${employee.name || id}. Use your approved password-sharing process to communicate the temporary password.` });
+      const res = await resetUserPassword(id, enteredTemp.trim() || undefined);
+      if (res?.success === false) {
+        throw new Error(res.message || "Unable to reset password.");
+      }
+      setNotice({
+        type: "success",
+        message: `Password reset completed for ${employee.name || id}. Mandatory first-login password change is now active.`,
+      });
     } catch (error) {
       setNotice({ type: "error", message: error?.message || "Unable to reset password." });
     } finally {
@@ -479,6 +582,20 @@ export default function EmployeeManagement() {
               disabled={isImporting}
               style={{ display: "none" }}
             />
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await hrAdminService.downloadImportTemplate();
+                } catch (err) {
+                  setNotice({ type: "error", message: err?.message || "Unable to download template." });
+                }
+              }}
+              style={styles.button}
+              title="Download Excel Import Template (.xlsx)"
+            >
+              <Download size={15} /> Download Template
+            </button>
             <label htmlFor="employee-excel-import" style={{ ...styles.button, opacity: isImporting ? 0.6 : 1 }}>
               <Upload size={15} /> {isImporting ? "Importing..." : "Import Excel"}
             </label>
@@ -570,7 +687,7 @@ export default function EmployeeManagement() {
           <table style={styles.table}>
             <thead>
               <tr>
-                {["Employee", "Employee ID", "Role / Level", "Department", "Designation", "Branch", "Status", "Actions"].map((heading) => (
+                {["Employee", "Employee ID", "Role / Position", "Department", "Designation", "Branch", "Status", "Actions"].map((heading) => (
                   <th key={heading} style={styles.th}>{heading}</th>
                 ))}
               </tr>
@@ -597,7 +714,7 @@ export default function EmployeeManagement() {
                     <td style={{ ...styles.td, fontWeight: 800, color: "#334155" }}>{id || "—"}</td>
                     <td style={styles.td}>
                       <div style={{ fontWeight: 750 }}>{ROLE_OPTIONS.find((r) => r.value === role)?.label || role}</div>
-                      <div style={{ marginTop: 4, color: "#64748b", fontSize: 10 }}>{role === "TRAINER" ? "No level" : (employee.level || "Level not set")}</div>
+                      <div style={{ marginTop: 4, color: "#64748b", fontSize: 10 }}>{role === "TRAINER" ? "No position" : (formatPosition(employee.position || employee.level) || "Position not set")}</div>
                     </td>
                     <td style={styles.td}>{employee.department || "Operations"}</td>
                     <td style={styles.td}>{employee.designation || "—"}</td>
@@ -676,7 +793,7 @@ export default function EmployeeManagement() {
                 {renderField("Official Email", "email", { required: true, type: "email", placeholder: "name@fairmacs.com", autoComplete: "email" })}
                 {renderField("Role", "role", { required: true, options: ROLE_OPTIONS })}
                 {renderField("Department", "department", { required: true, options: DEPARTMENT_OPTIONS })}
-                {!isTrainer && renderField("Employee Level", "level", { required: true, options: LEVEL_OPTIONS })}
+                {!isTrainer && renderField("Employee Position", "level", { required: true, options: POSITION_OPTIONS })}
                 {isTrainer
                   ? renderField("Designation", "designation", { required: true, placeholder: "e.g. Trainer" })
                   : renderField("Designation", "designation", {
@@ -704,10 +821,28 @@ export default function EmployeeManagement() {
                   }}>
                     <ShieldCheck size={17} />
                   </div>
-                  <div>
-                    <div style={{ color: "#1e40af", fontSize: 12, fontWeight: 850 }}>Initial password: Employee@123</div>
-                    <div style={{ marginTop: 4, color: "#526783", fontSize: 11, lineHeight: 1.55 }}>
-                      This password is assigned automatically when the account is created. The employee should change it after their first sign-in.
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: "#1e40af", fontSize: 12, fontWeight: 850, marginBottom: 6 }}>
+                      One-Time Initial Temporary Password
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        type="text"
+                        value={formData.temporaryPassword || ""}
+                        onChange={(e) => setField("temporaryPassword", e.target.value)}
+                        style={{ ...styles.input, fontFamily: "monospace", fontWeight: 700 }}
+                        placeholder="Min 8 chars, upper, lower, number, symbol"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setField("temporaryPassword", generateClientTemporaryPassword())}
+                        style={styles.button}
+                      >
+                        <RefreshCw size={13} /> Regenerate
+                      </button>
+                    </div>
+                    <div style={{ marginTop: 6, color: "#526783", fontSize: 11, lineHeight: 1.55 }}>
+                      Copy and share this temporary password securely with the employee. They will be forced to change it immediately upon their first sign-in.
                     </div>
                   </div>
                 </div>
@@ -720,7 +855,7 @@ export default function EmployeeManagement() {
               }}>
                 <CalendarDays size={16} style={{ flexShrink: 0, marginTop: 1, color: "#64748b" }} />
                 <div>
-                  <strong style={{ color: "#334155" }}>Level mapping:</strong> L0 Trainee, L1 Assistant, L2 Executive / Senior Executive, L3 Assistant Manager / Manager / Senior Manager, L4 Vice President. Trainers do not have a level.
+                  <strong style={{ color: "#334155" }}>Position mapping:</strong> P0 Trainee, P1 Assistant, P2 Executive / Senior Executive, P3 Assistant Manager / Manager / Senior Manager, P4 Vice President. Trainers do not have a position.
                 </div>
               </div>
 

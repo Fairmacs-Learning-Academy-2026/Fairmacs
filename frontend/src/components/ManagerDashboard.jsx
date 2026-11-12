@@ -37,15 +37,31 @@ async function apiGet(path) {
 
 const styles = {
   panel: {
-    background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14,
-    padding: '1.25rem', boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(15,23,42,.05))'
+    background: 'rgba(255, 255, 255, 0.78)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
+    border: '1px solid rgba(255, 255, 255, 0.85)',
+    borderRadius: 16,
+    padding: '1.35rem',
+    boxShadow: '0 8px 30px rgba(31, 70, 120, 0.06)'
   },
   muted: { color: '#64748b', fontSize: '.82rem' },
   button: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    gap: '.45rem', border: '1px solid #cbd5e1', borderRadius: 8,
-    background: '#fff', color: '#334155', padding: '.55rem .8rem',
-    fontSize: '.82rem', fontWeight: 700, cursor: 'pointer'
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '.45rem',
+    border: '1px solid rgba(255, 255, 255, 0.85)',
+    borderRadius: 10,
+    background: 'rgba(255, 255, 255, 0.75)',
+    color: '#102A43',
+    padding: '.55rem .85rem',
+    fontSize: '.82rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    backdropFilter: 'blur(8px)',
+    boxShadow: '0 2px 8px rgba(31, 70, 120, 0.05)',
+    transition: 'all 0.18s ease'
   }
 };
 
@@ -86,7 +102,6 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
   const [certInput, setCertInput] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState('');
@@ -108,8 +123,7 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
       setLoading(false);
       return;
     }
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    if (!isRefresh) setLoading(true);
     setLoadError('');
     try {
       const data = await apiGet(`/manager/reports/${encodeURIComponent(managerId)}`);
@@ -118,7 +132,6 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
       setLoadError(error.message || 'Unable to load the team report.');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [managerId]);
 
@@ -236,8 +249,12 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
       <section style={{
-        background: 'linear-gradient(135deg, #0284c7 0%, #0f172a 100%)',
-        padding: '1.75rem 2rem', borderRadius: 16, color: '#fff',
+        background: 'linear-gradient(135deg, rgba(16, 42, 67, 0.95) 0%, rgba(11, 31, 56, 0.92) 50%, rgba(2, 132, 199, 0.90) 100%)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid rgba(255, 255, 255, 0.16)',
+        boxShadow: '0 16px 38px rgba(11, 31, 56, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+        padding: '1.75rem 2rem', borderRadius: 20, color: '#fff',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         gap: '1rem', flexWrap: 'wrap'
       }}>
@@ -253,11 +270,6 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
-          <button type="button" onClick={() => loadReport(true)} disabled={loading || refreshing}
-            style={{ ...styles.button, background: 'rgba(255,255,255,.12)', color: '#fff', borderColor: 'rgba(255,255,255,.35)' }}>
-            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
           <button type="button" onClick={exportCsv} disabled={!team.length}
             style={{ ...styles.button, background: '#fff', color: '#0f172a', opacity: team.length ? 1 : .6 }}>
             <FileSpreadsheet size={16} /> Export CSV
@@ -394,9 +406,7 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
             </table>
           </div>
         )}
-        <div style={{ ...styles.muted, marginTop: '.85rem' }}>
-          Overdue counts are not shown because the manager report response does not include course due dates. Open an employee transcript to inspect course due dates.
-        </div>
+
       </section>
 
       {selectedEmployee && (

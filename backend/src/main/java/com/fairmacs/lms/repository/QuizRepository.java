@@ -18,7 +18,15 @@ public interface QuizRepository extends JpaRepository<Quiz, Long> {
 
     Optional<Quiz> findByModuleId(Long moduleId);
 
+    Optional<Quiz> findTopByModuleIdOrderByIdDesc(Long moduleId);
+
+    List<Quiz> findAllByModuleId(Long moduleId);
+
     boolean existsByQuizId(String quizId);
 
     boolean existsByCourse_Id(Long courseId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Quiz q WHERE q.course.id = :courseId")
+    void deleteByCourseId(@org.springframework.data.repository.query.Param("courseId") Long courseId);
 }

@@ -1,23 +1,23 @@
 package com.fairmacs.lms.controller;
 
+import java.util.List;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.fairmacs.lms.dto.DepartmentCourseDTO;
 import com.fairmacs.lms.dto.DepartmentCourseEmployeesDTO;
 import com.fairmacs.lms.dto.DepartmentDetailsDTO;
 import com.fairmacs.lms.dto.DepartmentEmployeeDTO;
 import com.fairmacs.lms.dto.DepartmentSummaryDTO;
 import com.fairmacs.lms.service.DepartmentService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/departments")
-@CrossOrigin
 public class DepartmentController {
 
     private final DepartmentService departmentService;
@@ -32,6 +32,7 @@ public class DepartmentController {
     }
 
     @GetMapping("/{departmentId}/employees")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER','MANAGER')")
     public ResponseEntity<List<DepartmentEmployeeDTO>> getDepartmentEmployees(
             @PathVariable Long departmentId
     ) {
@@ -41,6 +42,7 @@ public class DepartmentController {
     }
 
     @GetMapping("/{departmentId}/courses")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER','MANAGER')")
     public ResponseEntity<List<DepartmentCourseDTO>> getDepartmentCourses(
             @PathVariable Long departmentId
     ) {
@@ -50,6 +52,7 @@ public class DepartmentController {
     }
 
     @GetMapping("/{departmentId}/details")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER','MANAGER')")
     public ResponseEntity<DepartmentDetailsDTO> getDepartmentDetails(
             @PathVariable Long departmentId
     ) {
@@ -59,6 +62,7 @@ public class DepartmentController {
     }
 
     @GetMapping("/{departmentId}/courses/{courseId}/employees")
+    @PreAuthorize("hasAnyRole('HR_ADMIN','TRAINER','MANAGER')")
     public ResponseEntity<DepartmentCourseEmployeesDTO> getCourseEmployees(
             @PathVariable Long departmentId,
             @PathVariable Long courseId

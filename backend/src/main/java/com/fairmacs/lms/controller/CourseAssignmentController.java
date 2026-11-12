@@ -3,12 +3,17 @@ package com.fairmacs.lms.controller;
 import com.fairmacs.lms.entity.Course;
 import com.fairmacs.lms.entity.Enrollment;
 import com.fairmacs.lms.entity.EnrollmentStatus;
+import com.fairmacs.lms.entity.EnrollmentType;
+import com.fairmacs.lms.entity.NotificationPriority;
+import com.fairmacs.lms.entity.NotificationType;
 import com.fairmacs.lms.entity.Role;
 import com.fairmacs.lms.entity.User;
 import com.fairmacs.lms.repository.CourseRepository;
 import com.fairmacs.lms.repository.EnrollmentRepository;
 import com.fairmacs.lms.security.SecurityContextUtil;
 import com.fairmacs.lms.service.EnrollmentService;
+import com.fairmacs.lms.service.NotificationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,21 +26,31 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/course-assignments")
-@CrossOrigin
 public class CourseAssignmentController {
     private final EnrollmentService enrollmentService;
     private final SecurityContextUtil securityContextUtil;
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final NotificationService notificationService;
 
     public CourseAssignmentController(EnrollmentService enrollmentService,
                                       SecurityContextUtil securityContextUtil,
                                       CourseRepository courseRepository,
                                       EnrollmentRepository enrollmentRepository) {
+        this(enrollmentService, securityContextUtil, courseRepository, enrollmentRepository, null);
+    }
+
+    @Autowired
+    public CourseAssignmentController(EnrollmentService enrollmentService,
+                                      SecurityContextUtil securityContextUtil,
+                                      CourseRepository courseRepository,
+                                      EnrollmentRepository enrollmentRepository,
+                                      NotificationService notificationService) {
         this.enrollmentService = enrollmentService;
         this.securityContextUtil = securityContextUtil;
         this.courseRepository = courseRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.notificationService = notificationService;
     }
 
     @PostMapping
@@ -54,12 +69,14 @@ public class CourseAssignmentController {
         }
 
         Course course = resolveCourse(request.getCourseId(), request.getCourseCode());
-        if (!Boolean.TRUE.equals(course.getActive()) || Boolean.TRUE.equals(course.getDraft())) {
+        boolean isActive = course.getActive() == null || Boolean.TRUE.equals(course.getActive());
+        boolean isDraft = Boolean.TRUE.equals(course.getDraft());
+        if (!isActive || isDraft) {
             throw new IllegalArgumentException("Only published, active courses can be assigned.");
         }
 
         int assigned = enrollmentService.assignCourseToEmployees(
-                request.getEmployeeIds(), course.getId(), course.getCourseId(), request.getDueDate());
+                request.getEmployeeIds(), course.getId(), course.getCourseId(), request.getDueDate(), request.getAssignmentType());
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "assignedCount", assigned,
@@ -77,7 +94,7 @@ public class CourseAssignmentController {
         }
 
         List<Map<String, Object>> rows = enrollmentRepository.findByCourseId(courseId).stream()
-                .filter(e -> e.getStatus() != EnrollmentStatus.REVOKED)
+                .filter(e -> e.getStatus() != EnrollmentStatus.REVOKED && e.getUser() != null)
                 .map(e -> {
                     User user = e.getUser();
                     Map<String, Object> row = new LinkedHashMap<>();
@@ -91,6 +108,7 @@ public class CourseAssignmentController {
                     row.put("status", e.getStatus() == null ? "" : e.getStatus().name());
                     row.put("progressPercent", e.getProgressPercent() == null ? 0 : e.getProgressPercent());
                     row.put("certificateId", e.getCertificateId());
+                    row.put("assignmentType", e.getEnrollmentType() == EnrollmentType.MANDATORY ? "Mandatory" : "Recommended");
                     return row;
                 })
                 .toList();
@@ -126,6 +144,28 @@ public class CourseAssignmentController {
             courseRepository.save(course);
         }
 
+        if (notificationService != null) {
+            notificationService.createNotificationSafely(
+                    userId,
+                    "Course Assignment Removed: " + course.getTitle(),
+                    String.format(
+                            "Your assignment for \"%s\" (%s) has been removed by Training Administration. Any prior learning progress is preserved.",
+                            course.getTitle(),
+                            course.getCourseId()
+                    ),
+                    NotificationType.ASSIGNMENT_REVOKED,
+                    NotificationPriority.NORMAL,
+                    "COURSE_CODE",
+                    course.getCourseId(),
+                    "/progress",
+                    null,
+                    Map.of(
+                            "courseId", course.getCourseId(),
+                            "courseTitle", course.getTitle()
+                    )
+            );
+        }
+
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Course access revoked. Learning history has been preserved."
@@ -157,6 +197,7 @@ public class CourseAssignmentController {
         private String courseCode;
         private List<Long> employeeIds;
         private LocalDate dueDate;
+        private String assignmentType;
 
         public Long getCourseId() { return courseId; }
         public void setCourseId(Long courseId) { this.courseId = courseId; }
@@ -166,5 +207,7 @@ public class CourseAssignmentController {
         public void setEmployeeIds(List<Long> employeeIds) { this.employeeIds = employeeIds; }
         public LocalDate getDueDate() { return dueDate; }
         public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
+        public String getAssignmentType() { return assignmentType; }
+        public void setAssignmentType(String assignmentType) { this.assignmentType = assignmentType; }
     }
 }

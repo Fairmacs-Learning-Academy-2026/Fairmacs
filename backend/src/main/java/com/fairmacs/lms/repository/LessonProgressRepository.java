@@ -24,6 +24,19 @@ public interface LessonProgressRepository extends JpaRepository<LessonProgress, 
             Long lessonId
     );
 
+    @Query("""
+        SELECT lp
+        FROM LessonProgress lp
+        JOIN FETCH lp.enrollment e
+        JOIN FETCH e.user u
+        JOIN FETCH e.course c
+        JOIN FETCH lp.lesson l
+        WHERE e.status <> com.fairmacs.lms.entity.EnrollmentStatus.REVOKED
+          AND u.status = com.fairmacs.lms.entity.UserStatus.ACTIVE
+          AND c.active = true
+    """)
+    List<LessonProgress> findAllActiveLessonProgressWithDetails();
+
     /**
      * Returns the number of lessons in a module
      * that have been completed for an enrollment.
@@ -78,4 +91,8 @@ public interface LessonProgressRepository extends JpaRepository<LessonProgress, 
             @Param("enrollmentId") Long enrollmentId,
             @Param("moduleId") Long moduleId
     );
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM LessonProgress lp WHERE lp.lesson.module.course.id = :courseId OR lp.enrollment.course.id = :courseId")
+    void deleteByCourseId(@Param("courseId") Long courseId);
 }

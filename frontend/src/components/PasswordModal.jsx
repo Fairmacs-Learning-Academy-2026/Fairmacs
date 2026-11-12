@@ -1,16 +1,34 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Lock,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  ShieldAlert,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { authService } from '../services/authService';
 
-export default function PasswordModal({ onClose }) {
-  const { changePassword } = useAuth();
+const labelStyle = {
+  display: 'block',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  color: '#334155',
+  marginBottom: '0.35rem'
+};
+
+const inputStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '0.65rem 0.85rem',
+  borderRadius: '8px',
+  border: '1px solid #cbd5e1',
+  fontSize: '0.88rem'
+};
+
+export default function PasswordModal({ onClose, forceChange = false }) {
+  const { changePassword, logout } = useAuth();
 
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
@@ -20,95 +38,73 @@ export default function PasswordModal({ onClose }) {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Close on Escape, except for the mandatory first-login change
+  useEffect(() => {
+    if (forceChange || typeof onClose !== 'function') return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !loading) onClose();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [forceChange, onClose, loading]);
+
+  const validateNewPasswordPolicy = (password) => {
+    if (!password || password.length < 8) {
+      return 'New password must be at least 8 characters long.';
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'New password must contain at least one uppercase letter.';
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'New password must contain at least one lowercase letter.';
+    }
+    if (!/[0-9]/.test(password)) {
+      return 'New password must contain at least one number.';
+    }
+    if (!/[^A-Za-z0-9\s]/.test(password)) {
+      return 'New password must contain at least one special character.';
+    }
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError('');
     setSuccess('');
 
-    /*
-     * STEP 1:
-     * Current password is required.
-     */
     if (!currentPass) {
       setError('Please enter your current password.');
+      return;
+    }
+
+    if (!newPass) {
+      setError('Please enter a new password.');
+      return;
+    }
+
+    const policyError = validateNewPasswordPolicy(newPass);
+    if (policyError) {
+      setError(policyError);
+      return;
+    }
+
+    if (newPass === currentPass) {
+      setError('New password must be different from your current password.');
+      return;
+    }
+
+    if (newPass !== confirmPass) {
+      setError('New password and confirmation password do not match.');
       return;
     }
 
     setLoading(true);
 
     try {
-      /*
-       * STEP 2:
-       * Verify the current password ONLY.
-       *
-       * This does NOT change the password.
-       */
-      const verification =
-        await authService.verifyCurrentPassword(
-          currentPass
-        );
-
-      /*
-       * Backend/API error.
-       */
-      if (!verification?.success) {
-        setError(
-          verification?.error ||
-          'Unable to verify current password.'
-        );
-        return;
-      }
-
-      /*
-       * STEP 3:
-       * Current password is incorrect.
-       *
-       * This check happens BEFORE checking
-       * new password and confirm password.
-       */
-      if (!verification.valid) {
-        setError(
-          'Current password does not match.'
-        );
-        return;
-      }
-
-      /*
-       * STEP 4:
-       * Now validate the new password.
-       */
-      if (!newPass) {
-        setError('Please enter a new password.');
-        return;
-      }
-
-      if (newPass.length < 8) {
-        setError(
-          'New password must be at least 8 characters long.'
-        );
-        return;
-      }
-
-      /*
-       * STEP 5:
-       * Check new password confirmation.
-       */
-      if (newPass !== confirmPass) {
-        setError(
-          'New password and confirmation password do not match.'
-        );
-        return;
-      }
-
-      /*
-       * STEP 6:
-       * Actually change the password.
-       */
-      const res = await changePassword(
-        currentPass,
-        newPass
-      );
+      const res = await changePassword(currentPass, newPass);
 
       if (!res?.success) {
         setError(
@@ -119,51 +115,51 @@ export default function PasswordModal({ onClose }) {
         return;
       }
 
-      /*
-       * STEP 7:
-       * Password successfully changed.
-       */
-      setSuccess(
-        'Corporate password updated successfully!'
-      );
-
+      setSuccess('Corporate password updated successfully!');
       setCurrentPass('');
       setNewPass('');
       setConfirmPass('');
 
-      setTimeout(() => {
-        onClose();
-      }, 1500);
+      if (typeof onClose === 'function') {
+        setTimeout(() => {
+          onClose();
+        }, 1200);
+      }
 
-    } catch (error) {
-      console.error(
-        'Password update failed:',
-        error
-      );
-
+    } catch (err) {
+      console.error('Password update failed:', err);
       setError(
-        error?.message ||
+        err?.message ||
         'Unable to update password. Please try again.'
       );
-
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" style={{ zIndex: 1200 }}>
       <div
         className="modal-content animate-fade-in"
-        style={{ maxWidth: '460px' }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="password-modal-title"
+        style={{
+          width: '100%',
+          maxWidth: '470px',
+          boxSizing: 'border-box',
+          padding: '1.75rem',
+          maxHeight: 'calc(100dvh - 32px)',
+          overflowY: 'auto'
+        }}
       >
-
         {/* Header */}
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            gap: '0.75rem',
             borderBottom: '1px solid #e2e8f0',
             paddingBottom: '1rem',
             marginBottom: '1.25rem'
@@ -173,54 +169,80 @@ export default function PasswordModal({ onClose }) {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              gap: '0.5rem',
+              minWidth: 0
             }}
           >
             <Lock
               style={{
                 width: 20,
                 height: 20,
+                flexShrink: 0,
                 color: '#0284c7'
               }}
             />
 
             <h3
+              id="password-modal-title"
               style={{
+                margin: 0,
                 fontSize: '1.15rem',
                 fontWeight: 800,
                 color: '#0f172a'
               }}
             >
-              Change Corporate Password
+              {forceChange ? 'Mandatory First-Login Password Change' : 'Change Password'}
             </h3>
           </div>
 
-          <button
-            onClick={onClose}
-            disabled={loading}
+          {!forceChange && typeof onClose === 'function' && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading}
+              aria-label="Close"
+              style={{
+                background: '#f1f5f9',
+                border: 'none',
+                padding: '0.4rem',
+                borderRadius: '50%',
+                flexShrink: 0,
+                color: '#64748b',
+                cursor: loading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <X style={{ width: 18, height: 18 }} />
+            </button>
+          )}
+        </div>
+
+        {forceChange && (
+          <div
             style={{
-              background: '#f1f5f9',
-              border: 'none',
-              padding: '0.4rem',
-              borderRadius: '50%',
-              color: '#64748b',
-              cursor: loading
-                ? 'not-allowed'
-                : 'pointer'
+              background: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              color: '#1e40af',
+              padding: '0.85rem',
+              borderRadius: '10px',
+              fontSize: '0.82rem',
+              lineHeight: 1.5,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.6rem',
+              marginBottom: '1rem'
             }}
           >
-            <X
-              style={{
-                width: 18,
-                height: 18
-              }}
-            />
-          </button>
-        </div>
+            <ShieldAlert style={{ width: 18, height: 18, flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <strong>Action Required:</strong> You signed in with a temporary password. For your account security, please set a new personal password before accessing the Fairmacs LMS.
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
           <div
+            role="alert"
             style={{
               background: '#fff1f2',
               border: '1px solid #fecdd3',
@@ -242,7 +264,6 @@ export default function PasswordModal({ onClose }) {
                 flexShrink: 0
               }}
             />
-
             <span>{error}</span>
           </div>
         )}
@@ -250,6 +271,7 @@ export default function PasswordModal({ onClose }) {
         {/* Success Message */}
         {success && (
           <div
+            role="status"
             style={{
               background: '#f0fdf4',
               border: '1px solid #bbf7d0',
@@ -271,7 +293,6 @@ export default function PasswordModal({ onClose }) {
                 flexShrink: 0
               }}
             />
-
             <span>{success}</span>
           </div>
         )}
@@ -285,103 +306,64 @@ export default function PasswordModal({ onClose }) {
             gap: '1rem'
           }}
         >
-
           {/* Current Password */}
           <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                color: '#334155',
-                marginBottom: '0.35rem'
-              }}
-            >
-              Current Password
+            <label htmlFor="current-password" style={labelStyle}>
+              Current / Temporary Password
             </label>
 
             <input
+              id="current-password"
               type="password"
               required
+              autoFocus
+              autoComplete="current-password"
               value={currentPass}
-              onChange={(e) =>
-                setCurrentPass(e.target.value)
-              }
+              onChange={(e) => setCurrentPass(e.target.value)}
               placeholder="Enter current password"
               disabled={loading}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.88rem'
-              }}
+              style={inputStyle}
             />
           </div>
 
           {/* New Password */}
           <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                color: '#334155',
-                marginBottom: '0.35rem'
-              }}
-            >
+            <label htmlFor="new-password" style={labelStyle}>
               New Password
             </label>
 
             <input
+              id="new-password"
               type="password"
               required
+              autoComplete="new-password"
               value={newPass}
-              onChange={(e) =>
-                setNewPass(e.target.value)
-              }
-              placeholder="Min. 8 characters"
+              onChange={(e) => setNewPass(e.target.value)}
+              placeholder="Min. 8 characters..."
               disabled={loading}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.88rem'
-              }}
+              style={inputStyle}
             />
+            <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '0.3rem', lineHeight: 1.45 }}>
+              Must include at least 8 characters, uppercase, lowercase, number, and special character.
+            </div>
           </div>
 
           {/* Confirm Password */}
           <div>
-            <label
-              style={{
-                display: 'block',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                color: '#334155',
-                marginBottom: '0.35rem'
-              }}
-            >
+            <label htmlFor="confirm-password" style={labelStyle}>
               Confirm New Password
             </label>
 
             <input
+              id="confirm-password"
               type="password"
               required
+              autoComplete="new-password"
               value={confirmPass}
-              onChange={(e) =>
-                setConfirmPass(e.target.value)
-              }
+              onChange={(e) => setConfirmPass(e.target.value)}
               placeholder="Re-enter new password"
               disabled={loading}
-              style={{
-                width: '100%',
-                padding: '0.65rem 0.85rem',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '0.88rem'
-              }}
+              style={inputStyle}
             />
           </div>
 
@@ -391,17 +373,35 @@ export default function PasswordModal({ onClose }) {
               display: 'flex',
               gap: '0.75rem',
               justifyContent: 'flex-end',
+              flexWrap: 'wrap',
               marginTop: '0.5rem'
             }}
           >
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancel
-            </button>
+            {forceChange ? (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={logout}
+                disabled={loading}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <LogOut style={{ width: 15, height: 15 }} />
+                Sign Out
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={onClose}
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            )}
 
             <button
               type="submit"
@@ -412,7 +412,7 @@ export default function PasswordModal({ onClose }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.4rem',
-                minWidth: '145px'
+                minWidth: '155px'
               }}
             >
               {loading ? (
@@ -421,11 +421,9 @@ export default function PasswordModal({ onClose }) {
                     style={{
                       width: 16,
                       height: 16,
-                      animation:
-                        'spin 1s linear infinite'
+                      animation: 'spin 1s linear infinite'
                     }}
                   />
-
                   Updating...
                 </>
               ) : (
@@ -433,7 +431,6 @@ export default function PasswordModal({ onClose }) {
               )}
             </button>
           </div>
-
         </form>
       </div>
     </div>

@@ -1,16 +1,16 @@
 package com.fairmacs.lms.security;
 
-import com.fairmacs.lms.entity.User;
-import com.fairmacs.lms.entity.UserStatus;
-import com.fairmacs.lms.repository.UserRepository;
+import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Optional;
 
-import io.jsonwebtoken.Claims;
-
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -18,10 +18,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import com.fairmacs.lms.entity.User;
+import com.fairmacs.lms.entity.UserStatus;
+import com.fairmacs.lms.repository.UserRepository;
+
+import io.jsonwebtoken.Claims;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -32,7 +37,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     public JwtAuthenticationFilter(
             UserRepository userRepository,
             JwtService jwtService) {
-
         this.userRepository = userRepository;
         this.jwtService = jwtService;
     }
@@ -44,206 +48,111 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
-        String authHeader =
-                request.getHeader("Authorization");
+        String authHeader = request.getHeader("Authorization");
 
-        /*
-         * No Authorization header.
-         *
-         * Let Spring Security handle the request.
-         */
-        if (authHeader == null ||
-                !authHeader.startsWith("Bearer ")) {
-
-            filterChain.doFilter(
-                    request,
-                    response
-            );
-
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
             return;
         }
 
-        String token =
-                authHeader.substring(7).trim();
-
-        /*
-         * Empty token.
-         */
+        String token = authHeader.substring(7).trim();
         if (token.isEmpty()) {
-
-            filterChain.doFilter(
-                    request,
-                    response
-            );
-
+            filterChain.doFilter(request, response);
             return;
         }
 
         try {
-
-            // =====================================================
-            // 1. VALIDATE TOKEN USING JwtService
-            // =====================================================
-
+            // 1. Validate JWT signature and expiration
             if (!jwtService.isTokenValid(token)) {
-
-                logger.warn(
-                        "Rejected invalid or expired JWT for request: "
-                                + request.getRequestURI()
-                );
-
+                logger.debug("Rejected invalid or expired JWT for request: " + request.getRequestURI());
                 SecurityContextHolder.clearContext();
-
-                filterChain.doFilter(
-                        request,
-                        response
-                );
-
+                filterChain.doFilter(request, response);
                 return;
             }
 
+            // 2. Extract claims
+            Claims claims = jwtService.extractClaims(token);
+            String username = claims.getSubject();
 
-            // =====================================================
-            // 2. EXTRACT JWT CLAIMS
-            // =====================================================
-
-            Claims claims =
-                    jwtService.extractClaims(token);
-
-            String username =
-                    claims.getSubject();
-
-            if (username == null ||
-                    username.trim().isEmpty()) {
-
-                logger.warn(
-                        "JWT does not contain a subject."
-                );
-
+            if (username == null || username.trim().isEmpty()) {
+                logger.debug("JWT does not contain a subject.");
                 SecurityContextHolder.clearContext();
-
-                filterChain.doFilter(
-                        request,
-                        response
-                );
-
+                filterChain.doFilter(request, response);
                 return;
             }
+            username = username.trim();
 
-
-            username =
-                    username.trim();
-
-
-            // =====================================================
-            // 3. FIND USER FROM DATABASE
-            // =====================================================
-
-            Optional<User> userOptional =
-                    userRepository
-                            .findByEmailOrEmployeeIdIgnoreCase(
-                                    username
-                            );
-
+            // 3. Load authoritative user from database
+            Optional<User> userOptional = userRepository.findByEmailOrEmployeeIdIgnoreCase(username);
             if (userOptional.isEmpty()) {
-
-                logger.warn(
-                        "JWT user not found in database: "
-                                + username
-                );
-
+                logger.debug("JWT subject not found in database.");
                 SecurityContextHolder.clearContext();
-
-                filterChain.doFilter(
-                        request,
-                        response
-                );
-
+                filterChain.doFilter(request, response);
                 return;
             }
 
-            User user =
-                    userOptional.get();
+            User user = userOptional.get();
 
-
-            // =====================================================
-            // 4. CHECK ACCOUNT STATUS
-            // =====================================================
-
+            // 4. Verify account status and lockout state
             if (user.getStatus() != UserStatus.ACTIVE) {
-
-                logger.warn(
-                        "Blocked authentication attempt for inactive user: "
-                                + username
-                );
-
+                logger.debug("Blocked token usage for non-active user ID: " + user.getId());
                 SecurityContextHolder.clearContext();
-
-                filterChain.doFilter(
-                        request,
-                        response
-                );
-
+                filterChain.doFilter(request, response);
                 return;
             }
 
-
-            // =====================================================
-            // 5. USE DATABASE ROLE
-            // =====================================================
-
-            String role =
-                    user.getRole().name();
-
-            List<GrantedAuthority> authorities =
-                    new ArrayList<>();
-
-            authorities.add(
-                    new SimpleGrantedAuthority(
-                            "ROLE_" + role
-                    )
-            );
-
-
-            // =====================================================
-            // 6. GET USER ID
-            // =====================================================
-
-            Long userId =
-                    user.getId();
-
-
-            /*
-             * If userId exists in the JWT, use it.
-             * Otherwise fall back to the database ID.
-             */
-            Object userIdClaim =
-                    claims.get("userId");
-
-            if (userIdClaim instanceof Number) {
-
-                userId =
-                        ((Number) userIdClaim)
-                                .longValue();
+            if (user.getLockedUntil() != null && LocalDateTime.now().isBefore(user.getLockedUntil())) {
+                logger.debug("Blocked token usage for temporarily locked user ID: " + user.getId());
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
             }
 
+            // 5. Verify userId claim matches authoritative database ID (if present)
+            Long userId = user.getId();
+            Object userIdClaim = claims.get("userId");
+            if (userIdClaim instanceof Number) {
+                long claimedId = ((Number) userIdClaim).longValue();
+                if (userId != null && claimedId != userId.longValue()) {
+                    logger.warn("Rejected JWT due to userId claim mismatch for user ID: " + userId);
+                    SecurityContextHolder.clearContext();
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+            }
 
-            // =====================================================
-            // 7. CREATE JWT DETAILS
-            // =====================================================
+            // 6. Verify token was not issued prior to the user's most recent password change
+            if (isTokenInvalidatedByPasswordChange(claims, user)) {
+                logger.debug("Rejected JWT issued prior to password change for user ID: " + userId);
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
 
-            CurrentJwtClaims claimsDetails =
-                    new CurrentJwtClaims(
-                            userId,
-                            role,
-                            request.getRemoteAddr(),
-                            request.getRequestedSessionId()
-                    );
+            // 7. Server-side enforcement of mandatory first-login / temporary password change
+            if (Boolean.TRUE.equals(user.getMustChangePassword()) && !isAllowedDuringPasswordChangeLock(request)) {
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write(
+                        "{\"success\":false,\"error\":\"PASSWORD_CHANGE_REQUIRED\",\"mustChangePassword\":true,"
+                                + "\"message\":\"You must change your temporary password before accessing the LMS.\"}"
+                );
+                return;
+            }
 
+            // 8. Always derive role and userId from the authoritative database record
+            String role = user.getRole().name();
+            List<GrantedAuthority> authorities = new ArrayList<>();
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
 
-            // =====================================================
-            // 8. CREATE AUTHENTICATION
-            // =====================================================
+            CurrentJwtClaims claimsDetails = new CurrentJwtClaims(
+                    userId,
+                    role,
+                    request.getRemoteAddr(),
+                    request.getRequestedSessionId()
+            );
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
@@ -251,61 +160,55 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             null,
                             authorities
                     );
+            authentication.setDetails(claimsDetails);
 
-            authentication.setDetails(
-                    claimsDetails
-            );
-
-
-            // =====================================================
-            // 9. STORE AUTHENTICATION IN SECURITY CONTEXT
-            // =====================================================
-
-            SecurityContextHolder
-                    .getContext()
-                    .setAuthentication(
-                            authentication
-                    );
-
-            logger.debug(
-                    "JWT authentication successful for user: "
-                            + username
-                            + " with role: "
-                            + role
-            );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
         } catch (Exception e) {
-
-            /*
-             * IMPORTANT:
-             *
-             * Do not create an authentication object when
-             * JWT validation fails.
-             */
             SecurityContextHolder.clearContext();
-
-            logger.error(
-                    "JWT authentication failed for request: "
-                            + request.getRequestURI(),
-                    e
-            );
+            logger.debug("JWT authentication failed for request: " + request.getRequestURI());
         }
 
-
-        // =========================================================
-        // CONTINUE REQUEST
-        // =========================================================
-
-        filterChain.doFilter(
-                request,
-                response
-        );
+        filterChain.doFilter(request, response);
     }
 
+    private boolean isTokenInvalidatedByPasswordChange(Claims claims, User user) {
+        LocalDateTime pwdChangedAt = user.getPasswordChangedAt();
+        if (pwdChangedAt == null) {
+            return false;
+        }
 
-    // ============================================================
-    // CURRENT JWT CLAIMS
-    // ============================================================
+        long userPwdChangedMillis = pwdChangedAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        Object tokenPwdChangedClaim = claims.get("pwdChangedAt");
+        if (tokenPwdChangedClaim instanceof Number) {
+            long tokenPwdChangedMillis = ((Number) tokenPwdChangedClaim).longValue();
+            return tokenPwdChangedMillis < userPwdChangedMillis;
+        }
+
+        Date issuedAt = claims.getIssuedAt();
+        if (issuedAt == null) {
+            return true;
+        }
+        Instant pwdChangedInstantSeconds = pwdChangedAt
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+                .truncatedTo(ChronoUnit.SECONDS);
+        return issuedAt.toInstant().isBefore(pwdChangedInstantSeconds);
+    }
+
+    private boolean isAllowedDuringPasswordChangeLock(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri == null) {
+            return false;
+        }
+        String method = request.getMethod();
+        if ("OPTIONS".equalsIgnoreCase(method)) {
+            return true;
+        }
+        return uri.endsWith("/api/auth/change-password")
+                || uri.endsWith("/api/auth/me")
+                || uri.endsWith("/api/auth/logout");
+    }
 
     public static class CurrentJwtClaims {
 
@@ -319,7 +222,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String role,
                 String remoteAddress,
                 String sessionId) {
-
             this.userId = userId;
             this.role = role;
             this.remoteAddress = remoteAddress;

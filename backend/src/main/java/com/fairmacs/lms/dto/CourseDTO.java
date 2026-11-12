@@ -11,12 +11,23 @@ public class CourseDTO {
     private String title;
     private String category;
     private String categorySlug;
+    private String department;
+    private Long departmentId;
+    private String owningDepartmentName;
+    private List<CourseDepartmentAssignmentDTO> departmentAssignments = new ArrayList<>();
+    private List<String> departments = new ArrayList<>();
+    private String publishedAt;
+    private List<String> learningOutcomes = new ArrayList<>();
+    private Boolean certificateEligible;
     private String level;
     private String duration;
     private Double durationHours;
     private Double rating;
     private Integer enrolledCount;
+    private Integer moduleCount;
+    private Integer lessonCount;
     private String banner;
+    private Boolean active = true;
     private String description;
     private Integer passingScore;
     private Boolean foundation;
@@ -61,6 +72,70 @@ public class CourseDTO {
         this.category = category;
     }
 
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    public Long getDepartmentId() {
+        return departmentId;
+    }
+
+    public void setDepartmentId(Long departmentId) {
+        this.departmentId = departmentId;
+    }
+
+    public String getOwningDepartmentName() {
+        return owningDepartmentName;
+    }
+
+    public void setOwningDepartmentName(String owningDepartmentName) {
+        this.owningDepartmentName = owningDepartmentName;
+    }
+
+    public List<CourseDepartmentAssignmentDTO> getDepartmentAssignments() {
+        return departmentAssignments;
+    }
+
+    public void setDepartmentAssignments(List<CourseDepartmentAssignmentDTO> departmentAssignments) {
+        this.departmentAssignments = departmentAssignments != null ? departmentAssignments : new ArrayList<>();
+    }
+
+    public List<String> getDepartments() {
+        return departments;
+    }
+
+    public void setDepartments(List<String> departments) {
+        this.departments = departments;
+    }
+
+    public String getPublishedAt() {
+        return publishedAt;
+    }
+
+    public void setPublishedAt(String publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public List<String> getLearningOutcomes() {
+        return learningOutcomes;
+    }
+
+    public void setLearningOutcomes(List<String> learningOutcomes) {
+        this.learningOutcomes = learningOutcomes;
+    }
+
+    public Boolean getCertificateEligible() {
+        return certificateEligible;
+    }
+
+    public void setCertificateEligible(Boolean certificateEligible) {
+        this.certificateEligible = certificateEligible;
+    }
+
     public String getCategorySlug() {
         return categorySlug;
     }
@@ -75,6 +150,14 @@ public class CourseDTO {
 
     public void setLevel(String level) {
         this.level = level;
+    }
+
+    public String getPosition() {
+        return level;
+    }
+
+    public void setPosition(String position) {
+        this.level = position;
     }
 
     public String getDuration() {
@@ -109,12 +192,48 @@ public class CourseDTO {
         this.enrolledCount = enrolledCount;
     }
 
+    public Integer getModuleCount() {
+        return moduleCount;
+    }
+
+    public void setModuleCount(Integer moduleCount) {
+        this.moduleCount = moduleCount;
+    }
+
+    public Integer getLessonCount() {
+        return lessonCount;
+    }
+
+    public void setLessonCount(Integer lessonCount) {
+        this.lessonCount = lessonCount;
+    }
+
     public String getBanner() {
         return banner;
     }
 
     public void setBanner(String banner) {
         this.banner = banner;
+    }
+
+    public String getThumbnailUrl() {
+        return banner;
+    }
+
+    public void setThumbnailUrl(String thumbnailUrl) {
+        if (this.banner == null || this.banner.isBlank()) {
+            this.banner = thumbnailUrl;
+        }
+    }
+
+    public String getThumbnail() {
+        return banner;
+    }
+
+    public void setThumbnail(String thumbnail) {
+        if (this.banner == null || this.banner.isBlank()) {
+            this.banner = thumbnail;
+        }
     }
 
     public String getDescription() {
@@ -131,6 +250,14 @@ public class CourseDTO {
 
     public void setPassingScore(Integer passingScore) {
         this.passingScore = passingScore;
+    }
+
+    public Boolean getActive() {
+        return active;
+    }
+
+    public void setActive(Boolean active) {
+        this.active = active;
     }
 
     public Boolean getFoundation() {
@@ -269,8 +396,12 @@ public class CourseDTO {
         private String title;
         private String type;
         private String duration;
+        private String summary;
         private String assetUrl;
         private String workdriveFileId;
+
+        public String getSummary() { return summary; }
+        public void setSummary(String summary) { this.summary = summary; }
 
         public String getWorkdriveFileId() {return workdriveFileId;}
 

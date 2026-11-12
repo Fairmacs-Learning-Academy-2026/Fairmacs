@@ -9,7 +9,10 @@ import com.fairmacs.lms.dto.DepartmentSummaryDTO;
 import com.fairmacs.lms.entity.Course;
 import com.fairmacs.lms.entity.Department;
 import com.fairmacs.lms.entity.Enrollment;
+import com.fairmacs.lms.entity.EnrollmentStatus;
+import com.fairmacs.lms.entity.EnrollmentType;
 import com.fairmacs.lms.entity.User;
+import java.time.LocalDate;
 import com.fairmacs.lms.repository.CourseRepository;
 import com.fairmacs.lms.repository.DepartmentRepository;
 import com.fairmacs.lms.repository.EnrollmentRepository;
@@ -73,7 +76,8 @@ public class DepartmentService {
                 .filter(e -> e.getUser() != null)
                 .filter(e -> e.getCourse() != null)
                 .filter(e -> e.getUser().getDepartment() != null)
-                .filter(e -> e.getUser().getDepartment().equalsIgnoreCase(departmentName))
+                .filter(e -> e.getUser().getDepartment().equalsIgnoreCase(departmentName)
+                        || isCourseOwnedByDepartment(e.getCourse(), departmentName))
                 .toList();
 
         Map<Long, List<Enrollment>> grouped = enrollments.stream()
@@ -84,10 +88,37 @@ public class DepartmentService {
                 ));
 
         List<DepartmentCourseDTO> result = new ArrayList<>();
+        LocalDate today = LocalDate.now();
 
         for (Map.Entry<Long, List<Enrollment>> entry : grouped.entrySet()) {
             Course course = entry.getValue().get(0).getCourse();
             List<Enrollment> courseEnrollments = entry.getValue();
+
+            boolean isOwned = isCourseOwnedByDepartment(course, departmentName);
+            String owningName = course.getOwningDepartment() != null
+                    ? course.getOwningDepartment().getName()
+                    : (isOwned ? departmentName : "General");
+
+            long mandCount = courseEnrollments.stream()
+                    .filter(e -> e.getEnrollmentType() == EnrollmentType.MANDATORY)
+                    .count();
+            long recCount = courseEnrollments.stream()
+                    .filter(e -> e.getEnrollmentType() == EnrollmentType.RECOMMENDED || e.getEnrollmentType() == EnrollmentType.SELF_SELECTED)
+                    .count();
+            long compCount = courseEnrollments.stream()
+                    .filter(e -> e.getStatus() == EnrollmentStatus.COMPLETED)
+                    .count();
+
+            long overdueCount = courseEnrollments.stream()
+                    .filter(e -> e.getStatus() != EnrollmentStatus.COMPLETED && e.getDueDate() != null && e.getDueDate().isBefore(today))
+                    .count();
+
+            double avgScore = courseEnrollments.stream()
+                    .map(Enrollment::getScore)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .average()
+                    .orElse(0.0);
 
             double completionRate = courseEnrollments.stream()
                     .map(Enrollment::getProgressPercent)
@@ -96,14 +127,23 @@ public class DepartmentService {
                     .average()
                     .orElse(0.0);
 
-            result.add(new DepartmentCourseDTO(
+            DepartmentCourseDTO dto = new DepartmentCourseDTO(
                     course.getId(),
                     course.getCourseId(),
                     course.getTitle(),
                     course.getActive(),
                     courseEnrollments.size(),
                     round(completionRate)
-            ));
+            );
+            dto.setOwned(isOwned);
+            dto.setOwningDepartmentName(owningName);
+            dto.setAssignmentType(mandCount > 0 ? "MANDATORY" : (recCount > 0 ? "RECOMMENDED" : (isOwned ? "OWNED_COURSE" : "MANDATORY")));
+            dto.setMandatoryCount((int) mandCount);
+            dto.setRecommendedCount((int) recCount);
+            dto.setCompletedCount((int) compCount);
+            dto.setOverdueCount((int) overdueCount);
+            dto.setAverageScore(round(avgScore));
+            result.add(dto);
         }
 
         result.sort(Comparator.comparing(
@@ -124,7 +164,19 @@ public class DepartmentService {
                 .average()
                 .orElse(0.0);
 
-        return new DepartmentDetailsDTO(
+        long ownedCount = courses.stream().filter(DepartmentCourseDTO::isOwned).count();
+        long assignedCount = courses.stream().filter(c -> !c.isOwned() || c.getMandatoryCount() > 0 || c.getRecommendedCount() > 0).count();
+        int totalMandatory = courses.stream().mapToInt(DepartmentCourseDTO::getMandatoryCount).sum();
+        int totalRecommended = courses.stream().mapToInt(DepartmentCourseDTO::getRecommendedCount).sum();
+        int totalOverdue = courses.stream().mapToInt(DepartmentCourseDTO::getOverdueCount).sum();
+
+        double avgDeptScore = courses.stream()
+                .filter(c -> c.getAverageScore() > 0)
+                .mapToDouble(DepartmentCourseDTO::getAverageScore)
+                .average()
+                .orElse(0.0);
+
+        DepartmentDetailsDTO details = new DepartmentDetailsDTO(
                 department.getId(),
                 department.getName(),
                 department.getHeadId(),
@@ -135,6 +187,13 @@ public class DepartmentService {
                 employees,
                 courses
         );
+        details.setOwnedCoursesCount((int) ownedCount);
+        details.setAssignedCoursesCount((int) (assignedCount > 0 ? assignedCount : courses.size()));
+        details.setMandatoryAssignmentsCount(totalMandatory);
+        details.setRecommendedAssignmentsCount(totalRecommended);
+        details.setOverdueAssignmentsCount(totalOverdue);
+        details.setAverageAssessmentScore(round(avgDeptScore));
+        return details;
     }
 
     @Transactional(readOnly = true)
@@ -149,7 +208,8 @@ public class DepartmentService {
         List<CourseEmployeeDTO> employees = enrollmentRepository.findByCourseId(courseId).stream()
                 .filter(e -> e.getUser() != null)
                 .filter(e -> e.getUser().getDepartment() != null)
-                .filter(e -> e.getUser().getDepartment().equalsIgnoreCase(department.getName()))
+                .filter(e -> e.getUser().getDepartment().equalsIgnoreCase(department.getName())
+                        || isCourseOwnedByDepartment(course, department.getName()))
                 .map(this::toCourseEmployeeDTO)
                 .sorted(Comparator.comparing(
                         CourseEmployeeDTO::getName,
@@ -223,6 +283,32 @@ public class DepartmentService {
                 enrollment.getEnrolledAt(),
                 enrollment.getCompletedDate()
         );
+    }
+
+    private boolean isCourseOwnedByDepartment(Course course, String departmentName) {
+        if (course == null || departmentName == null || departmentName.isBlank()) {
+            return false;
+        }
+        if (course.getOwningDepartment() != null) {
+            return departmentName.equalsIgnoreCase(course.getOwningDepartment().getName());
+        }
+        if (course.getCatalogCategory() != null
+                && !course.getCatalogCategory().getName().equalsIgnoreCase("Uncategorized")
+                && course.getCatalogCategory().getName().equalsIgnoreCase(departmentName)) {
+            return true;
+        }
+        if (course.getCategory() != null
+                && !course.getCategory().isBlank()
+                && !course.getCategory().equalsIgnoreCase("Uncategorized")
+                && course.getCategory().equalsIgnoreCase(departmentName)) {
+            return true;
+        }
+        if (course.getDraftPayload() != null && !course.getDraftPayload().isBlank()) {
+            if (course.getDraftPayload().toLowerCase().contains("\"department\":\"" + departmentName.toLowerCase() + "\"")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private double round(double value) {

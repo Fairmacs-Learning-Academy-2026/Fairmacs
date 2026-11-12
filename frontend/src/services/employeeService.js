@@ -1,19 +1,24 @@
 // Employee Service
 // Handles employee-related API calls
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import {
+  API_BASE_URL,
+  getAuthHeaders,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
 export const employeeService = {
   // Get all employees
   getAllEmployees: async () => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/employees`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch employees');
@@ -28,14 +33,15 @@ export const employeeService = {
 
   // Get employee by ID
   getEmployeeById: async (employeeId) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/employees/${employeeId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return null;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch employee');
@@ -50,14 +56,15 @@ export const employeeService = {
 
   // Get employees by department
   getEmployeesByDepartment: async (department) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/employees/department/${department}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return [];
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch department employees');
@@ -72,17 +79,17 @@ export const employeeService = {
 
   // Create employee (HR only)
   createEmployee: async (employeeData) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/employees`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(employeeData),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to create employee');
@@ -97,17 +104,17 @@ export const employeeService = {
 
   // Update employee (HR only)
   updateEmployee: async (employeeId, employeeData) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/employees/${employeeId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(employeeData),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to update employee');
@@ -122,15 +129,16 @@ export const employeeService = {
 
   // Delete employee (HR only)
   deleteEmployee: async (employeeId) => {
-    const token = localStorage.getItem('fairmacs_token');
-    
     try {
       const response = await fetch(`${API_BASE_URL}/employees/${employeeId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
+
+      if (response.status === 401) {
+        handleUnauthorized(true);
+        return { success: false, error: 'Unauthorized' };
+      }
 
       if (!response.ok) {
         throw new Error('Failed to delete employee');

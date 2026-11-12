@@ -66,7 +66,9 @@ public class ZohoOAuthService {
 
     public String createAuthorizationUrl() {
         String state = UUID.randomUUID().toString();
-        pendingStates.put(state, Instant.now().plusSeconds(300));
+        Instant expiry = Instant.now().plusSeconds(300);
+        pendingStates.put(state, expiry);
+        saveOAuthState(state, expiry);
 
         return UriComponentsBuilder
                 .fromUriString(accountsUrl + "/oauth/v2/auth")
@@ -86,7 +88,7 @@ public class ZohoOAuthService {
     }
 
     public synchronized void exchangeCode(String code, String state) {
-        Instant expiry = pendingStates.remove(state);
+        Instant expiry = consumeOAuthState(state);
 
         if (expiry == null || !Instant.now().isBefore(expiry)) {
             throw new IllegalArgumentException(
@@ -177,6 +179,48 @@ public class ZohoOAuthService {
         } catch (Exception ex) {
             return false;
         }
+    }
+
+    private void saveOAuthState(String state, Instant expiry) {
+        if (jdbcTemplate == null) {
+            return;
+        }
+        try {
+            jdbcTemplate.update("DELETE FROM zoho_oauth_states WHERE expires_at < NOW()");
+            jdbcTemplate.update(
+                    "INSERT INTO zoho_oauth_states (state, expires_at, created_at) VALUES (?, ?, NOW()) ON CONFLICT (state) DO UPDATE SET expires_at = EXCLUDED.expires_at",
+                    state,
+                    java.sql.Timestamp.from(expiry)
+            );
+        } catch (Exception ignored) {
+            // Fallback to in-memory pendingStates if table is unavailable in unit-test context
+        }
+    }
+
+    private Instant consumeOAuthState(String state) {
+        if (state == null || state.isBlank()) {
+            return null;
+        }
+        Instant inMemoryExpiry = pendingStates.remove(state);
+        if (jdbcTemplate != null) {
+            try {
+                var rows = jdbcTemplate.query(
+                        "SELECT expires_at FROM zoho_oauth_states WHERE state = ?",
+                        (rs, rowNum) -> {
+                            java.sql.Timestamp ts = rs.getTimestamp(1);
+                            return ts != null ? ts.toInstant() : null;
+                        },
+                        state
+                );
+                jdbcTemplate.update("DELETE FROM zoho_oauth_states WHERE state = ? OR expires_at < NOW()", state);
+                if (!rows.isEmpty() && rows.get(0) != null) {
+                    return rows.get(0);
+                }
+            } catch (Exception ignored) {
+                // Fallback to inMemoryExpiry
+            }
+        }
+        return inMemoryExpiry;
     }
 
     private void setAccessToken(Map<?, ?> result) {

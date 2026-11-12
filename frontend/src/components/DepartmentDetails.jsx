@@ -18,7 +18,7 @@ import {
   Clock3,
 } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
 
 function CircularProgress({ percent = 0, size = 50, strokeWidth = 3.5 }) {
   const radius = (size - strokeWidth) / 2;
@@ -69,6 +69,7 @@ export default function DepartmentDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [courseTab, setCourseTab] = useState('ALL');
 
   const loadDepartmentDetails = async () => {
     try {
@@ -119,6 +120,14 @@ export default function DepartmentDetails() {
     [department]
   );
 
+  const displayedCourses = useMemo(() => {
+    return courses.filter(c => {
+      if (courseTab === 'ASSIGNED') return !c.owned;
+      if (courseTab === 'OWNED') return c.owned;
+      return true;
+    });
+  }, [courses, courseTab]);
+
   const filteredEmployees = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return employees;
@@ -163,7 +172,7 @@ export default function DepartmentDetails() {
     };
   };
 
-  const handleBack = () => navigate('/admin?tab=departments');
+  const handleBack = () => navigate('/hr/departments');
 
   const handleViewCourse = (courseId) => {
     navigate(`/hr/departments/${departmentId}/courses/${courseId}`);
@@ -257,61 +266,88 @@ export default function DepartmentDetails() {
             </section>
 
             {/* Statistics */}
-            <section className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
-              <div className="flex min-h-[108px] items-center rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+            <section className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="flex min-h-[96px] items-center rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
                   <Users className="h-5 w-5" />
                 </div>
-                <div className="ml-5">
-                  <p className="text-2xl font-extrabold leading-none text-slate-900">
+                <div className="ml-4 min-w-0">
+                  <p className="text-xl font-extrabold leading-none text-slate-900">
                     {employeeCount}
                   </p>
-                  <p className="mt-2 text-sm font-medium text-slate-500">
+                  <p className="mt-1.5 truncate text-xs font-semibold text-slate-500">
                     Employees
                   </p>
                 </div>
               </div>
 
-              <div className="flex min-h-[108px] items-center rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
+              <div className="flex min-h-[96px] items-center rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-600">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div className="ml-4 min-w-0">
+                  <p className="text-xl font-extrabold leading-none text-slate-900">
+                    {department?.ownedCoursesCount ?? 0}
+                  </p>
+                  <p className="mt-1.5 truncate text-xs font-semibold text-slate-500">
+                    Owned Courses
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex min-h-[96px] items-center rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
                   <BookOpen className="h-5 w-5" />
                 </div>
-                <div className="ml-5">
-                  <p className="text-2xl font-extrabold leading-none text-slate-900">
-                    {courseCount}
+                <div className="ml-4 min-w-0">
+                  <p className="text-xl font-extrabold leading-none text-slate-900">
+                    {department?.assignedCoursesCount ?? courses.length}
                   </p>
-                  <p className="mt-2 text-sm font-medium text-slate-500">
+                  <p className="mt-1.5 truncate text-xs font-semibold text-slate-500">
                     Assigned Courses
                   </p>
                 </div>
               </div>
 
-              <div className="min-h-[108px] rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-                <div className="flex items-center">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
-                    <CheckSquare className="h-5 w-5" />
-                  </div>
-
-                  <div className="ml-5">
-                    <p className="text-2xl font-extrabold leading-none text-slate-900">
-                      {completionRate}%
-                    </p>
-                    <p className="mt-2 text-sm font-medium text-slate-500">
-                      Completion Rate
-                    </p>
-                  </div>
+              <div className="flex min-h-[96px] items-center rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                  <CheckSquare className="h-5 w-5" />
                 </div>
+                <div className="ml-4 min-w-0">
+                  <p className="text-xl font-extrabold leading-none text-slate-900">
+                    {completionRate}%
+                  </p>
+                  <p className="mt-1.5 truncate text-xs font-semibold text-slate-500">
+                    Completion Rate
+                  </p>
+                </div>
+              </div>
 
-                <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-sky-600 transition-all duration-500"
-                    style={{
-                      width: `${Math.max(
-                        0,
-                        Math.min(100, completionRate)
-                      )}%`,
-                    }}
-                  />
+              <div className="flex min-h-[96px] items-center rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
+                  <Clock3 className="h-5 w-5" />
+                </div>
+                <div className="ml-4 min-w-0">
+                  <p className="text-xl font-extrabold leading-none text-rose-600">
+                    {department?.overdueAssignmentsCount ?? 0}
+                  </p>
+                  <p className="mt-1.5 truncate text-xs font-semibold text-slate-500">
+                    Overdue
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex min-h-[96px] items-center rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                  <Award className="h-5 w-5" />
+                </div>
+                <div className="ml-4 min-w-0">
+                  <p className="text-xl font-extrabold leading-none text-slate-900">
+                    {department?.averageAssessmentScore ?? 0}%
+                  </p>
+                  <p className="mt-1.5 truncate text-xs font-semibold text-slate-500">
+                    Avg Score
+                  </p>
                 </div>
               </div>
             </section>
@@ -440,26 +476,57 @@ export default function DepartmentDetails() {
               {/* Courses card */}
               <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="mb-5">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-                      <BookOpen className="h-4 w-4" />
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                        <BookOpen className="h-4 w-4" />
+                      </div>
+                      <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                        Department Courses
+                      </h2>
                     </div>
-                    <h2 className="text-xl font-bold tracking-tight text-slate-900">
-                      Assigned Courses
-                    </h2>
+
+                    {/* Filter tabs */}
+                    <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setCourseTab('ALL')}
+                        className={`px-2.5 py-1 rounded-md transition-colors ${courseTab === 'ALL' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
+                      >
+                        All ({courses.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCourseTab('ASSIGNED')}
+                        className={`px-2.5 py-1 rounded-md transition-colors ${courseTab === 'ASSIGNED' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
+                      >
+                        Assigned ({department?.assignedCoursesCount ?? courses.filter(c => !c.owned).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCourseTab('OWNED')}
+                        className={`px-2.5 py-1 rounded-md transition-colors ${courseTab === 'OWNED' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
+                      >
+                        Owned ({department?.ownedCoursesCount ?? courses.filter(c => c.owned).length})
+                      </button>
+                    </div>
                   </div>
                   <p className="mt-1.5 text-sm text-slate-500">
-                    Courses currently assigned to this department.
+                    Courses owned by or assigned to this department with real-time performance breakdown.
                   </p>
                 </div>
 
-                {courses.length === 0 ? (
+                {displayedCourses.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 py-12 text-center text-sm text-slate-400">
-                    No courses assigned to this department yet.
+                    {courseTab === 'OWNED'
+                      ? 'No courses owned by this department yet.'
+                      : courseTab === 'ASSIGNED'
+                      ? 'No courses assigned to this department yet.'
+                      : 'No courses found for this department.'}
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {courses.map((course, idx) => {
+                    {displayedCourses.map((course, idx) => {
                       const cfg = getCourseStatusConfig(course.completionRate);
 
                       return (
@@ -479,16 +546,37 @@ export default function DepartmentDetails() {
                                 {course.title}
                               </span>
 
-                              <span className="mt-1 flex items-center gap-1 text-xs text-slate-400">
-                                <Clock3 className="h-3 w-3" />
-                                Training course
-                              </span>
+                              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                {course.owned ? (
+                                  <span className="inline-flex rounded border border-purple-200 bg-purple-50 px-1.5 py-0.2 text-[9px] font-bold text-purple-700">
+                                    OWNED
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex rounded border border-sky-200 bg-sky-50 px-1.5 py-0.2 text-[9px] font-bold text-sky-700">
+                                    ASSIGNED
+                                  </span>
+                                )}
 
-                              <span
-                                className={`mt-2 inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wide ${cfg.className}`}
-                              >
-                                {cfg.label}
-                              </span>
+                                {course.mandatoryCount > 0 ? (
+                                  <span className="inline-flex rounded border border-rose-200 bg-rose-50 px-1.5 py-0.2 text-[9px] font-bold text-rose-700">
+                                    MANDATORY
+                                  </span>
+                                ) : course.recommendedCount > 0 ? (
+                                  <span className="inline-flex rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700">
+                                    RECOMMENDED
+                                  </span>
+                                ) : null}
+
+                                <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wide ${cfg.className}`}>
+                                  {cfg.label}
+                                </span>
+                              </div>
+
+                              <div className="mt-1.5 flex items-center gap-3 text-[11px] text-slate-500 font-medium">
+                                <span>Done: <strong className="text-slate-800">{course.completedCount ?? 0}</strong></span>
+                                {course.overdueCount > 0 && <span className="text-rose-600 font-bold">Overdue: {course.overdueCount}</span>}
+                                {course.averageScore != null && <span>Avg: <strong className="text-slate-800">{course.averageScore}%</strong></span>}
+                              </div>
                             </span>
                           </span>
 

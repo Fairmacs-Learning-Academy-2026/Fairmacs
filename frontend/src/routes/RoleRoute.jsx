@@ -23,7 +23,7 @@ function getDashboardPath(role) {
       return '/manager';
 
     case 'HR_ADMIN':
-      return '/admin';
+      return '/hr/overview';
 
     case 'EMPLOYEE':
     default:

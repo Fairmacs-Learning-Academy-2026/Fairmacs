@@ -3,6 +3,9 @@ package com.fairmacs.lms.service;
 import com.fairmacs.lms.dto.CertificateDTO;
 import com.fairmacs.lms.entity.Certificate;
 import com.fairmacs.lms.entity.Course;
+import com.fairmacs.lms.entity.Department;
+import com.fairmacs.lms.entity.NotificationPriority;
+import com.fairmacs.lms.entity.NotificationType;
 import com.fairmacs.lms.entity.Role;
 import com.fairmacs.lms.entity.User;
 import com.fairmacs.lms.exception.ResourceNotFoundException;
@@ -10,14 +13,18 @@ import com.fairmacs.lms.repository.CertificateRepository;
 import com.fairmacs.lms.repository.CourseRepository;
 import com.fairmacs.lms.repository.UserRepository;
 import com.fairmacs.lms.security.SecurityContextUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
 import com.lowagie.text.FontFactory;
+import com.lowagie.text.Image;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
 import com.lowagie.text.Rectangle;
+import com.lowagie.text.pdf.BaseFont;
+import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
@@ -32,7 +39,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -43,6 +53,8 @@ public class CertificateService {
     private final UserRepository userRepository;
     private final CourseRepository courseRepository;
     private final SecurityContextUtil securityContextUtil;
+    private final NotificationService notificationService;
+    private final IdSequenceService idSequenceService;
 
     private final Random random = new Random();
 
@@ -50,50 +62,100 @@ public class CertificateService {
             "uploads/certificates";
 
     private static final DateTimeFormatter DATE_FORMATTER =
-            DateTimeFormatter.ofPattern("dd MMMM yyyy");
+            DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public CertificateService(
             CertificateRepository certificateRepository,
             UserRepository userRepository,
             CourseRepository courseRepository,
             SecurityContextUtil securityContextUtil) {
+        this(certificateRepository, userRepository, courseRepository, securityContextUtil, null, null);
+    }
+
+    public CertificateService(
+            CertificateRepository certificateRepository,
+            UserRepository userRepository,
+            CourseRepository courseRepository,
+            SecurityContextUtil securityContextUtil,
+            NotificationService notificationService) {
+        this(certificateRepository, userRepository, courseRepository, securityContextUtil, notificationService, null);
+    }
+
+    @Autowired
+    public CertificateService(
+            CertificateRepository certificateRepository,
+            UserRepository userRepository,
+            CourseRepository courseRepository,
+            SecurityContextUtil securityContextUtil,
+            NotificationService notificationService,
+            IdSequenceService idSequenceService) {
 
         this.certificateRepository = certificateRepository;
         this.userRepository = userRepository;
         this.courseRepository = courseRepository;
         this.securityContextUtil = securityContextUtil;
+        this.notificationService = notificationService;
+        this.idSequenceService = idSequenceService;
     }
 
     // =========================================================
     // CERTIFICATE ID GENERATION
     // =========================================================
 
-    private String generateCertificateId() {
-
-        int year = Year.now().getValue();
-
-        int maxAttempts = 5;
-
-        for (int i = 0; i < maxAttempts; i++) {
-
-            String candidate = String.format(
-                    "FM-CERT-%d-%04d",
-                    year,
-                    random.nextInt(10000)
+    private String generateCertificateId(Course course, User user) {
+        if (course == null) {
+            throw new IllegalArgumentException("Course is required to generate a certificate ID.");
+        }
+        Department owningDept = course.getOwningDepartment();
+        if (owningDept == null || owningDept.getName() == null || owningDept.getName().isBlank()) {
+            throw new IllegalStateException(
+                    String.format("Course '%s' (%s) does not have an assigned owning department. Please assign an owning department before generating certificates.",
+                            course.getTitle(), course.getCourseId())
             );
+        }
+        String deptName = owningDept.getName().trim();
+        if ("Uncategorized".equalsIgnoreCase(deptName)) {
+            throw new IllegalStateException(
+                    String.format("Course '%s' (%s) has an invalid owning department 'Uncategorized'. Please assign a valid owning department before generating certificates.",
+                            course.getTitle(), course.getCourseId())
+            );
+        }
 
+        if (idSequenceService != null) {
+            int maxAttempts = 10;
+            for (int i = 0; i < maxAttempts; i++) {
+                String candidate = idSequenceService.generateCertificateId(deptName);
+                if (!certificateRepository.existsByCertificateId(candidate)) {
+                    return candidate;
+                }
+            }
+            return idSequenceService.generateCertificateId(deptName);
+        }
+
+        String prefix = resolveFallbackPrefix(deptName);
+        int maxAttempts = 5;
+        for (int i = 0; i < maxAttempts; i++) {
+            String candidate = String.format("%s%03d", prefix, random.nextInt(1000));
             if (!certificateRepository.existsByCertificateId(candidate)) {
                 return candidate;
             }
         }
 
-        String fallback = String.format(
-                "FM-CERT-%d-%08d",
-                year,
-                Math.abs(System.nanoTime() % 100000000L)
-        );
+        return String.format("%s%03d", prefix, Math.abs(System.nanoTime() % 1000L));
+    }
 
-        return fallback;
+    private String resolveFallbackPrefix(String departmentName) {
+        if (departmentName == null) return "GEN";
+        String lower = departmentName.toLowerCase(Locale.ROOT);
+        if (lower.contains("operation")) return "OP";
+        if (lower.contains("document")) return "DOC";
+        if (lower.contains("account") || lower.contains("finance")) return "ACC";
+        if (lower.contains("human") || lower.contains("hr")) return "HR";
+        if (lower.contains("admin")) return "ADM";
+        if (lower.contains("customer")) return "CS";
+        if (lower.contains("price") || lower.contains("pricing")) return "PRC";
+        if (lower.contains("sale")) return "SAL";
+        return "GEN";
     }
 
     // =========================================================
@@ -152,6 +214,27 @@ public class CertificateService {
                                 courseId
                         ));
 
+        if (Boolean.TRUE.equals(course.getFoundation())) {
+            throw new IllegalStateException(
+                    String.format("Course '%s' (%s) is a Foundation Course. Foundation courses do not issue certificates.",
+                            course.getTitle(), course.getCourseId())
+            );
+        }
+
+        if (course.getOwningDepartment() == null || course.getOwningDepartment().getName() == null || course.getOwningDepartment().getName().isBlank()) {
+            throw new IllegalStateException(
+                    String.format("Course '%s' (%s) does not have an assigned owning department. Please assign an owning department before generating certificates.",
+                            course.getTitle(), course.getCourseId())
+            );
+        }
+
+        if ("Uncategorized".equalsIgnoreCase(course.getOwningDepartment().getName().trim())) {
+            throw new IllegalStateException(
+                    String.format("Course '%s' (%s) has an invalid owning department 'Uncategorized'. Please assign a valid owning department before generating certificates.",
+                            course.getTitle(), course.getCourseId())
+            );
+        }
+
         Certificate certificate = new Certificate();
 
         certificate.setUser(user);
@@ -165,7 +248,7 @@ public class CertificateService {
             try {
 
                 certificate.setCertificateId(
-                        generateCertificateId()
+                        generateCertificateId(course, user)
                 );
 
                 /*
@@ -181,7 +264,9 @@ public class CertificateService {
 
                 generateAndAttachPdf(saved);
 
-                return certificateRepository.save(saved);
+                Certificate finalCert = certificateRepository.save(saved);
+                emitCertificateIssuedNotification(finalCert);
+                return finalCert;
 
             } catch (DataIntegrityViolationException e) {
 
@@ -235,6 +320,23 @@ public class CertificateService {
             certificateRepository.save(certificate);
 
         } catch (IOException e) {
+            if (notificationService != null) {
+                String certCode = certificate != null ? certificate.getCertificateId() : "UNKNOWN";
+                String courseTitle = (certificate != null && certificate.getCourse() != null)
+                        ? certificate.getCourse().getTitle()
+                        : "Course";
+                notificationService.notifyHrAdmins(
+                        "Certificate PDF Generation Alert",
+                        "Unable to generate PDF file for certificate " + certCode + " (\"" + courseTitle + "\"). Please verify certificate storage permissions.",
+                        NotificationType.HR_ADMIN_ALERT,
+                        NotificationPriority.HIGH,
+                        "CERTIFICATE",
+                        certCode,
+                        "/hr",
+                        "CERT_PDF_FAIL:" + certCode,
+                        Map.of("certificateId", certCode)
+                );
+            }
 
             throw new RuntimeException(
                     "Unable to create certificate PDF.",
@@ -243,11 +345,45 @@ public class CertificateService {
         }
     }
 
+    private void emitCertificateIssuedNotification(Certificate certificate) {
+        if (notificationService == null || certificate == null || certificate.getUser() == null) {
+            return;
+        }
+        User user = certificate.getUser();
+        Course course = certificate.getCourse();
+        String courseTitle = course != null ? course.getTitle() : "Training Course";
+        String courseCode = course != null ? course.getCourseId() : "";
+        String certId = certificate.getCertificateId();
+
+        notificationService.createNotificationSafely(
+                user.getId(),
+                "Certificate Issued: " + courseTitle,
+                String.format(
+                        "Your official Fairmacs completion certificate (%s) for \"%s\" (%s) has been issued and is ready to view or download.",
+                        certId,
+                        courseTitle,
+                        courseCode
+                ),
+                NotificationType.CERTIFICATE_ISSUED,
+                NotificationPriority.NORMAL,
+                "CERTIFICATE",
+                certId,
+                "/certificates",
+                "CERTIFICATE_ISSUED:" + certId,
+                Map.of(
+                        "certificateId", certId,
+                        "courseId", courseCode,
+                        "courseTitle", courseTitle,
+                        "pdfUrl", certificate.getPdfUrl() != null ? certificate.getPdfUrl() : ""
+                )
+        );
+    }
+
     // =========================================================
     // CREATE PDF CONTENT
     // =========================================================
 
-    private byte[] createCertificatePdf(
+    byte[] createCertificatePdf(
             Certificate certificate)
             throws IOException {
 
@@ -262,6 +398,71 @@ public class CertificateService {
                         50,
                         50
                 );
+
+        java.io.InputStream templateStream = getClass().getResourceAsStream("/certificate-template.jpg");
+        if (templateStream != null) {
+            try {
+                byte[] bgBytes = templateStream.readAllBytes();
+                Image bgImage = Image.getInstance(bgBytes);
+                bgImage.setAbsolutePosition(0, 0);
+                bgImage.scaleAbsolute(PageSize.A4.rotate().getWidth(), PageSize.A4.rotate().getHeight());
+
+                PdfWriter writer = PdfWriter.getInstance(document, outputStream);
+                document.open();
+
+                PdfContentByte canvas = writer.getDirectContentUnder();
+                canvas.addImage(bgImage);
+
+                PdfContentByte over = writer.getDirectContent();
+
+                // Mask placeholder text regions with white fill
+                over.saveState();
+                over.setColorFill(java.awt.Color.WHITE);
+                float pageWidth = PageSize.A4.rotate().getWidth();
+                over.rectangle(pageWidth * 0.25f, 345, pageWidth * 0.5f, 35);
+                over.rectangle(pageWidth * 0.25f, 255, pageWidth * 0.5f, 30);
+                over.rectangle(705, 94, 100, 15);
+                over.rectangle(705, 59, 100, 15);
+                over.fill();
+                over.restoreState();
+
+                over.beginText();
+
+                // 1. Learner Name (Centered at X = midpoint, Y = 355)
+                BaseFont serifFont = BaseFont.createFont(BaseFont.TIMES_BOLDITALIC, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
+                over.setFontAndSize(serifFont, 26);
+                over.setColorFill(new java.awt.Color(12, 74, 110));
+                String learnerName = certificate.getUser() != null ? certificate.getUser().getName() : "Learner Name";
+                over.showTextAligned(Element.ALIGN_CENTER, learnerName, PageSize.A4.rotate().getWidth() / 2, 355, 0);
+
+                // 2. Course Title (Centered at X = midpoint, Y = 265)
+                BaseFont sansBold = BaseFont.createFont(BaseFont.HELVETICA_BOLD, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
+                over.setFontAndSize(sansBold, 20);
+                over.setColorFill(new java.awt.Color(15, 23, 42));
+                String courseTitle = certificate.getCourse() != null ? certificate.getCourse().getTitle() : "Course Title";
+                over.showTextAligned(Element.ALIGN_CENTER, courseTitle.toUpperCase(Locale.ROOT), PageSize.A4.rotate().getWidth() / 2, 265, 0);
+
+                // 3. Certificate ID (Bottom right at X = 708, Y = 98)
+                BaseFont sansNormal = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
+                over.setFontAndSize(sansBold, 10);
+                over.setColorFill(new java.awt.Color(15, 23, 42));
+                over.showTextAligned(Element.ALIGN_LEFT, certificate.getCertificateId() != null ? certificate.getCertificateId() : "", 708, 98, 0);
+
+                // 4. Date of Completion (Bottom right at X = 708, Y = 63)
+                String completionDate = certificate.getIssuedAt() != null
+                        ? certificate.getIssuedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                        : java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                over.setFontAndSize(sansNormal, 10);
+                over.showTextAligned(Element.ALIGN_LEFT, completionDate, 708, 63, 0);
+
+                over.endText();
+                document.close();
+                return outputStream.toByteArray();
+            } catch (Exception e) {
+                outputStream.reset();
+                document = new Document(PageSize.A4.rotate(), 50, 50, 50, 50);
+            }
+        }
 
         try {
 
@@ -359,6 +560,18 @@ public class CertificateService {
             );
 
             document.add(company);
+
+            Paragraph tagline =
+                    new Paragraph(
+                            "Across All Boundaries",
+                            FontFactory.getFont(
+                                    FontFactory.HELVETICA_OBLIQUE,
+                                    11,
+                                    Font.ITALIC
+                            )
+                    );
+            tagline.setAlignment(Element.ALIGN_CENTER);
+            document.add(tagline);
 
             Paragraph heading =
                     new Paragraph(
@@ -530,26 +743,25 @@ public class CertificateService {
 
             document.add(course);
 
-            String category =
+            String courseDept =
                     safeValue(
-                            certificate.getCourse() != null
-                                    ? certificate.getCourse()
-                                    .getCategory()
+                            certificate.getCourse() != null && certificate.getCourse().getOwningDepartment() != null
+                                    ? certificate.getCourse().getOwningDepartment().getName()
                                     : null
                     );
 
-            Paragraph categoryParagraph =
+            Paragraph deptParagraph =
                     new Paragraph(
-                            category,
+                            courseDept,
                             normalFont
                     );
 
-            categoryParagraph.setAlignment(
+            deptParagraph.setAlignment(
                     Element.ALIGN_CENTER
             );
 
             document.add(
-                    categoryParagraph
+                    deptParagraph
             );
 
             document.add(
@@ -638,6 +850,32 @@ public class CertificateService {
 
             document.add(verification);
 
+            document.add(new Paragraph(" "));
+
+            PdfPTable signatureTable = new PdfPTable(2);
+            signatureTable.setWidthPercentage(80);
+            signatureTable.setWidths(new float[]{1, 1});
+
+            PdfPCell emptyLeftCell = new PdfPCell(new Phrase(""));
+            emptyLeftCell.setBorder(Rectangle.NO_BORDER);
+            signatureTable.addCell(emptyLeftCell);
+
+            PdfPCell signCell = new PdfPCell();
+            signCell.setBorder(Rectangle.NO_BORDER);
+            signCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            Paragraph signLine = new Paragraph("___________________________", boldFont);
+            signLine.setAlignment(Element.ALIGN_RIGHT);
+            Paragraph signTitle = new Paragraph("Executive Director", boldFont);
+            signTitle.setAlignment(Element.ALIGN_RIGHT);
+            Paragraph signCompany = new Paragraph("Fairmacs LMS", smallFont);
+            signCompany.setAlignment(Element.ALIGN_RIGHT);
+            signCell.addElement(signLine);
+            signCell.addElement(signTitle);
+            signCell.addElement(signCompany);
+            signatureTable.addCell(signCell);
+
+            document.add(signatureTable);
+
             document.close();
 
             return outputStream.toByteArray();
@@ -710,7 +948,7 @@ public class CertificateService {
     // READ PDF
     // =========================================================
 
-    @Transactional(readOnly = true)
+    @Transactional
     public byte[] getCertificatePdf(
             String certificateId) {
 
@@ -734,6 +972,10 @@ public class CertificateService {
                         CERTIFICATE_DIRECTORY,
                         certificateId + ".pdf"
                 );
+
+        if (!Files.exists(pdfPath)) {
+            generateAndAttachPdf(certificate);
+        }
 
         if (!Files.exists(pdfPath)) {
 
@@ -772,24 +1014,58 @@ public class CertificateService {
                 securityContextUtil
                         .getCurrentUserRole();
 
+        if (currentUserId == null || currentRole == null) {
+            throw new SecurityException("Authentication is required to access this certificate.");
+        }
+
         boolean isOwner =
                 certificate.getUser() != null
                         && certificate.getUser()
                         .getId()
                         .equals(currentUserId);
 
-        boolean isManagerOrHr =
-                Role.MANAGER.name()
-                        .equalsIgnoreCase(currentRole)
-                        || Role.HR_ADMIN.name()
-                        .equalsIgnoreCase(currentRole);
+        if (isOwner || Role.HR_ADMIN.name().equalsIgnoreCase(currentRole)) {
+            return;
+        }
 
-        if (!isOwner && !isManagerOrHr) {
-
+        if (Role.MANAGER.name().equalsIgnoreCase(currentRole)) {
+            User currentUser = securityContextUtil.getCurrentUser();
+            User certOwner = certificate.getUser();
+            if (currentUser != null
+                    && certOwner != null
+                    && currentUser.getDepartment() != null
+                    && currentUser.getDepartment().equalsIgnoreCase(certOwner.getDepartment())) {
+                return;
+            }
             throw new SecurityException(
-                    "You are not authorized to access this certificate."
+                    "Managers may only access certificates within their own department."
             );
         }
+
+        if (Role.TRAINER.name().equalsIgnoreCase(currentRole)) {
+            User currentUser = securityContextUtil.getCurrentUser();
+            Course course = certificate.getCourse();
+            boolean isAuthor = course != null && course.getCreatedBy() != null
+                    && course.getCreatedBy().getId() != null
+                    && course.getCreatedBy().getId().equals(currentUserId);
+            boolean isCourseDept = currentUser != null && currentUser.getDepartment() != null
+                    && course != null && course.getOwningDepartment() != null
+                    && currentUser.getDepartment().equalsIgnoreCase(course.getOwningDepartment().getName());
+            boolean isUserDept = currentUser != null && currentUser.getDepartment() != null
+                    && certificate.getUser() != null && certificate.getUser().getDepartment() != null
+                    && currentUser.getDepartment().equalsIgnoreCase(certificate.getUser().getDepartment());
+
+            if (isAuthor || isCourseDept || isUserDept) {
+                return;
+            }
+            throw new SecurityException(
+                    "Trainers may only access certificates within their authorized training scope."
+            );
+        }
+
+        throw new SecurityException(
+                "You are not authorized to access this certificate."
+        );
     }
 
     // =========================================================
@@ -842,10 +1118,14 @@ public class CertificateService {
                 Role.MANAGER.name()
                         .equalsIgnoreCase(currentRole);
 
+        boolean isTrainer =
+                Role.TRAINER.name()
+                        .equalsIgnoreCase(currentRole);
+
         boolean isSelf =
                 targetUserId.equals(currentUserId);
 
-        if (!isSelf && !isManager && !isHr) {
+        if (!isSelf && !isManager && !isHr && !isTrainer) {
 
             throw new SecurityException(
                     "You are not authorized to view certificates for this user."
@@ -866,10 +1146,10 @@ public class CertificateService {
                                             targetUserId
                                     ));
 
-            if (currentUser != null
-                    && targetUser.getDepartment() != null
-                    && !targetUser.getDepartment()
-                    .equals(currentUser.getDepartment())) {
+            if (currentUser == null
+                    || currentUser.getDepartment() == null
+                    || targetUser.getDepartment() == null
+                    || !targetUser.getDepartment().equalsIgnoreCase(currentUser.getDepartment())) {
 
                 throw new SecurityException(
                         "Managers may only view certificates within their own department."
@@ -882,6 +1162,25 @@ public class CertificateService {
                         .findByUserIdWithCourse(
                                 targetUserId
                         );
+
+        if (isTrainer && !isSelf && !isHr) {
+            User currentUser = securityContextUtil.getCurrentUser();
+            String trainerDept = currentUser != null ? currentUser.getDepartment() : null;
+            return certs.stream()
+                    .filter(c -> {
+                        Course course = c.getCourse();
+                        boolean isAuthor = course != null && course.getCreatedBy() != null
+                                && course.getCreatedBy().getId() != null
+                                && course.getCreatedBy().getId().equals(currentUserId);
+                        boolean courseDept = course != null && course.getOwningDepartment() != null
+                                && trainerDept != null && trainerDept.equalsIgnoreCase(course.getOwningDepartment().getName());
+                        boolean userDept = c.getUser() != null && c.getUser().getDepartment() != null
+                                && trainerDept != null && trainerDept.equalsIgnoreCase(c.getUser().getDepartment());
+                        return isAuthor || courseDept || userDept;
+                    })
+                    .map(this::toDTO)
+                    .collect(Collectors.toList());
+        }
 
         return certs.stream()
                 .map(this::toDTO)
@@ -896,15 +1195,47 @@ public class CertificateService {
     public List<CertificateDTO> getRecentCertificates(
             int limit) {
 
-        if (!securityContextUtil.isManagerOrHr()) {
+        String currentRole = securityContextUtil.getCurrentUserRole();
+        Long currentUserId = securityContextUtil.getCurrentUserId();
+
+        boolean isHr = Role.HR_ADMIN.name().equalsIgnoreCase(currentRole);
+        boolean isManager = Role.MANAGER.name().equalsIgnoreCase(currentRole);
+        boolean isTrainer = Role.TRAINER.name().equalsIgnoreCase(currentRole);
+
+        if (!isHr && !isManager && !isTrainer) {
 
             throw new SecurityException(
-                    "Only Manager and HR roles may access recent certificates."
+                    "Only Manager, HR, and Trainer roles may access recent certificates."
             );
         }
 
+        User currentUser = securityContextUtil.getCurrentUser();
         List<Certificate> certs =
                 certificateRepository.findAll();
+
+        if (isManager && currentUser != null && currentUser.getDepartment() != null) {
+            String mgrDept = currentUser.getDepartment();
+            certs = certs.stream()
+                    .filter(c -> c.getUser() != null
+                            && c.getUser().getDepartment() != null
+                            && c.getUser().getDepartment().equalsIgnoreCase(mgrDept))
+                    .collect(Collectors.toList());
+        } else if (isTrainer && currentUser != null) {
+            String trnDept = currentUser.getDepartment();
+            certs = certs.stream()
+                    .filter(c -> {
+                        Course course = c.getCourse();
+                        boolean isAuthor = course != null && course.getCreatedBy() != null
+                                && course.getCreatedBy().getId() != null
+                                && course.getCreatedBy().getId().equals(currentUserId);
+                        boolean courseDept = course != null && course.getOwningDepartment() != null
+                                && trnDept != null && trnDept.equalsIgnoreCase(course.getOwningDepartment().getName());
+                        boolean userDept = c.getUser() != null && c.getUser().getDepartment() != null
+                                && trnDept != null && trnDept.equalsIgnoreCase(c.getUser().getDepartment());
+                        return isAuthor || courseDept || userDept;
+                    })
+                    .collect(Collectors.toList());
+        }
 
         certs.sort((a, b) -> {
 
@@ -927,10 +1258,94 @@ public class CertificateService {
     }
 
     // =========================================================
+    // SEARCH & FILTER CERTIFICATES
+    // =========================================================
+
+    @Transactional(readOnly = true)
+    public List<CertificateDTO> searchCertificates(
+            String query,
+            String department,
+            int limit) {
+
+        String currentRole = securityContextUtil.getCurrentUserRole();
+        Long currentUserId = securityContextUtil.getCurrentUserId();
+
+        boolean isHr = Role.HR_ADMIN.name().equalsIgnoreCase(currentRole);
+        boolean isManager = Role.MANAGER.name().equalsIgnoreCase(currentRole);
+        boolean isTrainer = Role.TRAINER.name().equalsIgnoreCase(currentRole);
+
+        User currentUser = securityContextUtil.getCurrentUser();
+        List<Certificate> certs = certificateRepository.findAll();
+
+        // RBAC Scope Filtering
+        if (isManager && currentUser != null && currentUser.getDepartment() != null) {
+            String mgrDept = currentUser.getDepartment();
+            certs = certs.stream()
+                    .filter(c -> c.getUser() != null && c.getUser().getDepartment() != null
+                            && c.getUser().getDepartment().equalsIgnoreCase(mgrDept))
+                    .collect(Collectors.toList());
+        } else if (isTrainer && currentUser != null) {
+            String trnDept = currentUser.getDepartment();
+            certs = certs.stream()
+                    .filter(c -> {
+                        Course course = c.getCourse();
+                        boolean isAuthor = course != null && course.getCreatedBy() != null
+                                && course.getCreatedBy().getId() != null
+                                && course.getCreatedBy().getId().equals(currentUserId);
+                        boolean courseDept = course != null && course.getOwningDepartment() != null
+                                && trnDept != null && trnDept.equalsIgnoreCase(course.getOwningDepartment().getName());
+                        boolean userDept = c.getUser() != null && c.getUser().getDepartment() != null
+                                && trnDept != null && trnDept.equalsIgnoreCase(c.getUser().getDepartment());
+                        return isAuthor || courseDept || userDept;
+                    })
+                    .collect(Collectors.toList());
+        } else if (!isHr) {
+            certs = certs.stream()
+                    .filter(c -> c.getUser() != null && currentUserId != null && currentUserId.equals(c.getUser().getId()))
+                    .collect(Collectors.toList());
+        }
+
+        // Apply department parameter filter
+        if (department != null && !department.isBlank() && !"ALL".equalsIgnoreCase(department)) {
+            certs = certs.stream()
+                    .filter(c -> (c.getUser() != null && c.getUser().getDepartment() != null && department.equalsIgnoreCase(c.getUser().getDepartment()))
+                            || (c.getCourse() != null && c.getCourse().getOwningDepartment() != null && department.equalsIgnoreCase(c.getCourse().getOwningDepartment().getName())))
+                    .collect(Collectors.toList());
+        }
+
+        // Apply text query filter
+        if (query != null && !query.isBlank()) {
+            String q = query.trim().toLowerCase(Locale.ROOT);
+            certs = certs.stream()
+                    .filter(c -> {
+                        boolean matchCertId = c.getCertificateId() != null && c.getCertificateId().toLowerCase(Locale.ROOT).contains(q);
+                        boolean matchName = c.getUser() != null && c.getUser().getName() != null && c.getUser().getName().toLowerCase(Locale.ROOT).contains(q);
+                        boolean matchEmpId = c.getUser() != null && c.getUser().getEmployeeId() != null && c.getUser().getEmployeeId().toLowerCase(Locale.ROOT).contains(q);
+                        boolean matchCourse = c.getCourse() != null && c.getCourse().getTitle() != null && c.getCourse().getTitle().toLowerCase(Locale.ROOT).contains(q);
+                        return matchCertId || matchName || matchEmpId || matchCourse;
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        certs.sort((a, b) -> {
+            if (a.getIssuedAt() == null) return 1;
+            if (b.getIssuedAt() == null) return -1;
+            return b.getIssuedAt().compareTo(a.getIssuedAt());
+        });
+
+        int max = limit > 0 ? limit : 50;
+        return certs.stream().limit(max).map(this::toDTO).collect(Collectors.toList());
+    }
+
+    // =========================================================
     // DTO MAPPING
     // =========================================================
 
-    private CertificateDTO toDTO(
+    public Optional<Certificate> getCertificateByUserIdAndCourseId(Long userId, Long courseId) {
+        return certificateRepository.findByUserIdAndCourseId(userId, courseId);
+    }
+
+    public CertificateDTO toDTO(
             Certificate cert) {
 
         CertificateDTO dto =
@@ -978,7 +1393,9 @@ public class CertificateService {
             );
 
             dto.setCourseCategory(
-                    cert.getCourse().getCategory()
+                    cert.getCourse().getOwningDepartment() != null && cert.getCourse().getOwningDepartment().getName() != null
+                            ? cert.getCourse().getOwningDepartment().getName()
+                            : cert.getCourse().getCategory()
             );
         }
 

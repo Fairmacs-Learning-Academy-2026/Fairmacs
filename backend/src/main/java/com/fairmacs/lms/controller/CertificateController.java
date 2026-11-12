@@ -3,6 +3,7 @@ package com.fairmacs.lms.controller;
 import com.fairmacs.lms.dto.ApiResponse;
 import com.fairmacs.lms.dto.CertificateDTO;
 import com.fairmacs.lms.dto.CompleteCourseRequest;
+import com.fairmacs.lms.security.SecurityContextUtil;
 import com.fairmacs.lms.service.CertificateService;
 import com.fairmacs.lms.service.EnrollmentService;
 import org.springframework.http.ContentDisposition;
@@ -16,18 +17,20 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/certificates")
-@CrossOrigin(origins = "http://localhost:5173")
 public class CertificateController {
 
     private final EnrollmentService enrollmentService;
     private final CertificateService certificateService;
+    private final SecurityContextUtil securityContextUtil;
 
     public CertificateController(
             EnrollmentService enrollmentService,
-            CertificateService certificateService) {
+            CertificateService certificateService,
+            SecurityContextUtil securityContextUtil) {
 
         this.enrollmentService = enrollmentService;
         this.certificateService = certificateService;
+        this.securityContextUtil = securityContextUtil;
     }
 
     // =========================================================
@@ -96,6 +99,14 @@ public class CertificateController {
                             )
                     );
         }
+    }
+
+    @GetMapping("/course/{courseId}")
+    public ResponseEntity<?> getCertificateForCourse(@PathVariable Long courseId) {
+        Long currentUserId = securityContextUtil.getCurrentUserId();
+        return certificateService.getCertificateByUserIdAndCourseId(currentUserId, courseId)
+                .map(cert -> ResponseEntity.ok(certificateService.toDTO(cert)))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
     // =========================================================
@@ -286,5 +297,64 @@ public class CertificateController {
                             )
                     );
         }
+    }
+
+    // =========================================================
+    // SEARCH & FILTER CERTIFICATES
+    // =========================================================
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<CertificateDTO>>>
+    searchCertificates(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String department,
+            @RequestParam(defaultValue = "50") int limit) {
+
+        try {
+
+            List<CertificateDTO> certs =
+                    certificateService.searchCertificates(
+                            query,
+                            department,
+                            limit
+                    );
+
+            return ResponseEntity.ok(
+                    ApiResponse.success(
+                            "Certificates found.",
+                            certs
+                    )
+            );
+
+        } catch (SecurityException e) {
+
+            return ResponseEntity
+                    .status(HttpStatus.FORBIDDEN)
+                    .body(
+                            ApiResponse.error(
+                                    e.getMessage()
+                            )
+                    );
+
+        } catch (Exception e) {
+
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(
+                            ApiResponse.error(
+                                    e.getMessage()
+                            )
+                    );
+        }
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<CertificateDTO>>>
+    getAllCertificates(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String department,
+            @RequestParam(defaultValue = "50") int limit) {
+
+        return searchCertificates(query, department, limit);
     }
 }

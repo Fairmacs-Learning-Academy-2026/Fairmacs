@@ -1,4 +1,3 @@
-
 package com.fairmacs.lms.controller;
 
 import com.fairmacs.lms.integration.zoho.ZohoWorkDriveDownloadService;
@@ -12,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/lessons")
@@ -42,6 +42,9 @@ public class LessonDocumentController {
                         .build());
         headers.setCacheControl(CacheControl.noStore());
         headers.set("X-Content-Type-Options", "nosniff");
+        headers.set("X-Document-Filename", document.filename());
+        headers.setAccessControlExposeHeaders(
+                List.of("Content-Disposition", "X-Document-Filename", "Content-Type"));
 
         return ResponseEntity.ok()
                 .headers(headers)

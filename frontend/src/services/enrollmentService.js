@@ -1,22 +1,9 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
-
-function getAuthToken() {
-  return (
-    localStorage.getItem('fairmacs_token') ||
-    localStorage.getItem('fairmacs_lms_token')
-  );
-}
-
-function authHeaders() {
-  const token = getAuthToken();
-
-  return {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
+import { notifyEnrollmentUpdated } from '../utils/enrollmentSync';
+import {
+  API_BASE_URL,
+  getAuthHeaders as authHeaders,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
 async function parseResponse(response) {
   const text = await response.text();
@@ -60,6 +47,10 @@ async function request(url, options = {}) {
       ...(options.headers || {}),
     },
   });
+
+  if (response.status === 401) {
+    handleUnauthorized(true);
+  }
 
   const payload = await parseResponse(response);
 
@@ -236,9 +227,9 @@ export const enrollmentService = {
       throw new Error('Course ID or course code is required.');
     }
 
-      return request(
+    const result = await request(
       `${API_BASE_URL}/enrollments/assign-department`,
-        {
+      {
         method: 'POST',
         body: JSON.stringify({
           department,
@@ -249,6 +240,15 @@ export const enrollmentService = {
         }),
       }
     );
+
+    notifyEnrollmentUpdated({
+      source: 'assign-course-department',
+      department,
+      courseId,
+      courseCode
+    });
+
+    return result;
   },
   // ---------------------------------------------------------
   // GET RECENT CERTIFICATES

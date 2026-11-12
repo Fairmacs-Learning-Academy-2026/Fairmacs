@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { enrollmentService } from '../services/enrollmentService';
+import { notifyEnrollmentUpdated } from '../utils/enrollmentSync';
 
 function normalizeCertificate(cert) {
   if (!cert) return null;
@@ -114,6 +115,8 @@ export const useEnrollmentStore = create((set, get) => ({
         isLoading: false,
       }));
 
+      notifyEnrollmentUpdated({ source: 'enroll-course', courseId, courseCode });
+
       return enrolledCourse;
     } catch (error) {
       set({
@@ -210,6 +213,8 @@ export const useEnrollmentStore = create((set, get) => ({
         ),
         isLoading: false,
       }));
+
+      notifyEnrollmentUpdated({ source: 'complete-course', courseId, courseCode });
 
       return {
         success: true,

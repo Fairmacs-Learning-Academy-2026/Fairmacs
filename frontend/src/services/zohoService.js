@@ -1,12 +1,13 @@
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:8080/api";
-
-const TOKEN_KEY = "fairmacs_token";
+import {
+  API_BASE_URL,
+  getAuthToken,
+  getAuthHeaders,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
 export const getZohoConnectUrl = async () => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getAuthToken();
 
   if (!token) {
     throw new Error("Please log in to Fairmacs KMS first.");
@@ -16,15 +17,13 @@ export const getZohoConnectUrl = async () => {
     `${API_BASE_URL}/integrations/zoho/connect-url`,
     {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
+      headers: getAuthHeaders(),
     }
   );
 
   if (!response.ok) {
     if (response.status === 401) {
+      handleUnauthorized(false);
       throw new Error("Your session has expired. Please log in again.");
     }
 

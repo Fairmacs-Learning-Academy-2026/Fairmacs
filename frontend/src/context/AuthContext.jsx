@@ -6,7 +6,6 @@ import React, {
   useCallback
 } from 'react';
 
-import { MOCK_USERS_DATABASE } from '../data/mockData';
 import authService from '../services/authService.js';
 import hrAdminService from '../services/hrAdminService';
 
@@ -19,27 +18,13 @@ const CANON_TOKEN_KEY = 'fairmacs_token';
 
 function persistAuth(u, t) {
   if (u) {
-    localStorage.setItem(
-      LEGACY_USER_KEY,
-      JSON.stringify(u)
-    );
-
-    localStorage.setItem(
-      CANON_USER_KEY,
-      JSON.stringify(u)
-    );
+    localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(u));
+    localStorage.setItem(CANON_USER_KEY, JSON.stringify(u));
   }
 
   if (t) {
-    localStorage.setItem(
-      LEGACY_TOKEN_KEY,
-      t
-    );
-
-    localStorage.setItem(
-      CANON_TOKEN_KEY,
-      t
-    );
+    localStorage.setItem(LEGACY_TOKEN_KEY, t);
+    localStorage.setItem(CANON_TOKEN_KEY, t);
   }
 }
 
@@ -54,76 +39,29 @@ function normalizeEmployee(employee) {
   return {
     ...employee,
     id: employee.id || employee.employeeId,
-    employeeId:
-      employee.employeeId || employee.id,
+    employeeId: employee.employeeId || employee.id,
     role: employee.role || 'EMPLOYEE',
-    roleLabel:
-      employee.roleLabel || 'Employee',
-    status:
-      employee.status || 'Active',
+    roleLabel: employee.roleLabel || 'Employee',
+    status: employee.status || 'Active',
     statusCode:
       employee.statusCode ||
-      (
-        employee.status || 'ACTIVE'
-      )
-        .toUpperCase()
-        .replace(/\s+/g, '_'),
-    designation:
-      employee.designation || 'Executive',
-    department:
-      employee.department || 'Operations'
+      (employee.status || 'ACTIVE').toUpperCase().replace(/\s+/g, '_'),
+    designation: employee.designation || 'Executive',
+    department: employee.department || 'Operations',
+    mustChangePassword: Boolean(employee.mustChangePassword)
   };
 }
 
 export function AuthProvider({ children }) {
-  const [usersList, setUsersList] = useState(() => {
-    try {
-      const savedUsers =
-        localStorage.getItem(
-          'fairmacs_lms_users'
-        );
-
-      if (!savedUsers) {
-        return MOCK_USERS_DATABASE;
-      }
-
-      const parsed = JSON.parse(savedUsers);
-
-      const mergedMap = new Map();
-
-      MOCK_USERS_DATABASE.forEach(user => {
-        mergedMap.set(user.id, user);
-      });
-
-      parsed.forEach(user => {
-        if (!mergedMap.has(user.id)) {
-          mergedMap.set(user.id, user);
-        }
-      });
-
-      return Array.from(
-        mergedMap.values()
-      );
-
-    } catch {
-      return MOCK_USERS_DATABASE;
-    }
-  });
+  const [usersList, setUsersList] = useState([]);
 
   const [user, setUser] = useState(() => {
     try {
       const savedUser =
-        localStorage.getItem(
-          LEGACY_USER_KEY
-        ) ||
-        localStorage.getItem(
-          CANON_USER_KEY
-        );
+        localStorage.getItem(CANON_USER_KEY) ||
+        localStorage.getItem(LEGACY_USER_KEY);
 
-      return savedUser
-        ? JSON.parse(savedUser)
-        : null;
-
+      return savedUser ? JSON.parse(savedUser) : null;
     } catch {
       return null;
     }
@@ -131,38 +69,53 @@ export function AuthProvider({ children }) {
 
   const [token, setToken] = useState(() => {
     return (
-      localStorage.getItem(
-        CANON_TOKEN_KEY
-      ) ||
-      localStorage.getItem(
-        LEGACY_TOKEN_KEY
-      ) ||
+      localStorage.getItem(CANON_TOKEN_KEY) ||
+      localStorage.getItem(LEGACY_TOKEN_KEY) ||
       ''
     );
   });
 
-  const [employeesLoading, setEmployeesLoading] =
-    useState(false);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(
-      'fairmacs_lms_users',
-      JSON.stringify(usersList)
-    );
-  }, [usersList]);
-
-  useEffect(() => {
-    if (user) {
+    if (user && token) {
       persistAuth(user, token);
-    } else {
+    } else if (!user || !token) {
       clearAuth();
     }
   }, [user, token]);
 
+  // Synchronize authoritative profile and mustChangePassword state from backend on session restore
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    let cancelled = false;
+    authService.getCurrentUser().then((serverProfile) => {
+      if (cancelled) return;
+      if (!serverProfile) {
+        if (!authService.getToken()) {
+          setUser(null);
+          setToken('');
+        }
+        return;
+      }
+      setUser((prev) => ({
+        ...(prev || {}),
+        ...serverProfile,
+        mustChangePassword: Boolean(serverProfile.mustChangePassword)
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
   const loadEmployees = useCallback(async () => {
     if (
       !token ||
-      user?.role !== 'HR_ADMIN'
+      user?.role !== 'HR_ADMIN' ||
+      user?.mustChangePassword
     ) {
       return {
         success: false,
@@ -173,81 +126,48 @@ export function AuthProvider({ children }) {
     setEmployeesLoading(true);
 
     try {
-      const employees =
-        await hrAdminService.getEmployees();
+      const employees = await hrAdminService.getEmployees();
+      const normalizedEmployees = Array.isArray(employees)
+        ? employees.map(normalizeEmployee)
+        : [];
 
-      const normalizedEmployees =
-        Array.isArray(employees)
-          ? employees.map(
-              normalizeEmployee
-            )
-          : [];
-
-      setUsersList(
-        normalizedEmployees
-      );
+      setUsersList(normalizedEmployees);
 
       return {
         success: true,
-        employees:
-          normalizedEmployees
+        employees: normalizedEmployees
       };
 
     } catch (error) {
-      console.error(
-        'Unable to load employees from backend:',
-        error
-      );
-
+      console.error('Unable to load employees from backend:', error);
       return {
         success: false,
-        message:
-          error.message ||
-          'Unable to load employees.'
+        message: error.message || 'Unable to load employees.'
       };
-
     } finally {
       setEmployeesLoading(false);
     }
-  }, [token, user?.role]);
+  }, [token, user?.role, user?.mustChangePassword]);
 
   useEffect(() => {
-    if (
-      user?.role === 'HR_ADMIN' &&
-      token
-    ) {
+    if (user?.role === 'HR_ADMIN' && token && !user?.mustChangePassword) {
       loadEmployees();
     }
-  }, [
-    user?.role,
-    token,
-    loadEmployees
-  ]);
+  }, [user?.role, user?.mustChangePassword, token, loadEmployees]);
 
-  const login = async (
-    loginId,
-    password
-  ) => {
+  const login = async (loginId, password) => {
     if (!loginId || !password) {
       return {
         success: false,
-        message:
-          'Please enter both Employee ID / Corporate Email and Password.'
+        message: 'Please enter both Employee ID / Corporate Email and Password.'
       };
     }
 
-    const cleanId =
-      loginId.trim().toLowerCase();
-
-    const cleanPass =
-      password.trim();
+    const cleanId = loginId.trim();
+    const cleanPass = password;
 
     try {
-      const res =
-        await authService.login(
-          cleanId,
-          cleanPass
-        );
+      const res = await authService.login(cleanId, cleanPass);
 
       if (!res?.success) {
         return {
@@ -259,87 +179,39 @@ export function AuthProvider({ children }) {
         };
       }
 
-      if (
-        !res.token ||
-        !res.user
-      ) {
+      if (!res.token || !res.user) {
         return {
           success: false,
-          message:
-            'Login failed. The server returned an invalid authentication response.'
+          message: 'Login failed. The server returned an invalid authentication response.'
         };
       }
 
-      const backendUser =
-        res.user;
+      const backendUser = res.user;
+      const backendToken = res.token;
 
-      const backendToken =
-        res.token;
+      const normalizedUser = {
+        ...backendUser,
+        id: backendUser.id || backendUser.employeeId || backendUser.userId,
+        employeeId: backendUser.employeeId || backendUser.id,
+        name: backendUser.userName || backendUser.name || cleanId,
+        role: backendUser.role || 'EMPLOYEE',
+        roleLabel:
+          backendUser.roleLabel ||
+          ((backendUser.role || 'EMPLOYEE').toUpperCase() === 'HR_ADMIN'
+            ? 'HR / Admin'
+            : (backendUser.role || 'EMPLOYEE').charAt(0) +
+              (backendUser.role || 'EMPLOYEE').slice(1).toLowerCase()),
+        department: backendUser.department || 'Operations',
+        designation: backendUser.designation || 'Executive',
+        email: backendUser.email || '',
+        status: backendUser.status || 'Active',
+        mustChangePassword: Boolean(backendUser.mustChangePassword)
+      };
 
-      const normalizedUser =
-        backendUser.id
-          ? backendUser
-          : {
-              ...backendUser,
-
-              id:
-                backendUser.employeeId ||
-                backendUser.userId ||
-                cleanId.toUpperCase(),
-
-              name:
-                backendUser.userName ||
-                backendUser.name ||
-                cleanId,
-
-              role:
-                backendUser.role ||
-                'EMPLOYEE',
-
-              roleLabel: (() => {
-                const r =
-                  (
-                    backendUser.role ||
-                    'EMPLOYEE'
-                  ).toUpperCase();
-
-                if (
-                  r === 'HR_ADMIN'
-                ) {
-                  return 'HR / Admin';
-                }
-
-                return (
-                  r.charAt(0) +
-                  r.slice(1).toLowerCase()
-                );
-              })(),
-
-              department:
-                backendUser.department ||
-                'Operations',
-
-              designation:
-                backendUser.designation ||
-                'Executive',
-
-              email:
-                backendUser.email ||
-                `${cleanId}@fairmacs.com`,
-
-              status:
-                backendUser.status ||
-                'Active'
-            };
-
-      if (
-        normalizedUser.status ===
-        'Disabled'
-      ) {
+      if (normalizedUser.status === 'Disabled') {
         return {
           success: false,
-          message:
-            'Your account has been disabled. Please contact HR Admin.'
+          message: 'Your account has been disabled. Please contact HR Admin.'
         };
       }
 
@@ -352,29 +224,22 @@ export function AuthProvider({ children }) {
       };
 
     } catch (error) {
-      console.error(
-        'Backend login failed:',
-        error
-      );
-
+      console.error('Backend login failed:', error);
       return {
         success: false,
-        message:
-          error?.message ||
-          'Unable to connect to the server. Please try again.'
+        message: error?.message || 'Unable to connect to the server. Please try again.'
       };
     }
   };
 
   const logout = () => {
+    authService.logout();
     setUser(null);
-    setToken(null);
+    setToken('');
+    setUsersList([]);
   };
 
-  const changePassword = async (
-    currentPassword,
-    newPassword
-  ) => {
+  const changePassword = async (currentPassword, newPassword) => {
     if (!user) {
       return {
         success: false,
@@ -383,11 +248,10 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const result =
-        await authService.changePassword(
-          currentPassword,
-          newPassword
-        );
+      const result = await authService.changePassword(
+        currentPassword,
+        newPassword
+      );
 
       if (!result?.success) {
         return {
@@ -399,194 +263,127 @@ export function AuthProvider({ children }) {
         };
       }
 
+      const updatedData = result?.data || {};
+      const rotatedToken = updatedData.token || token;
+
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...updatedData,
+              mustChangePassword: false
+            }
+          : prev
+      );
+
+      if (rotatedToken) {
+        setToken(rotatedToken);
+      }
+
       return {
         success: true,
-        message:
-          result?.message ||
-          'Password updated successfully!'
+        message: result?.message || 'Password updated successfully!'
       };
 
     } catch (error) {
-      console.error(
-        'Change password failed:',
-        error
-      );
-
+      console.error('Change password failed:', error);
       return {
         success: false,
-        message:
-          error?.message ||
-          'Unable to change password.'
+        message: error?.message || 'Unable to change password.'
       };
     }
   };
 
-  const createEmployee = async (
-    newEmpData
-  ) => {
+  const createEmployee = async (newEmpData) => {
     try {
-      const employee =
-        await hrAdminService.createEmployee(
-          newEmpData
-        );
+      const employee = await hrAdminService.createEmployee(newEmpData);
+      const normalizedEmployee = normalizeEmployee(employee);
 
-      const normalizedEmployee =
-        normalizeEmployee(
-          employee
-        );
-
-      setUsersList(prev => {
-        const withoutDuplicate =
-          prev.filter(
-            u =>
-              u.id !==
-              normalizedEmployee.id
-          );
-
-        return [
-          ...withoutDuplicate,
-          normalizedEmployee
-        ];
+      setUsersList((prev) => {
+        const withoutDuplicate = prev.filter((u) => u.id !== normalizedEmployee.id);
+        return [...withoutDuplicate, normalizedEmployee];
       });
 
       return {
         success: true,
-        employee:
-          normalizedEmployee
+        employee: normalizedEmployee
       };
 
     } catch (error) {
-      console.error(
-        'Create employee failed:',
-        error
-      );
-
+      console.error('Create employee failed:', error);
       return {
         success: false,
-        message:
-          error.message ||
-          'Unable to create employee.'
+        message: error.message || 'Unable to create employee.'
       };
     }
   };
 
-  const importEmployees = async (
-    file
-  ) => {
+  const importEmployees = async (file) => {
     try {
-      const result =
-        await hrAdminService.importEmployees(
-          file
-        );
-
-      if (
-        result?.success
-      ) {
+      const result = await hrAdminService.importEmployees(file);
+      if (result?.success) {
         await loadEmployees();
       }
-
       return result;
-
     } catch (error) {
-      console.error(
-        'Import employees failed:',
-        error
-      );
-
+      console.error('Import employees failed:', error);
       return {
         success: false,
-        message:
-          error.message ||
-          'Unable to import employees.'
+        message: error.message || 'Unable to import employees.'
       };
     }
   };
 
-  const changeEmployeeStatus = async (
-  empId,
-  newStatus
-) => {
-  try {
-    const updatedEmployee =
-      await hrAdminService.changeEmployeeStatus(
-        empId,
-        newStatus
-      );
-
-    const normalizedEmployee =
-      normalizeEmployee(
-        updatedEmployee
-      );
-
-    setUsersList(prev =>
-      prev.map(employee => {
-        if (employee.id !== empId) {
-          return employee;
-        }
-
-        return {
-          ...employee,
-          ...normalizedEmployee,
-          id: employee.id,
-          employeeId:
-            employee.employeeId ||
-            normalizedEmployee.employeeId ||
-            employee.id,
-        };
-      })
-    );
-
-    return {
-      success: true,
-      employee: normalizedEmployee
-    };
-
-  } catch (error) {
-    console.error(
-      'Change employee status failed:',
-      error
-    );
-
-    return {
-      success: false,
-      message:
-        error.message ||
-        'Unable to update employee status.'
-    };
-  }
-};
-
-  const resetUserPassword = async (
-    empId,
-    newPass = 'Reset@123'
-  ) => {
+  const changeEmployeeStatus = async (empId, newStatus, reason) => {
     try {
-      const result =
-        await hrAdminService.resetEmployeePassword(
-          empId,
-          newPass
-        );
+      const updatedEmployee = await hrAdminService.changeEmployeeStatus(empId, newStatus, reason);
+      const normalizedEmployee = normalizeEmployee(updatedEmployee);
+
+      setUsersList((prev) =>
+        prev.map((employee) => {
+          if (employee.id !== empId) {
+            return employee;
+          }
+          return {
+            ...employee,
+            ...normalizedEmployee,
+            id: employee.id,
+            employeeId:
+              employee.employeeId ||
+              normalizedEmployee.employeeId ||
+              employee.id,
+          };
+        })
+      );
 
       return {
-        success:
-          result?.success === true,
-
-        temporaryPasswordSet:
-          result?.temporaryPasswordSet === true
+        success: true,
+        employee: normalizedEmployee
       };
 
     } catch (error) {
-      console.error(
-        'Reset password failed:',
-        error
-      );
+      console.error('Change employee status failed:', error);
+      return {
+        success: false,
+        message: error.message || 'Unable to update employee status.'
+      };
+    }
+  };
 
+  const resetUserPassword = async (empId, newPass) => {
+    try {
+      const result = await hrAdminService.resetEmployeePassword(empId, newPass);
+      return {
+        success: result?.success === true,
+        temporaryPasswordSet: result?.temporaryPasswordSet === true,
+        mustChangePassword: result?.mustChangePassword === true
+      };
+    } catch (error) {
+      console.error('Reset password failed:', error);
       return {
         success: false,
         temporaryPasswordSet: false,
-        message:
-          error.message ||
-          'Unable to reset password.'
+        message: error.message || 'Unable to reset password.'
       };
     }
   };
@@ -595,7 +392,8 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        isAuthenticated: Boolean(user && token),
+        mustChangePassword: Boolean(user?.mustChangePassword),
         token,
 
         usersList,
@@ -619,13 +417,10 @@ export function AuthProvider({ children }) {
 }
 
 export function useAuth() {
-  const context =
-    useContext(AuthContext);
+  const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error(
-      'useAuth must be used within an AuthProvider'
-    );
+    throw new Error('useAuth must be used within an AuthProvider');
   }
 
   return context;

@@ -86,8 +86,8 @@ export default function PublicHome() {
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               className="flex items-center gap-3"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/20 border border-blue-400/30">
-                <Building2 size={21} className="text-blue-300" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md p-1.5 border border-white/20">
+                <img src="/fairmacs-logo.png" alt="Fairmacs" className="h-full w-auto object-contain" />
               </div>
 
               <div className="text-left">
@@ -511,7 +511,7 @@ export default function PublicHome() {
           </h2>
 
           <p className="mt-6 max-w-2xl mx-auto text-lg leading-8 text-slate-400">
-            Access your courses, learning paths, assessments and professional
+            Access your courses, assessments and professional
             development resources through the Fairmacs KMS.
           </p>
 
@@ -537,8 +537,8 @@ export default function PublicHome() {
 
             <div>
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-blue-500/15 flex items-center justify-center">
-                  <Building2 size={18} className="text-blue-300" />
+                <div className="h-9 w-9 rounded-xl bg-white shadow-sm flex items-center justify-center p-1.5 border border-white/10">
+                  <img src="/fairmacs-logo.png" alt="Fairmacs" className="h-full w-auto object-contain" />
                 </div>
 
                 <div>

@@ -1,54 +1,15 @@
 // Course Service
 // Handles course-related API calls
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  'http://localhost:8080/api';
+import {
+  API_BASE_URL,
+  getAuthHeaders,
+  getAuthToken,
+  handleUnauthorized,
+} from '../utils/apiConfig';
 
-const TOKEN_KEY = 'fairmacs_token';
-const USER_KEY = 'fairmacs_user';
-
-
-// ============================================================
-// GET CURRENT AUTH TOKEN
-// ============================================================
-
-const getToken = () => {
-  return localStorage.getItem(TOKEN_KEY) || '';
-};
-
-
-// ============================================================
-// CLEAR AUTHENTICATION
-// ============================================================
-
-const forceLogout = () => {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(USER_KEY);
-
-  // Remove legacy authentication keys
-  localStorage.removeItem('fairmacs_lms_token');
-  localStorage.removeItem('fairmacs_lms_user');
-
-  window.location.href = '/login';
-};
-
-
-// ============================================================
-// AUTH HEADERS
-// ============================================================
-
-const getAuthHeaders = () => {
-  const token = getToken();
-
-  return {
-    ...(token
-      ? {
-          Authorization: `Bearer ${token}`,
-        }
-      : {}),
-  };
-};
+const getToken = () => getAuthToken();
+const forceLogout = () => handleUnauthorized(true);
 
 
 // ============================================================
@@ -101,6 +62,83 @@ export const courseService = {
     }
   },
 
+
+  // ==========================================================
+  // GET TRAINER INSIGHTS
+  // ==========================================================
+
+  getTrainerInsights: async () => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/trainer/insights`,
+        {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get trainer insights error:', error);
+      return null;
+    }
+  },
+
+  // ==========================================================
+  // GET UPCOMING LIVE SESSIONS
+  // ==========================================================
+
+  getUpcomingLiveSessions: async (limit = 5) => {
+    const response = await fetch(
+      `${API_BASE_URL}/training-calendar/upcoming?limit=${encodeURIComponent(limit)}`,
+      {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (response.status === 401) {
+      forceLogout();
+      return [];
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch upcoming live sessions (${response.status})`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  },
+
+  // ==========================================================
+  // GET RECENT LEARNER ACTIVITY
+  // ==========================================================
+
+  getRecentLearnerActivity: async (limit = 8) => {
+    const response = await fetch(
+      `${API_BASE_URL}/activity/recent?limit=${encodeURIComponent(limit)}`,
+      {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      }
+    );
+
+    if (response.status === 401) {
+      forceLogout();
+      return [];
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch recent learner activity (${response.status})`);
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  },
 
   // ==========================================================
   // GET EMPLOYEE LEARNING DASHBOARD
@@ -558,10 +596,27 @@ export const courseService = {
 
 
       if (!response.ok) {
+        let errorMsg = `Failed to delete course (${response.status})`;
+        try {
+          const rawText = await response.text();
+          try {
+            const errData = JSON.parse(rawText);
+            if (errData && errData.message) {
+              errorMsg = errData.message;
+            } else if (errData && errData.error) {
+              errorMsg = errData.error;
+            }
+          } catch (_) {
+            if (rawText && rawText.trim() && !rawText.trim().startsWith('<')) {
+              errorMsg = rawText.trim();
+            }
+          }
+        } catch (_) {}
 
-        throw new Error(
-          `Failed to delete course (${response.status})`
-        );
+        return {
+          success: false,
+          error: errorMsg,
+        };
       }
 
 
@@ -580,6 +635,58 @@ export const courseService = {
         success: false,
         error: error.message,
       };
+    }
+  },
+
+  assignCourseOwnership: async (courseId, departmentId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/ownership`, {
+        method: 'PATCH',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ departmentId: departmentId ? Number(departmentId) : null }),
+      });
+      if (response.status === 401) {
+        forceLogout();
+        return { success: false, error: 'Session expired.' };
+      }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to update course ownership (${response.status})`);
+      }
+      const data = await response.json();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Assign course ownership error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  updateCourseStatus: async (courseId, active) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/courses/${courseId}/status`, {
+        method: 'PATCH',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ active: Boolean(active) }),
+      });
+      if (response.status === 401) {
+        forceLogout();
+        return { success: false, error: 'Session expired.' };
+      }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to update course status (${response.status})`);
+      }
+      const data = await response.json();
+      return { success: true, data };
+    } catch (error) {
+      console.error('Update course status error:', error);
+      return { success: false, error: error.message };
     }
   },
 };

@@ -8,7 +8,6 @@ import {
   EyeOff,
   ShieldCheck,
   ArrowRight,
-  KeyRound,
   AlertCircle,
   Home
 } from 'lucide-react';
@@ -25,7 +24,7 @@ export default function Login() {
       case 'MANAGER':
         return '/manager';
       case 'HR_ADMIN':
-        return '/admin';
+        return '/hr/overview';
       case 'EMPLOYEE':
       default:
         return '/dashboard';
@@ -38,8 +37,6 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotSubmitted, setForgotSubmitted] = useState(false);
 
   // Redirect authenticated users to their role-specific dashboard
   React.useEffect(() => {
@@ -48,13 +45,39 @@ export default function Login() {
     }
   }, [isAuthenticated, user, navigate]);
 
+  // Close the reset-password dialog with Escape
+  React.useEffect(() => {
+    if (!showForgotModal) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setShowForgotModal(false);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showForgotModal]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!empId || !password) {
+    if (!empId && !password) {
       setError(
-        'Please enter both Employee ID / Corporate Email and Password.'
+        'Enter both Employee ID / Email and Password.'
+      );
+      return;
+    }
+
+    if (!password) {
+      setError(
+        'Please enter password.'
+      );
+      return;
+    }
+
+    if (!empId) {
+      setError(
+        'Please enter Employee ID / Corporate Email.'
       );
       return;
     }
@@ -70,33 +93,6 @@ export default function Login() {
         setError(
           res.message ||
           'Invalid Employee ID/Email or Password.'
-        );
-      }
-    } catch (error) {
-      setError(
-        error.message ||
-        'Unable to login. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickLogin = async (demoId, demoPass) => {
-    setEmpId(demoId);
-    setPassword(demoPass);
-    setError('');
-    setLoading(true);
-
-    try {
-      const res = await login(demoId, demoPass);
-
-      if (res.success) {
-        navigate(getDashboardPath(res.user?.role), { replace: true });
-      } else {
-        setError(
-          res.message ||
-          'Unable to login with these credentials.'
         );
       }
     } catch (error) {
@@ -192,15 +188,21 @@ export default function Login() {
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.85rem',
-              marginBottom: '0.85rem'
+              width: 68,
+              height: 68,
+              borderRadius: '18px',
+              backgroundColor: '#ffffff',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15)',
+              padding: '10px',
+              marginBottom: '1rem'
             }}
           >
             <img
               src="/fairmacs-logo.png"
               alt="Fairmacs"
               style={{
-                height: 48,
+                height: '100%',
+                width: 'auto',
                 objectFit: 'contain'
               }}
             />
@@ -234,12 +236,15 @@ export default function Login() {
 
         {/* Login Card */}
         <div
+          className="glass-modal"
           style={{
-            background: '#ffffff',
-            borderRadius: '16px',
+            background: 'rgba(255, 255, 255, 0.94)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            borderRadius: '20px',
             padding: '2.25rem 2rem',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.35)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.3)',
+            border: '1px solid rgba(255, 255, 255, 0.85)',
             textAlign: 'center'
           }}
         >
@@ -274,6 +279,7 @@ export default function Login() {
 
           {error && (
             <div
+              role="alert"
               style={{
                 background: '#fff1f2',
                 border: '1px solid #fecdd3',
@@ -314,6 +320,7 @@ export default function Login() {
             {/* Employee ID / Email */}
             <div style={{ textAlign: 'center' }}>
               <label
+                htmlFor="login-id"
                 style={{
                   display: 'block',
                   fontSize: '0.8rem',
@@ -323,7 +330,7 @@ export default function Login() {
                   textAlign: 'center'
                 }}
               >
-                Employee ID / Corporate Email
+                Employee ID / Email
               </label>
 
               <div style={{ position: 'relative' }}>
@@ -339,7 +346,9 @@ export default function Login() {
                 />
 
                 <input
+                  id="login-id"
                   type="text"
+                  autoComplete="username"
                   placeholder="e.g. EMP1001 or arjun.kumar@fairmacs.com"
                   value={empId}
                   onChange={(e) => setEmpId(e.target.value)}
@@ -364,6 +373,7 @@ export default function Login() {
             {/* Password */}
             <div style={{ textAlign: 'center' }}>
               <label
+                htmlFor="login-password"
                 style={{
                   display: 'block',
                   fontSize: '0.8rem',
@@ -389,7 +399,9 @@ export default function Login() {
                 />
 
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -411,6 +423,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   style={{
                     position: 'absolute',
                     right: 12,
@@ -494,218 +507,6 @@ export default function Login() {
           </form>
         </div>
 
-        {/* Demo Credentials - Development Only */}
-        {import.meta.env.DEV && (
-          <div
-            style={{
-              marginTop: '1.5rem',
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '12px',
-              padding: '1.1rem',
-              backdropFilter: 'blur(4px)',
-              textAlign: 'center'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.4rem',
-                color: '#eab308',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.8px',
-                marginBottom: '0.75rem',
-                textAlign: 'center'
-              }}
-            >
-              <KeyRound
-                style={{
-                  width: 14,
-                  height: 14
-                }}
-              />
-
-              1-Click Demo Credentials
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '0.5rem'
-              }}
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    'EMP1001',
-                    'Employee@123'
-                  )
-                }
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: 'white',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '8px',
-                  fontSize: '0.78rem',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center'
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    color: '#38bdf8'
-                  }}
-                >
-                  Employee
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: '#cbd5e1'
-                  }}
-                >
-                  EMP1001 • Arjun
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    'TRN2001',
-                    'Trainer@123'
-                  )
-                }
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: 'white',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '8px',
-                  fontSize: '0.78rem',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center'
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    color: '#c084fc'
-                  }}
-                >
-                  Trainer
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: '#cbd5e1'
-                  }}
-                >
-                  TRN2001 • Ravi
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    'MGR3001',
-                    'Manager@123'
-                  )
-                }
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: 'white',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '8px',
-                  fontSize: '0.78rem',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center'
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    color: '#f59e0b'
-                  }}
-                >
-                  Manager
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: '#cbd5e1'
-                  }}
-                >
-                  MGR3001 • Priya
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    'HR4001',
-                    'Admin@123'
-                  )
-                }
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: 'white',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '8px',
-                  fontSize: '0.78rem',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center'
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: 700,
-                    color: '#34d399'
-                  }}
-                >
-                  HR / Admin
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: '#cbd5e1'
-                  }}
-                >
-                  HR4001 • Anita
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Security Footer */}
         <div
           style={{
@@ -727,189 +528,87 @@ export default function Login() {
             }}
           />
 
-          Encrypted TLS 1.3 • Role Authorization Active
+          Encrypted TLS • Role Authorization Active
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
+      {/* Reset Password Modal
+          Password resets are done by HR / IT (temporary password, then a
+          forced change at first login). There is no self-service reset
+          endpoint, so this dialog explains the process instead of
+          pretending to send a link. */}
       {showForgotModal && (
-        <div className="modal-overlay">
+        <div
+          className="modal-overlay"
+          onClick={() => setShowForgotModal(false)}
+        >
           <div
             className="modal-content animate-fade-in"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="forgot-password-title"
+            onClick={(e) => e.stopPropagation()}
             style={{
+              width: '100%',
               maxWidth: '440px',
-              textAlign: 'center'
+              boxSizing: 'border-box',
+              padding: '1.75rem',
+              textAlign: 'center',
+              maxHeight: 'calc(100dvh - 32px)',
+              overflowY: 'auto'
             }}
           >
             <div
               style={{
-                borderBottom: '1px solid #e2e8f0',
-                paddingBottom: '1rem',
-                marginBottom: '1rem',
-                textAlign: 'center'
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: '#e0f2fe',
+                color: '#0284c7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1rem'
               }}
             >
-              <h3
-                style={{
-                  fontSize: '1.15rem',
-                  fontWeight: 800,
-                  color: '#0f172a',
-                  textAlign: 'center'
-                }}
-              >
-                Reset Corporate Password
-              </h3>
-
-              <p
-                style={{
-                  fontSize: '0.82rem',
-                  color: '#64748b',
-                  marginTop: '0.2rem',
-                  textAlign: 'center'
-                }}
-              >
-                Enter your Employee ID or Corporate Email to receive
-                password reset instructions.
-              </p>
+              <Lock style={{ width: 22, height: 22 }} />
             </div>
 
-            {!forgotSubmitted ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  setForgotSubmitted(true);
-                }}
-                style={{ textAlign: 'center' }}
-              >
-                <div
-                  style={{
-                    marginBottom: '1.25rem',
-                    textAlign: 'center'
-                  }}
-                >
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      color: '#334155',
-                      marginBottom: '0.4rem',
-                      textAlign: 'center'
-                    }}
-                  >
-                    Corporate Email / Employee ID
-                  </label>
+            <h3
+              id="forgot-password-title"
+              style={{
+                margin: 0,
+                fontSize: '1.15rem',
+                fontWeight: 800,
+                color: '#0f172a'
+              }}
+            >
+              Reset Password
+            </h3>
 
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. arjun.kumar@fairmacs.com"
-                    value={forgotEmail}
-                    onChange={(e) =>
-                      setForgotEmail(e.target.value)
-                    }
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      fontSize: '0.88rem',
-                      textAlign: 'center'
-                    }}
-                  />
-                </div>
+            <p
+              style={{
+                fontSize: '0.88rem',
+                color: '#475569',
+                lineHeight: 1.6,
+                margin: '0.75rem 0 1.5rem'
+              }}
+            >
+              Password resets are handled by your HR or IT Helpdesk. Share
+              your Employee ID with them and they will give you a temporary
+              password. You will be asked to choose a new one when you
+              sign in.
+            </p>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '0.75rem',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => {
-                      setShowForgotModal(false);
-                      setForgotSubmitted(false);
-                    }}
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                  >
-                    Send Reset Link
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: '1rem 0'
-                }}
-              >
-                <div
-                  style={{
-                    background: '#dcfce7',
-                    color: '#16a34a',
-                    padding: '0.75rem',
-                    borderRadius: '50%',
-                    width: 48,
-                    height: 48,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 1rem'
-                  }}
-                >
-                  <ShieldCheck
-                    style={{
-                      width: 28,
-                      height: 28
-                    }}
-                  />
-                </div>
-
-                <h4
-                  style={{
-                    fontSize: '1rem',
-                    fontWeight: 700,
-                    color: '#0f172a',
-                    textAlign: 'center'
-                  }}
-                >
-                  Reset Instructions Dispatched
-                </h4>
-
-                <p
-                  style={{
-                    fontSize: '0.82rem',
-                    color: '#64748b',
-                    marginTop: '0.4rem',
-                    marginBottom: '1.25rem',
-                    textAlign: 'center'
-                  }}
-                >
-                  A secure password reset link has been dispatched
-                  to your registered Fairmacs email account.
-                </p>
-
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => {
-                    setShowForgotModal(false);
-                    setForgotSubmitted(false);
-                  }}
-                >
-                  Return to Sign In
-                </button>
-              </div>
-            )}
+            <button
+              type="button"
+              className="btn-primary"
+              autoFocus
+              onClick={() => setShowForgotModal(false)}
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
+              Got it
+            </button>
           </div>
         </div>
       )}

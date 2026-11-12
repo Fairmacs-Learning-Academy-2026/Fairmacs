@@ -15,4 +15,12 @@ public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, Long
     List<QuizQuestion> findByQuiz_Id(Long quizId);
 
     boolean existsByQuestionId(String questionId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM QuizQuestion qq WHERE qq.quiz.id = :quizId")
+    void deleteByQuizId(@org.springframework.data.repository.query.Param("quizId") Long quizId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM QuizQuestion qq WHERE qq.quiz.course.id = :courseId")
+    void deleteByCourseId(@org.springframework.data.repository.query.Param("courseId") Long courseId);
 }

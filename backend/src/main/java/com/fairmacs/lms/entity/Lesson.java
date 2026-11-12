@@ -1,5 +1,6 @@
 package com.fairmacs.lms.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -31,9 +32,13 @@ public class Lesson {
     @Column
     private String duration;
 
+    @Column(columnDefinition = "TEXT")
+    private String summary;
+
     @Column
     private Integer orderIndex;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "module_id", nullable = false)
     private Module module;
@@ -64,6 +69,9 @@ public class Lesson {
 
     public String getDuration() { return duration; }
     public void setDuration(String duration) { this.duration = duration; }
+
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
 
     public Integer getOrderIndex() { return orderIndex; }
     public void setOrderIndex(Integer orderIndex) { this.orderIndex = orderIndex; }
