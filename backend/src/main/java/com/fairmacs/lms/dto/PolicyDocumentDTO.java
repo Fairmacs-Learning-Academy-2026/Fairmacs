@@ -23,6 +23,8 @@ public class PolicyDocumentDTO {
     private Long totalAssignments = 0L;
     private Long totalAcknowledgements = 0L;
     private Double compliancePercentage = 0.0;
+    private Boolean mandatory = true;
+    private java.time.LocalDate dueDate;
     private String createdByEmployeeId;
     private String createdByName;
     private String approvedByName;
@@ -95,6 +97,12 @@ public class PolicyDocumentDTO {
 
     public Double getCompliancePercentage() { return compliancePercentage; }
     public void setCompliancePercentage(Double compliancePercentage) { this.compliancePercentage = compliancePercentage; }
+
+    public Boolean getMandatory() { return mandatory != null ? mandatory : true; }
+    public void setMandatory(Boolean mandatory) { this.mandatory = mandatory != null ? mandatory : true; }
+
+    public java.time.LocalDate getDueDate() { return dueDate; }
+    public void setDueDate(java.time.LocalDate dueDate) { this.dueDate = dueDate; }
 
     public String getCreatedByEmployeeId() { return createdByEmployeeId; }
     public void setCreatedByEmployeeId(String createdByEmployeeId) { this.createdByEmployeeId = createdByEmployeeId; }

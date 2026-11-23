@@ -17,6 +17,11 @@ public interface PolicyVersionRepository extends JpaRepository<PolicyVersion, Lo
 
     List<PolicyVersion> findByPolicyDocument_IdOrderByCreatedAtDesc(Long policyDocumentId);
 
+    @Query("SELECT v FROM PolicyVersion v WHERE v.policyDocument.id = :documentId ORDER BY v.createdAt ASC")
+    List<PolicyVersion> findByPolicyDocumentIdOrderByCreatedAtAsc(@Param("documentId") Long policyDocumentId);
+
+    List<PolicyVersion> findByPolicyDocument_IdOrderByCreatedAtAsc(Long policyDocumentId);
+
     @Query("SELECT v FROM PolicyVersion v WHERE v.policyDocument.id = :documentId AND v.versionNumber = :versionNumber")
     Optional<PolicyVersion> findByPolicyDocumentIdAndVersionNumber(
             @Param("documentId") Long policyDocumentId,

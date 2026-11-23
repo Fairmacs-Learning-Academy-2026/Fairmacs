@@ -11,6 +11,7 @@ import com.fairmacs.lms.security.SecurityContextUtil;
 import com.fairmacs.lms.service.PolicyService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -58,6 +59,20 @@ public class PolicyEmployeeController {
     }
 
     /**
+     * Get immutable acknowledgement history for the authenticated user only
+     */
+    @GetMapping("/my-acknowledgements")
+    public ResponseEntity<ApiResponse<List<PolicyAcknowledgementDTO>>> getMyAcknowledgements() {
+        Long userId = securityContextUtil.getCurrentUserId();
+        if (userId == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+
+        List<PolicyAcknowledgementDTO> history = policyService.getMyAcknowledgements(userId);
+        return ResponseEntity.ok(ApiResponse.success("Employee policy acknowledgement history", history));
+    }
+
+    /**
      * Get published policy document details
      */
     @GetMapping("/{id}")
@@ -86,7 +101,7 @@ public class PolicyEmployeeController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(doc.contentType() != null ? doc.contentType() : MediaType.APPLICATION_PDF);
-        headers.setContentDispositionFormData("inline", doc.filename());
+        headers.setContentDisposition(ContentDisposition.inline().filename(doc.filename()).build());
         headers.setContentLength(doc.content().length);
         headers.setCacheControl("private, max-age=3600");
 
@@ -108,7 +123,7 @@ public class PolicyEmployeeController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(doc.contentType() != null ? doc.contentType() : MediaType.APPLICATION_PDF);
-        headers.setContentDispositionFormData("attachment", doc.filename());
+        headers.setContentDisposition(ContentDisposition.attachment().filename(doc.filename()).build());
         headers.setContentLength(doc.content().length);
 
         return new ResponseEntity<>(doc.content(), headers, HttpStatus.OK);

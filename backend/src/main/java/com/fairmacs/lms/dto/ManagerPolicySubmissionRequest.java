@@ -21,7 +21,13 @@ public class ManagerPolicySubmissionRequest {
 
     private String versionNotes;
 
+    private String versionNumber = "1.0";
+
     private LocalDate effectiveDate;
+
+    private Boolean mandatory = true;
+
+    private LocalDate dueDate;
 
     private Boolean allowDownload = true;
 
@@ -45,8 +51,17 @@ public class ManagerPolicySubmissionRequest {
     public String getSubmissionNotes() { return versionNotes; }
     public void setSubmissionNotes(String submissionNotes) { this.versionNotes = submissionNotes; }
 
+    public String getVersionNumber() { return versionNumber != null && !versionNumber.isBlank() ? versionNumber : "1.0"; }
+    public void setVersionNumber(String versionNumber) { this.versionNumber = versionNumber; }
+
     public LocalDate getEffectiveDate() { return effectiveDate; }
     public void setEffectiveDate(LocalDate effectiveDate) { this.effectiveDate = effectiveDate; }
+
+    public Boolean getMandatory() { return mandatory != null ? mandatory : true; }
+    public void setMandatory(Boolean mandatory) { this.mandatory = mandatory != null ? mandatory : true; }
+
+    public LocalDate getDueDate() { return dueDate; }
+    public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
 
     public Boolean getAllowDownload() { return allowDownload != null ? allowDownload : true; }
     public void setAllowDownload(Boolean allowDownload) { this.allowDownload = allowDownload != null ? allowDownload : true; }

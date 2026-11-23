@@ -98,12 +98,15 @@ public class SecurityConfig {
                         // Employee training transcript endpoint enforces self / department / trainer / HR checks in ManagerReportsController
                         .requestMatchers(HttpMethod.GET, "/api/manager/reports/employee/**").hasAnyRole("EMPLOYEE", "MANAGER", "TRAINER", "HR_ADMIN")
 
-                        // Manager reporting restricted to HR_ADMIN and MANAGER
-                        .requestMatchers("/api/manager/**").hasAnyRole("HR_ADMIN", "MANAGER")
+                        // Manager Policies & Agreements restricted strictly to MANAGER
+                        .requestMatchers("/api/manager/policies", "/api/manager/policies/**").hasRole("MANAGER")
 
-                        // Trainer and HR Admin can list employees for course assignment; all other /api/hr/** endpoints require HR_ADMIN
-                        .requestMatchers(HttpMethod.GET, "/api/hr/employees").hasAnyRole("HR_ADMIN", "TRAINER")
-                        .requestMatchers("/api/hr/**").hasRole("HR_ADMIN")
+                        // Manager reporting restricted to HR_ADMIN, MANAGER and SUPER_ADMIN
+                        .requestMatchers("/api/manager/**").hasAnyRole("HR_ADMIN", "MANAGER", "SUPER_ADMIN")
+
+                        // Trainer and HR Admin can list employees for course assignment; all other /api/hr/** endpoints require HR_ADMIN or SUPER_ADMIN
+                        .requestMatchers(HttpMethod.GET, "/api/hr/employees").hasAnyRole("HR_ADMIN", "TRAINER", "SUPER_ADMIN")
+                        .requestMatchers("/api/hr/**").hasAnyRole("HR_ADMIN", "SUPER_ADMIN")
 
                         // All other LMS APIs require authentication
                         .anyRequest().authenticated()

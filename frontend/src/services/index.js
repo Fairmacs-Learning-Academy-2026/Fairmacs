@@ -8,6 +8,8 @@ export { reportService } from './reportService';
 export { quizService } from './quizService';
 export { hrAdminService } from './hrAdminService';
 export { notificationService } from './notificationService';
+export { policyService } from './policyService';
+export { learningStreakService } from './learningStreakService';
 export { getZohoConnectUrl } from './zohoService';
 export {
   API_BASE_URL,

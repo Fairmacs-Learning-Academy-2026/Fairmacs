@@ -3,6 +3,8 @@ package com.fairmacs.lms.service;
 import com.fairmacs.lms.entity.*;
 import com.fairmacs.lms.exception.ResourceNotFoundException;
 import com.fairmacs.lms.repository.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -274,5 +276,53 @@ class EmployeeProfileServiceTest {
         assertEquals(UserStatus.ON_LEAVE, employeeUser.getStatus());
         verify(statusHistoryRepository).save(any(EmploymentStatusHistory.class));
         verify(timelineEventRepository).save(any(EmployeeTimelineEvent.class));
+    }
+
+    @Test
+    @DisplayName("Employee profile serializes to JSON without Hibernate ByteBuddyInterceptor error when certificates are present")
+    void testProfileSerializationWithCertificatesAndNoByteBuddyProxies() throws Exception {
+        Course course = new Course();
+        course.setId(99L);
+        course.setTitle("Workplace Security & Compliance");
+
+        Certificate cert = new Certificate();
+        cert.setId(1L);
+        cert.setCertificateId("CERT-FAIR-2026-001");
+        cert.setUser(employeeUser);
+        cert.setCourse(course);
+        cert.setScore(95);
+        cert.setIssuedAt(java.time.LocalDateTime.now());
+
+        when(userRepository.findById(101L)).thenReturn(Optional.of(employeeUser));
+        when(personalInfoRepository.findByUserId(101L)).thenReturn(Optional.empty());
+        when(emergencyContactRepository.findByUserIdOrderByIsPrimaryDescCreatedAtAsc(101L)).thenReturn(Collections.emptyList());
+        when(statusRequestRepository.findByUserIdOrderByCreatedAtDesc(101L)).thenReturn(Collections.emptyList());
+        when(statusHistoryRepository.findByUserIdOrderByEffectiveDateDescCreatedAtDesc(101L)).thenReturn(Collections.emptyList());
+        when(documentRepository.findByUserIdOrderByCreatedAtDesc(101L)).thenReturn(Collections.emptyList());
+        when(enrollmentRepository.findByUserId(101L)).thenReturn(Collections.emptyList());
+        when(certificateRepository.findByUserId(101L)).thenReturn(List.of(cert));
+        when(preferenceRepository.findByUserId(101L)).thenReturn(Optional.empty());
+        when(timelineEventRepository.findByUserIdOrderByEventDateDescCreatedAtDesc(101L)).thenReturn(Collections.emptyList());
+
+        Map<String, Object> profile = profileService.getEmployeeProfile(101L, employeeUser);
+
+        assertNotNull(profile);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> learning = (Map<String, Object>) profile.get("learning");
+        assertNotNull(learning);
+        @SuppressWarnings("unchecked")
+        List<Object> certificates = (List<Object>) learning.get("certificates");
+        assertNotNull(certificates);
+        assertEquals(1, certificates.size());
+        assertTrue(certificates.get(0) instanceof com.fairmacs.lms.dto.CertificateDTO);
+
+        // Verify full JSON serialization via Jackson
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        String json = assertDoesNotThrow(() -> mapper.writeValueAsString(profile));
+        assertNotNull(json);
+        assertTrue(json.contains("CERT-FAIR-2026-001"));
+        assertTrue(json.contains("Workplace Security & Compliance"));
+        assertFalse(json.contains("ByteBuddyInterceptor"));
     }
 }

@@ -2,6 +2,8 @@ package com.fairmacs.lms.repository;
 
 import com.fairmacs.lms.entity.PolicyAssignment;
 import com.fairmacs.lms.entity.PolicyAssignmentStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -66,9 +68,25 @@ public interface PolicyAssignmentRepository extends JpaRepository<PolicyAssignme
         SELECT a FROM PolicyAssignment a
         WHERE a.assignmentStatus = 'ACTIVE'
           AND a.dueDate IS NOT NULL
+          AND a.dueDate = :targetDate
+    """)
+    Page<PolicyAssignment> findActiveAssignmentsDueOn(@Param("targetDate") LocalDate targetDate, Pageable pageable);
+
+    @Query("""
+        SELECT a FROM PolicyAssignment a
+        WHERE a.assignmentStatus = 'ACTIVE'
+          AND a.dueDate IS NOT NULL
           AND a.dueDate < :currentDate
     """)
     List<PolicyAssignment> findActiveOverdueAssignments(@Param("currentDate") LocalDate currentDate);
+
+    @Query("""
+        SELECT a FROM PolicyAssignment a
+        WHERE a.assignmentStatus = 'ACTIVE'
+          AND a.dueDate IS NOT NULL
+          AND a.dueDate < :currentDate
+    """)
+    Page<PolicyAssignment> findActiveOverdueAssignments(@Param("currentDate") LocalDate currentDate, Pageable pageable);
 
     @Query("""
         SELECT a FROM PolicyAssignment a

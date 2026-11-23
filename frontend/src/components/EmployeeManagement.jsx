@@ -568,7 +568,6 @@ export default function EmployeeManagement() {
       <section style={{ ...styles.panel, background: "linear-gradient(120deg,#ffffff 0%,#f4f8ff 100%)" }}>
         <div style={styles.header}>
           <div>
-            <div style={styles.eyebrow}><ShieldCheck size={15} /> HR Governance & User Directory</div>
             <h1 style={styles.title}>Employee Accounts</h1>
             <p style={styles.subtitle}>Onboard employees, manage access, and maintain employee profiles.</p>
           </div>

@@ -23,6 +23,7 @@ function getDashboardPath(role) {
       return '/manager';
 
     case 'HR_ADMIN':
+    case 'SUPER_ADMIN':
       return '/hr/overview';
 
     case 'EMPLOYEE':
@@ -94,17 +95,21 @@ export default function RoleRoute({
    * User is trying to access a route
    * belonging to another role.
    *
+   * Hierarchical compatibility:
+   * SUPER_ADMIN is an administrative superset of HR_ADMIN and inherits access
+   * to HR_ADMIN-protected routes to prevent redirect loops.
+   * Conversely, HR_ADMIN does NOT inherit SUPER_ADMIN-only routes.
+   *
    * Instead of sending the user to an
    * employee dashboard or leaving them
    * in the wrong area, send them to their
    * own dashboard.
    */
-  if (
-    !normalizedAllowedRoles.includes(
-      userRole
-    )
-  ) {
+  const hasAccess =
+    normalizedAllowedRoles.includes(userRole) ||
+    (userRole === 'SUPER_ADMIN' && normalizedAllowedRoles.includes('HR_ADMIN'));
 
+  if (!hasAccess) {
     return (
       <Navigate
         to={getDashboardPath(userRole)}

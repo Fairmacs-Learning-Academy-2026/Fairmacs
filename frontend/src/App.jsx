@@ -20,6 +20,7 @@ import { courseService } from './services/courseService';
 import PublicHome from './components/PublicHome';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
+import FairmacsFooter from './components/footer/FairmacsFooter';
 import Overview from './components/Overview';
 import MyLearning from './components/MyLearning';
 import TrainerDashboard from './components/TrainerDashboard';
@@ -33,6 +34,8 @@ import HrDraftsPage from './components/HrDraftsPage';
 import HrCertificatesPage from './components/HrCertificatesPage';
 import HrAnnouncementsPage from './components/HrAnnouncementsPage';
 import HrSettingsPage from './components/HrSettingsPage';
+import PolicyHrManagement from './components/policies/PolicyHrManagement';
+import PolicyManagerManagement from './components/policies/manager/PolicyManagerManagement';
 import DepartmentDetails from './components/DepartmentDetails';
 import DepartmentCourseEmployees from './components/DepartmentCourseEmployees';
 import CourseCatalog from './components/CourseCatalog';
@@ -83,6 +86,8 @@ const tabToPath = {
   hrCertificates: '/hr/certificates',
   hrAnnouncements: '/hr/announcements',
   hrSettings: '/hr/settings',
+  hrPolicies: '/hr/policies',
+  managerPolicies: '/manager/policies',
 };
 
 
@@ -91,6 +96,7 @@ const pathToTab = {
   '/trainer': 'dashboard',
   '/manager': 'dashboard',
   '/manager/all-courses': 'allCourses',
+  '/manager/policies': 'managerPolicies',
   '/admin': 'hrOverview',
   '/hr': 'hrOverview',
   '/hr/overview': 'hrOverview',
@@ -102,6 +108,7 @@ const pathToTab = {
   '/hr/certificates': 'hrCertificates',
   '/hr/announcements': 'hrAnnouncements',
   '/hr/settings': 'hrSettings',
+  '/hr/policies': 'hrPolicies',
 
   '/courses': 'catalog',
   '/progress': 'mylearning',
@@ -238,14 +245,13 @@ function MainApp() {
   ========================================================== */
 
   useEffect(() => {
-
     const currentTab =
       pathToTab[location.pathname];
-
     if (currentTab) {
       setActiveTab(currentTab);
+    } else if (location.pathname.startsWith('/courses/')) {
+      setActiveTab('catalog');
     }
-
   }, [location.pathname]);
 
 
@@ -613,6 +619,20 @@ function MainApp() {
       return <HrSettingsPage />;
     }
 
+    if (location.pathname === '/hr/policies') {
+      if (String(user?.role || '').toUpperCase() !== 'HR_ADMIN' && String(user?.role || '').toUpperCase() !== 'SUPER_ADMIN') {
+        return <Unauthorized />;
+      }
+      return <PolicyHrManagement />;
+    }
+
+    if (location.pathname === '/manager/policies') {
+      if (String(user?.role || '').toUpperCase() !== 'MANAGER') {
+        return <Unauthorized />;
+      }
+      return <PolicyManagerManagement />;
+    }
+
     /* -----------------------------------------
        COURSE OVERVIEW PAGE
     ------------------------------------------ */
@@ -636,9 +656,14 @@ function MainApp() {
               setActiveTab('certificates');
               navigate('/certificates');
             }}
-            onBackToDashboard={() => {
+            onBackToDashboard={(returnedCourseId) => {
               setActiveTab('dashboard');
-              navigate('/dashboard');
+              navigate('/dashboard', {
+                state: {
+                  returnedFromCourseId: returnedCourseId || overviewCourseId,
+                  fromCarouselIndex: location.state?.fromCarouselIndex
+                }
+              });
             }}
             onBackToCatalog={() => {
               setActiveTab('catalog');
@@ -949,6 +974,17 @@ function MainApp() {
           <main className="main-content">
             {renderContent()}
           </main>
+
+          {!location.pathname.endsWith('/learn') && (
+            <FairmacsFooter
+              variant="dashboard"
+              role={user?.role}
+              onNavigate={(path) => {
+                navigate(path);
+                window.scrollTo({ top: 0, behavior: 'auto' });
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -1149,6 +1185,15 @@ export default function App() {
             }
           />
 
+          <Route
+            path="/manager/policies"
+            element={
+              <RoleRoute allowedRoles={['MANAGER']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
           {/* =================================================
               HR / ADMIN DEDICATED ROUTES
           ================================================= */}
@@ -1239,6 +1284,15 @@ export default function App() {
             path="/hr/settings"
             element={
               <RoleRoute allowedRoles={['HR_ADMIN']}>
+                <MainApp />
+              </RoleRoute>
+            }
+          />
+
+          <Route
+            path="/hr/policies"
+            element={
+              <RoleRoute allowedRoles={['HR_ADMIN', 'SUPER_ADMIN']}>
                 <MainApp />
               </RoleRoute>
             }

@@ -61,6 +61,18 @@ public interface PolicyService {
 
     List<PolicyDocumentDTO> getDepartmentPoliciesForManager(Long managerId);
 
+    List<DepartmentSummaryDTO> getManagerDepartments(Long managerId);
+
+    PolicyDeptOverviewDTO getDepartmentOverview(Long managerId);
+
+    List<PolicyDocumentDTO> getManagerSubmissions(Long managerId);
+
+    List<PolicyAssignmentDTO> getDepartmentPolicyAssignments(Long managerId, Long policyId, Long departmentId, String status);
+
+    byte[] exportDepartmentAssignmentsToExcel(Long managerId, Long policyId, Long departmentId, String status);
+
+    void sendAcknowledgementReminder(Long assignmentId, Long managerId);
+
     List<PolicyDocumentDTO> getPendingSubmissionsForHr();
 
     PolicyDocumentDTO decideManagerSubmission(
@@ -73,6 +85,8 @@ public interface PolicyService {
     // 4. Employee Policy Operations
     // ==========================================
     List<PolicyAssignmentDTO> getMyAssignments(Long userId, String statusFilter);
+
+    List<PolicyAcknowledgementDTO> getMyAcknowledgements(Long userId);
 
     PolicyDocumentDTO getMyPolicyDetails(Long policyId, Long userId);
 
@@ -88,9 +102,17 @@ public interface PolicyService {
             String userAgent
     );
 
+    boolean isCompliant(Long versionId, Long userId);
+
     // ==========================================
-    // 5. Compliance Reporting
+    // 5. Compliance Reporting & Organization Overview
     // ==========================================
+    PolicyOrgOverviewDTO getOrganizationOverview();
+
+    List<PolicyAssignmentDTO> getAllPolicyAssignments(Long policyId, Long departmentId, String status);
+
+    byte[] exportAssignmentsToExcel(Long policyId, Long departmentId, String status);
+
     PolicyComplianceSummaryDTO getPolicyComplianceSummary(Long policyId, Long userId, String userRole);
 
     List<PolicyComplianceSummaryDTO.DepartmentComplianceDTO> getDepartmentComplianceBreakdown(
@@ -98,6 +120,21 @@ public interface PolicyService {
             Long userId,
             String userRole
     );
+
+    // ==========================================
+    // STAGE 8: COMPLIANCE REPORTING & TRACKING
+    // ==========================================
+    List<PolicyDepartmentReportDTO> getDepartmentComplianceReports(Long managerId, String userRole);
+
+    List<PolicyDocumentReportDTO> getDocumentComplianceReports(Long managerId, String userRole, String category, Boolean mandatory, String status);
+
+    List<PolicyEmployeeReportDTO> getEmployeeComplianceReports(Long managerId, String userRole, Long departmentId, String complianceStatus, String userStatus, String search);
+
+    PolicyEmployeeHistoryDTO getEmployeeAcknowledgementHistory(Long employeeId, Long requesterUserId, String requesterRole);
+
+    byte[] exportComplianceReportToExcel(String reportType, Long managerId, String userRole, Long departmentId, Long policyId, String status);
+
+    PolicyExcelExportResult exportPolicyDocumentComplianceExcel(Long policyId, Long managerId, String userRole);
 
     // ==========================================
     // 6. Audit Logging

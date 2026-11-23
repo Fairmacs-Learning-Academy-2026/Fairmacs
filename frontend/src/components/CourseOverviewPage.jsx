@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Compass,
@@ -88,11 +89,35 @@ export default function CourseOverviewPage({
   onBackToDashboard,
   onBackToCatalog
 }) {
-  const [course, setCourse] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const initialCourseData = location.state?.courseData || null;
+  const fromCarousel = Boolean(location.state?.fromCarousel);
+  const fromCarouselIndex = location.state?.fromCarouselIndex;
+
+  const [course, setCourse] = useState(initialCourseData);
+  const [loading, setLoading] = useState(!initialCourseData);
   const [error, setError] = useState('');
   const [completedLessonsMap, setCompletedLessonsMap] = useState({});
   const [expandedModules, setExpandedModules] = useState({});
+  const [isExiting, setIsExiting] = useState(false);
+
+  const handleBackToDashboard = () => {
+    if (isExiting) return;
+    setIsExiting(true);
+    setTimeout(() => {
+      if (onBackToDashboard) {
+        onBackToDashboard(course?.id || course?.courseId || courseId);
+      } else {
+        navigate('/dashboard', {
+          state: {
+            returnedFromCourseId: course?.id || course?.courseId || courseId,
+            fromCarouselIndex
+          }
+        });
+      }
+    }, 240);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -104,10 +129,12 @@ export default function CourseOverviewPage({
         return;
       }
 
-      setLoading(true);
+      if (!initialCourseData) {
+        setLoading(true);
+        // Prevent stale course data when navigating between courses
+        setCourse(null);
+      }
       setError('');
-      // Prevent stale course data when navigating between courses
-      setCourse(null);
       setCompletedLessonsMap({});
       setExpandedModules({});
 
@@ -116,7 +143,7 @@ export default function CourseOverviewPage({
         if (cancelled) return;
         if (!data) throw new Error('This course could not be found or you do not have permission to access it.');
 
-        setCourse(data);
+        setCourse((prev) => (prev ? { ...prev, ...data } : data));
 
         // Expand first module by default
         if (Array.isArray(data.modules) && data.modules.length > 0) {
@@ -338,7 +365,7 @@ export default function CourseOverviewPage({
           <button
             type="button"
             className="btn-primary"
-            onClick={onBackToDashboard}
+            onClick={handleBackToDashboard}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
           >
             <ArrowLeft size={16} /> Return to Dashboard
@@ -358,7 +385,7 @@ export default function CourseOverviewPage({
 
   return (
     <div
-      className="course-overview-page animate-fade-in"
+      className={`course-overview-page ${isExiting ? 'course-overview-page-exiting' : 'course-overview-page-entering'}`}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -380,7 +407,7 @@ export default function CourseOverviewPage({
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             type="button"
-            onClick={onBackToDashboard}
+            onClick={handleBackToDashboard}
             style={{
               background: 'rgba(255, 255, 255, 0.85)',
               border: '1px solid #E2E8F0',
@@ -469,10 +496,10 @@ export default function CourseOverviewPage({
       </div>
 
       {/* 2. HERO SECTION – SPLIT LAYOUT WITH PROMINENT THUMBNAIL */}
-      <section className="course-overview-hero">
+      <section className={`course-overview-hero ${fromCarousel ? 'course-overview-hero-expanding' : ''}`}>
         <div className="course-overview-hero-split">
           {/* Left Column: Dedicated Course Thumbnail Card */}
-          <div className="course-overview-hero-thumb-card">
+          <div className="course-overview-hero-thumb-card course-overview-hero-thumb-animated">
             <CourseThumbnailImage
               course={course}
               alt={course.title}
@@ -481,7 +508,7 @@ export default function CourseOverviewPage({
           </div>
 
           {/* Right Column: Hierarchical Course Information */}
-          <div className="course-overview-hero-info">
+          <div className="course-overview-hero-info course-overview-hero-info-animated">
             {/* Top Row: Categorization and Status Badges */}
             <div className="course-overview-hero-badges">
               {/* Department Badge */}
@@ -651,7 +678,7 @@ export default function CourseOverviewPage({
                 className="course-overview-cert-btn"
                 onClick={() => {
                   if (onViewCertificate) onViewCertificate(course);
-                  else if (onBackToDashboard) onBackToDashboard();
+                  else handleBackToDashboard();
                 }}
                 style={{
                   background: 'rgba(16, 185, 129, 0.95)',
@@ -685,8 +712,10 @@ export default function CourseOverviewPage({
         </div>
       </section>
 
-      {/* 3. KEY COURSE INFORMATION STRIP (FACTS CARDS) */}
-      <section className="course-overview-facts-grid">
+      {/* 3. DETAILS CONTENT (CURRICULUM, OUTCOMES, INSTRUCTOR) WITH STAGGERED ENTRANCE */}
+      <div className="course-overview-content-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* KEY COURSE INFORMATION STRIP (FACTS CARDS) */}
+        <section className="course-overview-facts-grid">
         <div style={factCardStyle}>
           <div style={{ color: '#0F6CBD', marginBottom: '0.25rem' }}>
             <BookOpen size={18} />
@@ -1169,6 +1198,8 @@ export default function CourseOverviewPage({
             </div>
           </section>
         </aside>
+      </div>
+      {/* End course-overview-content-stagger */}
       </div>
     </div>
   );

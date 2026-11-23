@@ -49,3 +49,8 @@ backups/
 *.zip
 backend/uploads/
 uploads/
+
+# Build and scratch artifacts
+.vite/
+desktop.ini
+scratch/

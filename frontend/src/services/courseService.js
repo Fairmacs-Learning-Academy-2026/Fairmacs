@@ -689,6 +689,32 @@ export const courseService = {
       return { success: false, error: error.message };
     }
   },
+
+  // ==========================================================
+  // GET LEARNING STREAKS (PHASE 3)
+  // ==========================================================
+  getLearningStreaks: async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/learning/streaks`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.status === 401) {
+        forceLogout();
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch learning streaks (${response.status})`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching learning streaks:', error);
+      throw error;
+    }
+  },
 };
 
 

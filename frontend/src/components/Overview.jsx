@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   BookOpen,
   CheckCircle2,
@@ -13,7 +13,15 @@ import {
 } from 'lucide-react';
 import { courseService } from '../services/courseService';
 import AssignedLearningCarousel from './AssignedLearningCarousel';
-import GlassCarousel from './GlassCarousel';
+import WelcomeBanner from './dashboard/WelcomeBanner';
+import LearningStreaks from './dashboard/LearningStreaks';
+import SmartLearningCard from './dashboard/SmartLearningCard';
+import LearningProgress from './dashboard/LearningProgress';
+import CertificatesWidget from './dashboard/CertificatesWidget';
+import PoliciesWidget from './dashboard/PoliciesWidget';
+import AnnouncementsWidget from './dashboard/AnnouncementsWidget';
+import UpcomingDeadlinesWidget from './dashboard/UpcomingDeadlinesWidget';
+import RecommendedElectivesWidget from './dashboard/RecommendedElectivesWidget';
 import { formatCourseDuration } from '../utils/courseDuration';
 import { subscribeEnrollmentSync } from '../utils/enrollmentSync';
 
@@ -76,70 +84,16 @@ function formatDate(value) {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function getDeadlineInfo(dueDateStr) {
-  if (!dueDateStr) return null;
-  const due = new Date(dueDateStr);
-  if (Number.isNaN(due.getTime())) return null;
-
-  const now = new Date();
-  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diffDays = Math.round((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) {
-    const overdueDays = Math.abs(diffDays);
-    return {
-      type: 'overdue',
-      label: `Overdue by ${overdueDays}d`,
-      fullLabel: `Overdue by ${overdueDays} day${overdueDays === 1 ? '' : 's'}`,
-      badgeStyle: {
-        background: '#FEF2F2',
-        color: '#DC2626',
-        border: '1px solid #FECACA'
-      }
-    };
-  }
-  if (diffDays === 0) {
-    return {
-      type: 'due_today',
-      label: 'Due today',
-      fullLabel: 'Due today',
-      badgeStyle: {
-        background: '#FFFBEB',
-        color: '#D97706',
-        border: '1px solid #FDE68A'
-      }
-    };
-  }
-  if (diffDays <= 5) {
-    return {
-      type: 'approaching',
-      label: `${diffDays}d remaining`,
-      fullLabel: `${diffDays} day${diffDays === 1 ? '' : 's'} remaining`,
-      badgeStyle: {
-        background: '#FFFBEB',
-        color: '#D97706',
-        border: '1px solid #FDE68A'
-      }
-    };
-  }
-  return {
-    type: 'normal',
-    label: `${diffDays}d remaining`,
-    fullLabel: `${diffDays} days remaining`,
-    badgeStyle: {
-      background: '#F0F9FF',
-      color: '#0284C7',
-      border: '1px solid #BAE6FD'
-    }
-  };
-}
 
 export default function Overview({
   onSelectCourse,
-  setActiveTab
+  setActiveTab,
+  onOpenCertificates
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnedCourseId = location.state?.returnedFromCourseId;
+  const returnedIndex = location.state?.fromCarouselIndex;
   const [dashboard, setDashboard] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
@@ -198,11 +152,21 @@ export default function Overview({
     };
   }, [loadDashboard]);
 
-  // Navigate to dedicated course overview page
+  // Navigate to dedicated course overview page with seamless transition state
+  // Navigation Contract: navigate(`/courses/${encodeURIComponent(code)}/overview`)
   const handleOpenCourse = (course) => {
     const code = course.id || course.courseId;
     if (code) {
-      navigate(`/courses/${encodeURIComponent(code)}/overview`);
+      const courseIndex = assignedCourses.findIndex(
+        (c) => (c.id || c.courseId || c.dbId) === (course.id || course.courseId || course.dbId)
+      );
+      navigate(`/courses/${encodeURIComponent(code)}/overview`, {
+        state: {
+          courseData: course,
+          fromCarousel: true,
+          fromCarouselIndex: courseIndex >= 0 ? courseIndex : 0
+        }
+      });
     } else if (onSelectCourse) {
       onSelectCourse(course);
     }
@@ -256,6 +220,21 @@ export default function Overview({
 
   const completedCourses = Number(dashboard?.completedCourses ?? 0);
 
+  // Set of completed course IDs for authoritative elective filtering
+  const completedCourseIds = useMemo(() => {
+    const ids = new Set();
+    if (Array.isArray(dashboard?.enrolled)) {
+      for (const c of dashboard.enrolled) {
+        if (c.enrollmentStatus === 'COMPLETED' || c.status === 'COMPLETED') {
+          if (c.id) ids.add(String(c.id));
+          if (c.dbId) ids.add(String(c.dbId));
+          if (c.courseId) ids.add(String(c.courseId));
+        }
+      }
+    }
+    return ids;
+  }, [dashboard]);
+
   // Overall progress percentage
   const overallProgress = useMemo(() => {
     if (dashboard?.mandatoryPercent != null && typeof dashboard.mandatoryPercent === 'number') {
@@ -268,528 +247,311 @@ export default function Overview({
     return Math.round((assignedSum + completedSum) / totalCount);
   }, [dashboard, assignedCourses, completedCourses]);
 
-  // Upcoming deadlines (active incomplete assigned courses only)
-  const upcomingDeadlines = useMemo(() => {
-    return assignedCourses
-      .filter((course) => Boolean(course.dueDate))
-      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-      .slice(0, 5);
-  }, [assignedCourses]);
-
-  if (loading) {
-    return (
-      <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0 }}>
-        {/* Carousel Skeleton */}
-        <div className="skeleton-shimmer" style={{ height: '360px', borderRadius: '24px', border: '1px solid rgba(226, 235, 245, 0.8)' }} />
-        {/* Snapshot Skeleton */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={`ov-skel-${i}`} className="skeleton-shimmer" style={{ height: '110px', borderRadius: '16px', border: '1px solid rgba(226, 235, 245, 0.8)' }} />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="animate-fade-in" style={{ ...panelStyle, padding: '2.5rem 2rem', textAlign: 'center' }}>
-        <div
-          style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: '14px',
-            background: '#fef2f2',
-            color: '#dc2626',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '1rem',
-            border: '1px solid #fecaca',
-          }}
-        >
-          <AlertCircle size={28} />
-        </div>
-        <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: '0 0 .4rem' }}>
-          Dashboard Unavailable
-        </h2>
-        <p role="alert" style={{ color: '#b91c1c', fontSize: '.88rem', margin: '0 0 1.25rem' }}>{error}</p>
-        <button type="button" className="btn-primary" onClick={() => loadDashboard()} style={{ display: 'inline-flex', alignItems: 'center', gap: '.45rem' }}>
-          <RefreshCw size={15} /> Try again
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.6rem', minWidth: 0 }}>
+    <div className="employee-dashboard-shell animate-fade-in">
       {/* ========================================================
-          PART B & C: ASSIGNED LEARNING CAROUSEL OR PART G: EMPTY STATE
+          PHASE 2: BALANCED APPLE LIQUID GLASS WELCOME HEADER
+          Always displayed at the top of the dashboard shell
       ======================================================== */}
-      {assignedCourses.length > 0 ? (
-        <AssignedLearningCarousel
-          courses={assignedCourses}
-          onOpenCourse={handleOpenCourse}
-        />
-      ) : (
-        /* PART G: EMPTY STATE */
-        <section
-          className="assigned-learning-empty-state animate-fade-in"
+      <WelcomeBanner
+        onOpenNotifications={() => {
+          if (setActiveTab) setActiveTab('notifications');
+          navigate('/notifications');
+        }}
+      />
+
+      {/* ========================================================
+          DASHBOARD STATE: LOADING SKELETON
+      ======================================================== */}
+      {loading ? (
+        <div
+          className="employee-dashboard-loading animate-fade-in"
+          style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', minWidth: 0 }}
+        >
+          {/* Carousel Skeleton - compact realistic height 220px matching AssignedLearningCarousel card aspect ratio */}
+          <div
+            className="skeleton-shimmer"
+            style={{
+              height: '220px',
+              borderRadius: '22px',
+              border: '1px solid rgba(226, 235, 245, 0.85)',
+              boxShadow: '0 8px 24px rgba(31, 70, 120, 0.04)'
+            }}
+          />
+          {/* Learning Streaks Skeleton - realistic height 190px matching Dual Activity Rings & Weekly Calendar */}
+          <div
+            className="skeleton-shimmer"
+            style={{
+              height: '190px',
+              borderRadius: '22px',
+              border: '1px solid rgba(226, 235, 245, 0.85)',
+              boxShadow: '0 8px 24px rgba(31, 70, 120, 0.04)'
+            }}
+          />
+          {/* Smart Learning Card Skeleton */}
+          <SmartLearningCard loading={true} />
+          {/* Learning Progress Skeleton */}
+          <LearningProgress loading={true} />
+          {/* Phase 5 Widgets Grid Skeleton */}
+          <div className="employee-dashboard-phase5-grid">
+            <div className="phase5-skeleton-row" style={{ height: '170px', borderRadius: '22px' }} />
+            <div className="phase5-skeleton-row" style={{ height: '170px', borderRadius: '22px' }} />
+            <div className="phase5-skeleton-row" style={{ height: '170px', borderRadius: '22px' }} />
+          </div>
+          {/* Phase 7 Widgets Skeleton */}
+          <UpcomingDeadlinesWidget loading={true} />
+          <RecommendedElectivesWidget loading={true} />
+        </div>
+      ) : error ? (
+        /* ========================================================
+            DASHBOARD STATE: ERROR FALLBACK PANEL
+        ======================================================== */
+        <div
+          className="dashboard-error-panel animate-fade-in"
           style={{
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.88) 0%, rgba(246, 250, 255, 0.92) 100%)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderRadius: '24px',
-            border: '1px solid rgba(255, 255, 255, 0.95)',
-            boxShadow: '0 16px 42px rgba(31, 70, 120, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95)',
-            padding: '3.2rem 2rem',
-            textAlign: 'center'
+            ...panelStyle,
+            padding: '2.5rem 2rem',
+            textAlign: 'center',
+            borderRadius: '22px'
           }}
         >
           <div
             style={{
-              width: '68px',
-              height: '68px',
+              width: '52px',
+              height: '52px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%)',
-              color: '#16A34A',
+              background: '#FEE2E2',
+              color: '#DC2626',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              marginBottom: '1.25rem',
-              boxShadow: '0 8px 24px rgba(22, 163, 74, 0.2)'
+              margin: '0 auto 1rem',
+              border: '1px solid #FECACA'
             }}
           >
-            <CheckCircle2 size={34} />
+            <AlertCircle size={28} />
           </div>
           <h2
             style={{
-              fontSize: '1.5rem',
+              fontSize: '1.25rem',
               fontWeight: 800,
               color: '#0F172A',
               margin: '0 0 0.5rem',
               letterSpacing: '-0.02em'
             }}
           >
-            You're all caught up!
+            Dashboard Temporarily Unavailable
           </h2>
           <p
+            role="alert"
             style={{
               color: '#64748B',
-              fontSize: '0.94rem',
-              maxWidth: '520px',
-              margin: '0 auto 1.5rem',
-              lineHeight: 1.6
+              fontSize: '0.88rem',
+              margin: '0 auto 1.25rem',
+              maxWidth: '460px',
+              lineHeight: 1.55
             }}
           >
-            You have completed all your assigned courses. Explore the course catalog to discover more learning opportunities.
+            {error}
           </p>
           <button
             type="button"
             className="btn-primary"
-            onClick={() => {
-              if (setActiveTab) setActiveTab('catalog');
-              navigate('/courses');
-            }}
+            onClick={() => loadDashboard()}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.45rem',
-              padding: '0.75rem 1.45rem',
-              fontSize: '0.9rem',
-              boxShadow: '0 4px 16px rgba(15, 108, 189, 0.35)'
+              padding: '0.65rem 1.35rem',
+              borderRadius: '10px'
             }}
           >
-            <Compass size={17} /> Explore Course Catalog
+            <RefreshCw size={15} /> Retry Loading
           </button>
-        </section>
-      )}
-
-      {/* ========================================================
-          PART H: EMPLOYEE LEARNING SNAPSHOT (3 COMPACT CARDS)
-      ======================================================== */}
-      <section
-        className="employee-learning-snapshot-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '1rem'
-        }}
-      >
-        {/* CARD 1: ASSIGNED COURSES */}
-        <div
-          className="stat-card"
-          style={{
-            background: 'rgba(255, 255, 255, 0.85)',
-            backdropFilter: 'blur(16px)',
-            borderRadius: '16px',
-            border: '1px solid rgba(226, 232, 240, 0.9)',
-            padding: '1.25rem 1.35rem',
-            boxShadow: '0 4px 16px rgba(31, 70, 120, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            minWidth: 0
-          }}
-        >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: '12px',
-              background: '#E0F2FE',
-              color: '#0284C7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <BookOpen size={22} />
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-              {assignedCourses.length}
-            </div>
-            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155', marginTop: '2px' }}>
-              Assigned Courses
-            </div>
-            <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>
-              Active incomplete curricula
-            </div>
-          </div>
         </div>
-
-        {/* CARD 2: COURSES COMPLETED */}
-        <div
-          className="stat-card"
-          style={{
-            background: 'rgba(255, 255, 255, 0.85)',
-            backdropFilter: 'blur(16px)',
-            borderRadius: '16px',
-            border: '1px solid rgba(226, 232, 240, 0.9)',
-            padding: '1.25rem 1.35rem',
-            boxShadow: '0 4px 16px rgba(31, 70, 120, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            minWidth: 0
-          }}
-        >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: '12px',
-              background: '#DCFCE7',
-              color: '#16A34A',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <CheckCircle2 size={22} />
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-              {completedCourses}
-            </div>
-            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155', marginTop: '2px' }}>
-              Courses Completed
-            </div>
-            <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: '2px' }}>
-              Successfully satisfied
-            </div>
-          </div>
-        </div>
-
-        {/* CARD 3: OVERALL LEARNING PROGRESS */}
-        <div
-          className="stat-card"
-          style={{
-            background: 'rgba(255, 255, 255, 0.85)',
-            backdropFilter: 'blur(16px)',
-            borderRadius: '16px',
-            border: '1px solid rgba(226, 232, 240, 0.9)',
-            padding: '1.25rem 1.35rem',
-            boxShadow: '0 4px 16px rgba(31, 70, 120, 0.04)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            minWidth: 0
-          }}
-        >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: '12px',
-              background: '#F3E8FF',
-              color: '#9333EA',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            <GraduationCap size={22} />
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
-                {overallProgress}%
-              </div>
-              <span
-                style={{
-                  fontSize: '0.68rem',
-                  fontWeight: 700,
-                  color: overallProgress >= 75 ? '#16A34A' : '#0F6CBD',
-                  background: overallProgress >= 75 ? '#DCFCE7' : '#E0F2FE',
-                  padding: '0.15rem 0.5rem',
-                  borderRadius: '999px'
-                }}
-              >
-                Overall
-              </span>
-            </div>
-            <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155', marginTop: '2px' }}>
-              Learning Progress
-            </div>
-            {/* Mini Progress Bar */}
-            <div
+      ) : (
+        /* ========================================================
+            DASHBOARD STATE: FULLY LOADED CONTENT
+        ======================================================== */
+        <>
+          {/* ========================================================
+              PART B & C: ASSIGNED LEARNING CAROUSEL OR PART G: EMPTY STATE
+          ======================================================== */}
+          {assignedCourses.length > 0 ? (
+            <AssignedLearningCarousel
+              courses={assignedCourses}
+              onOpenCourse={handleOpenCourse}
+              initialCourseId={returnedCourseId}
+              initialIndex={returnedIndex}
+            />
+          ) : (
+            /* PART G: REFINED EMPTY STATE MATCHING REFERENCE SPECIFICATION */
+            <section
+              className="assigned-learning-empty-state animate-fade-in"
               style={{
-                height: '5px',
-                background: '#E2E8F0',
-                borderRadius: '999px',
-                overflow: 'hidden',
-                marginTop: '6px'
+                background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(246, 250, 255, 0.86) 100%)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                borderRadius: '22px',
+                border: '1px solid rgba(255, 255, 255, 0.95)',
+                boxShadow: '0 12px 36px rgba(31, 70, 120, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.95)',
+                padding: '2.75rem 2rem',
+                textAlign: 'center'
               }}
             >
               <div
                 style={{
-                  height: '100%',
-                  width: `${overallProgress}%`,
-                  background: 'linear-gradient(90deg, #9333EA 0%, #0F6CBD 100%)',
-                  borderRadius: '999px'
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================
-          PART I: UPCOMING DEADLINES & RECOMMENDED LEARNING GRID
-      ======================================================== */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: upcomingDeadlines.length > 0 ? 'minmax(0, 1.4fr) minmax(300px, 1fr)' : '1fr',
-          gap: '1.4rem',
-          alignItems: 'start'
-        }}
-      >
-        {/* UPCOMING DEADLINES SECTION */}
-        {upcomingDeadlines.length > 0 && (
-          <section
-            style={{
-              ...panelStyle,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.9rem'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <div>
-                <h3
-                  style={{
-                    fontSize: '1.05rem',
-                    fontWeight: 800,
-                    color: '#0F172A',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem'
-                  }}
-                >
-                  <Calendar size={17} style={{ color: '#0F6CBD' }} />
-                  Upcoming Deadlines
-                </h3>
-                <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '3px 0 0' }}>
-                  Active incomplete assigned courses with target completion dates.
-                </p>
-              </div>
-
-              <span
-                style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  color: '#64748B',
-                  background: '#F1F5F9',
-                  padding: '0.2rem 0.55rem',
-                  borderRadius: '6px'
+                  width: '64px',
+                  height: '64px',
+                  borderRadius: '50%',
+                  background: '#EFF6FF',
+                  color: '#2563EB',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 1.15rem',
+                  border: '1px solid rgba(37, 99, 235, 0.15)',
+                  boxShadow: '0 4px 16px rgba(37, 99, 235, 0.12)'
                 }}
               >
-                {upcomingDeadlines.length} Due Soon
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              {upcomingDeadlines.map((course) => {
-                const deadline = getDeadlineInfo(course.dueDate);
-                const isMandatory =
-                  String(course.assignmentType || '').toUpperCase() === 'MANDATORY' ||
-                  String(course.enrollmentType || '').toUpperCase() === 'MANDATORY';
-
-                return (
-                  <div
-                    key={`dl-${course._key || course.id}`}
-                    onClick={() => handleOpenCourse(course)}
-                    style={{
-                      background: '#FFFFFF',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: '12px',
-                      padding: '0.8rem 1rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '0.85rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#0F6CBD';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 108, 189, 0.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#E2E8F0';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.25rem' }}>
-                        <span
-                          style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 800,
-                            padding: '0.12rem 0.45rem',
-                            borderRadius: '4px',
-                            background: isMandatory ? '#FEE2E2' : '#DCFCE7',
-                            color: isMandatory ? '#DC2626' : '#16A34A',
-                            textTransform: 'uppercase'
-                          }}
-                        >
-                          {isMandatory ? 'Mandatory' : 'Recommended'}
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>
-                          Due {formatDate(course.dueDate)}
-                        </span>
-                      </div>
-                      <h4
-                        style={{
-                          fontSize: '0.88rem',
-                          fontWeight: 750,
-                          color: '#0F172A',
-                          margin: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {course.title}
-                      </h4>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexShrink: 0 }}>
-                      {deadline && (
-                        <span
-                          style={{
-                            ...deadline.badgeStyle,
-                            fontSize: '0.72rem',
-                            fontWeight: 750,
-                            padding: '0.22rem 0.55rem',
-                            borderRadius: '6px',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {deadline.label}
-                        </span>
-                      )}
-                      <ArrowRight size={14} color="#94A3B8" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {/* RECOMMENDED COURSES SECTION */}
-        <section style={{ minWidth: 0 }}>
-          {recommendedCourses.length > 0 ? (
-            <GlassCarousel
-              items={recommendedCourses}
-              title="Recommended For You"
-              subtitle="Tailored to your organizational position and role"
-              badge="RECOMMENDED"
-              icon={Sparkles}
-              actionButton={
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (setActiveTab) setActiveTab('catalog');
-                    navigate('/courses');
-                  }}
-                  style={{
-                    color: '#0F6CBD',
-                    fontSize: '0.82rem',
-                    fontWeight: 750,
-                    background: 'none',
-                    border: 0,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  View catalog →
-                </button>
-              }
-              onSelectCourse={handleOpenCourse}
-              onOpenCourseDetails={handleOpenCourse}
-            />
-          ) : (
-            <div
-              style={{
-                ...panelStyle,
-                borderStyle: 'dashed',
-                boxShadow: 'none',
-                textAlign: 'center',
-                color: '#64748B',
-                padding: '2rem 1.5rem'
-              }}
-            >
-              <GraduationCap size={32} color="#94A3B8" style={{ marginBottom: '0.5rem' }} />
-              <div style={{ fontWeight: 750, color: '#334155', fontSize: '0.92rem' }}>
-                Explore More Skills
+                <CheckCircle2 size={30} />
               </div>
-              <p style={{ fontSize: '0.82rem', margin: '0.35rem 0 1rem' }}>
-                Discover new courses available in your enterprise catalog.
+              <h2
+                style={{
+                  fontSize: '1.4rem',
+                  fontWeight: 800,
+                  color: '#0F172A',
+                  margin: '0 0 0.45rem',
+                  letterSpacing: '-0.02em'
+                }}
+              >
+                You're all caught up
+              </h2>
+              <p
+                style={{
+                  color: '#64748B',
+                  fontSize: '0.92rem',
+                  maxWidth: '480px',
+                  margin: '0 auto 1.35rem',
+                  lineHeight: 1.55
+                }}
+              >
+                You have completed all your assigned courses. Explore the course catalog to discover more learning opportunities.
               </p>
               <button
                 type="button"
-                className="btn-secondary"
+                className="btn-primary"
                 onClick={() => {
                   if (setActiveTab) setActiveTab('catalog');
                   navigate('/courses');
                 }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem' }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  padding: '0.68rem 1.4rem',
+                  fontSize: '0.88rem',
+                  borderRadius: '10px',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.28)'
+                }}
               >
-                <Compass size={14} /> Open Course Catalog
+                <Compass size={16} /> Explore Course Catalog
               </button>
-            </div>
+            </section>
           )}
-        </section>
-      </div>
+
+          {/* ========================================================
+              PHASE 3: LEARNING CONSISTENCY (DUAL ACTIVITY RINGS & CALENDAR)
+              Positioned immediately below the Course Carousel
+          ======================================================== */}
+          <LearningStreaks />
+
+          {/* ========================================================
+              PHASE 4: DYNAMIC SMART LEARNING CARD
+              Context-aware priority-driven action card
+          ======================================================== */}
+          <SmartLearningCard
+            assignedCourses={assignedCourses}
+            recommendedCourses={recommendedCourses}
+            completedCoursesCount={completedCourses}
+            onOpenCourse={handleOpenCourse}
+            onExploreCatalog={() => {
+              if (setActiveTab) setActiveTab('catalog');
+              navigate('/courses');
+            }}
+          />
+
+          {/* ========================================================
+              PHASE 4: LEARNING PROGRESS WIDGETS & CURRICULUM SNAPSHOT
+              Segmented visual progress bar and 4 Liquid Glass metric cards
+          ======================================================== */}
+          <LearningProgress
+            dashboard={dashboard}
+            onNavigateProgressHub={() => {
+              if (setActiveTab) setActiveTab('mylearning');
+              navigate('/progress');
+            }}
+          />
+
+          {/* ========================================================
+              PHASE 5: CERTIFICATES, POLICIES & AGREEMENTS, AND ANNOUNCEMENTS
+              Liquid Glass 3-Card Responsive Grid Layout
+          ======================================================== */}
+          <div className="employee-dashboard-phase5-grid">
+            {/* 6. Certificates Widget */}
+            <CertificatesWidget
+              onViewAllCertificates={() => {
+                if (onOpenCertificates) {
+                  onOpenCertificates();
+                } else {
+                  if (setActiveTab) setActiveTab('certificates');
+                  navigate('/certificates');
+                }
+              }}
+            />
+
+            {/* 7. Policies & Agreements Widget */}
+            <PoliciesWidget
+              onViewAllPolicies={() => {
+                if (setActiveTab) setActiveTab('profile');
+                navigate('/profile?tab=policies#policies');
+              }}
+            />
+
+            {/* 8. Announcements Widget */}
+            <AnnouncementsWidget
+              onViewAllAnnouncements={() => {
+                if (setActiveTab) setActiveTab('notifications');
+                navigate('/notifications');
+              }}
+            />
+          </div>
+
+          {/* ========================================================
+              PHASE 7: UPCOMING DEADLINES & RECOMMENDED ELECTIVES
+              Balanced Apple Liquid Glass Sections
+          ======================================================== */}
+          {/* 9. Upcoming Deadlines Widget */}
+          <UpcomingDeadlinesWidget
+            assignedCourses={assignedCourses}
+            onOpenCourse={handleOpenCourse}
+            loading={false}
+          />
+
+          {/* 10. Recommended Electives Widget */}
+          <RecommendedElectivesWidget
+            recommendedCourses={recommendedCourses}
+            assignedCourses={assignedCourses}
+            completedCourseIds={completedCourseIds}
+            onOpenCourse={handleOpenCourse}
+            onExploreCatalog={() => {
+              if (setActiveTab) setActiveTab('catalog');
+              navigate('/courses');
+            }}
+            loading={false}
+          />
+        </>
+      )}
     </div>
   );
 }

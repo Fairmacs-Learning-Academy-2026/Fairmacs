@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Bell,
   Award,
@@ -90,6 +90,7 @@ const menuButtonStyle = {
 };
 
 export default function Header({
+  activeTab,
   onOpenCertificates,
   onOpenNotifications,
   onNavigateHome,
@@ -97,6 +98,7 @@ export default function Header({
 }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
@@ -106,6 +108,78 @@ export default function Header({
   const [notifications, setNotifications] = useState([]);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [serverUnreadCount, setServerUnreadCount] = useState(0);
+
+  const [isScrolled, setIsScrolled] = useState(false);
+  const headerRef = useRef(null);
+
+  // ============================================================
+  // SCROLL-RESPONSIVE FLOATING GLASS HEADER
+  // Listens to window or nested scroll container, with passive
+  // listener, requestAnimationFrame throttling, and hysteresis.
+  // ============================================================
+  useEffect(() => {
+    let ticking = false;
+    let scrollParent = null;
+
+    const findScrollParent = (node) => {
+      let current = node ? node.parentElement : null;
+      while (current && current !== document.body && current !== document.documentElement) {
+        const style = window.getComputedStyle(current);
+        const overflowY = style.overflowY;
+        if (overflowY === 'auto' || overflowY === 'scroll') {
+          return current;
+        }
+        current = current.parentElement;
+      }
+      return null;
+    };
+
+    const getScrollTop = () => {
+      const windowScroll =
+        window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      if (scrollParent) {
+        return Math.max(windowScroll, scrollParent.scrollTop || 0);
+      }
+      return windowScroll;
+    };
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScroll = getScrollTop();
+          // Threshold of 48px with 8px hysteresis to avoid flicker near boundary
+          setIsScrolled((prev) => {
+            if (!prev && currentScroll > 48) return true;
+            if (prev && currentScroll < 40) return false;
+            return prev;
+          });
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    if (headerRef.current) {
+      scrollParent = findScrollParent(headerRef.current);
+    }
+
+    // Initial check (handles reload when already scrolled down)
+    handleScroll();
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    if (scrollParent) {
+      scrollParent.addEventListener('scroll', handleScroll, { passive: true });
+    }
+    window.addEventListener('resize', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollParent) {
+        scrollParent.removeEventListener('scroll', handleScroll);
+      }
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, []);
 
   // ============================================================
   // ABOUT MODAL: close on Escape and lock page scroll while open
@@ -310,8 +384,18 @@ export default function Header({
   const userRole = String(user?.role || '').toUpperCase();
   const showCertificateAction = userRole === 'EMPLOYEE' && Boolean(onOpenCertificates);
 
+  // Suppress duplicate greeting on Employee Dashboard where WelcomeBanner provides primary hero greeting
+  const isEmployeeDashboard =
+    userRole === 'EMPLOYEE' &&
+    (location?.pathname === '/dashboard' || location?.pathname === '/' || activeTab === 'dashboard');
+
   return (
-    <header className="header floating-glass-header">
+    <header
+      ref={headerRef}
+      className={`header floating-glass-header ${isScrolled ? 'header-scrolled' : 'header-top'}`}
+      data-scrolled={isScrolled ? 'true' : 'false'}
+      role="banner"
+    >
       {/* ======================================================
           BRAND LOGO & MOBILE HAMBURGER
       ====================================================== */}
@@ -335,18 +419,22 @@ export default function Header({
           style={{ cursor: 'pointer' }}
           title="Fairmacs - KMS"
         >
-          <FairmacsLogo variant="default" height={42} />
+          <FairmacsLogo variant="default" height={38} />
         </div>
       </div>
 
       {/* ======================================================
-          DYNAMIC GREETING (hidden on narrow screens via CSS)
+          DYNAMIC GREETING
+          Hidden on Employee Dashboard to prevent duplicate greeting,
+          and hidden on narrow screens via CSS
       ====================================================== */}
-      <div className="header-greeting">
-        <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--deep-navy)' }}>
-          {getGreeting()}, {firstName} 👋
-        </span>
-      </div>
+      {!isEmployeeDashboard && (
+        <div className="header-greeting">
+          <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--deep-navy)' }}>
+            {getGreeting()}, {firstName} 👋
+          </span>
+        </div>
+      )}
 
       {/* ======================================================
           USER ACTIONS
@@ -355,9 +443,6 @@ export default function Header({
       <div
         className="header-actions"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem',
           position: 'relative'
         }}
       >
@@ -366,7 +451,7 @@ export default function Header({
           <button
             onClick={onOpenCertificates}
             type="button"
-            className="glass-button-secondary"
+            className="glass-button-secondary header-cert-btn"
             style={{
               background: 'rgba(236, 253, 245, 0.75)',
               color: '#047857',
@@ -378,7 +463,7 @@ export default function Header({
             }}
           >
             <Award style={icon(15)} />
-            Certificates
+            <span className="header-cert-label">Certificates</span>
           </button>
         )}
 
@@ -769,7 +854,7 @@ export default function Header({
                 }}
               >
                 <LogOut style={icon(16)} />
-                Sign Out
+                Log Out
               </button>
             </div>
           )}

@@ -17,6 +17,18 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
 
     List<QuizAttempt> findByUserIdOrderByCompletedAtDesc(Long userId);
 
+    /**
+     * Retrieves all qualifying completed/submitted quiz timestamps for an authenticated employee.
+     */
+    @Query("""
+        SELECT qa.completedAt
+        FROM QuizAttempt qa
+        WHERE qa.user.id = :userId
+          AND qa.completedAt IS NOT NULL
+        ORDER BY qa.completedAt ASC
+    """)
+    List<LocalDateTime> findCompletedQuizTimestampsByUserId(@Param("userId") Long userId);
+
     List<QuizAttempt> findByQuizIdOrderByStartedAtDesc(Long quizId);
 
     List<QuizAttempt> findByUserIdOrderByStartedAtDesc(Long userId);

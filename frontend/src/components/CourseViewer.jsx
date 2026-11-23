@@ -24,6 +24,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { enrollmentService } from '../services/enrollmentService';
 import { notifyEnrollmentUpdated } from '../utils/enrollmentSync';
+import { generateSafeWatermarkSvg } from '../utils/watermarkUtil';
 import { useAuth } from '../context/AuthContext';
 import { renderAsync } from 'docx-preview';
 import CertificateViewer from './CertificateViewer';
@@ -136,6 +137,52 @@ export default function CourseViewer({
   const pdfContainerRef = useRef(null);
   const docxContainerRef = useRef(null);
 
+  // Course Document Watermark State & SVG Pattern
+  const [watermarkData, setWatermarkData] = useState(null);
+
+  const watermarkString = useMemo(() => {
+    if (watermarkData?.watermarkText) {
+      return watermarkData.watermarkText;
+    }
+    const empName = watermarkData?.employeeName || user?.fullName || user?.name || user?.email || 'Authorized Employee';
+    const empCode = watermarkData?.employeeCode || user?.employeeId;
+    const timeStr = watermarkData?.timestamp || new Date().toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    return `CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | ${empName} | ${empCode} | FAIRMACS KMS | ${timeStr}`;
+  }, [watermarkData, user]);
+
+  const watermarkSvgUrl = useMemo(() => {
+    const escapedText = watermarkString
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="560" height="280" viewBox="0 0 560 280">
+      <text 
+        x="280" 
+        y="140" 
+        text-anchor="middle" 
+        dominant-baseline="central" 
+        transform="rotate(-45 280 140)" 
+        fill="rgba(15, 23, 42, 0.22)" 
+        font-size="11" 
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
+        font-weight="600" 
+        letter-spacing="0.5"
+        xml:space="preserve"
+      >${escapedText}</text>
+    </svg>`;
+
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  }, [watermarkString]);
+
   // Video player refs & states (HTML5 & YouTube)
   const html5VideoRef = useRef(null);
   const videoWrapperRef = useRef(null);
@@ -205,7 +252,7 @@ export default function CourseViewer({
 
   const [moduleQuizzes, setModuleQuizzes] = useState([]);
   const [finalQuiz, setFinalQuiz] = useState(null);
-  const [quizLoadError, setQuizLoadError] = useState('');
+  const [_quizLoadError, setQuizLoadError] = useState('');
   const [pendingModuleQuiz, setPendingModuleQuiz] = useState(null);
   const [quizUnlockStatuses, setQuizUnlockStatuses] = useState({});
   const [countdownNow, setCountdownNow] = useState(Date.now());
@@ -921,7 +968,19 @@ export default function CourseViewer({
         activeLesson?.title ||
         'Lesson Document';
 
+      const headerWatermarkText = response.headers.get('x-watermark-text') || '';
+      const headerEmpName = response.headers.get('x-watermark-employee-name') || '';
+      const headerEmpCode = response.headers.get('x-watermark-employee-code') || '';
+      const headerTimestamp = response.headers.get('x-watermark-timestamp') || '';
+
       if (cancelled) return;
+
+      setWatermarkData({
+        watermarkText: headerWatermarkText,
+        employeeName: headerEmpName,
+        employeeCode: headerEmpCode,
+        timestamp: headerTimestamp
+      });
 
       objectUrl = URL.createObjectURL(
         contentType ? new Blob([blob], { type: contentType }) : blob
@@ -1029,6 +1088,23 @@ export default function CourseViewer({
             marginBottom: pageNum < totalPages ? '16px' : '0'
           });
 
+          const pageCanvasBox = document.createElement('div');
+          pageCanvasBox.className = 'course-pdf-page-box';
+          Object.assign(pageCanvasBox.style, {
+            position: 'relative',
+            width: `${Math.floor(viewport.width)}px`,
+            height: `${Math.floor(viewport.height)}px`,
+            maxWidth: '100%',
+            borderRadius: '6px',
+            overflow: 'hidden',
+            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
+            border: '1px solid #e2e8f0',
+            background: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          });
+
           const canvas = document.createElement('canvas');
           canvas.width = Math.floor(viewport.width * dpr);
           canvas.height = Math.floor(viewport.height * dpr);
@@ -1037,9 +1113,6 @@ export default function CourseViewer({
             height: `${Math.floor(viewport.height)}px`,
             maxWidth: '100%',
             background: '#ffffff',
-            borderRadius: '6px',
-            boxShadow: '0 2px 8px rgba(15, 23, 42, 0.08)',
-            border: '1px solid #e2e8f0',
             display: 'block'
           });
 
@@ -1052,7 +1125,26 @@ export default function CourseViewer({
             }).promise;
           }
 
-          pageWrapper.appendChild(canvas);
+          // Per-page safe non-clipping diagonal watermark overlay layer
+          const watermarkOverlay = document.createElement('div');
+          watermarkOverlay.className = 'course-pdf-page-watermark';
+          watermarkOverlay.setAttribute('aria-hidden', 'true');
+          Object.assign(watermarkOverlay.style, {
+            position: 'absolute',
+            inset: '0',
+            width: '100%',
+            height: '100%',
+            zIndex: '10',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            overflow: 'hidden',
+            mixBlendMode: 'multiply'
+          });
+          watermarkOverlay.innerHTML = generateSafeWatermarkSvg(viewport.width, viewport.height, watermarkString, 45);
+
+          pageCanvasBox.appendChild(canvas);
+          pageCanvasBox.appendChild(watermarkOverlay);
+          pageWrapper.appendChild(pageCanvasBox);
           fragment.appendChild(pageWrapper);
         }
 
@@ -1097,7 +1189,7 @@ export default function CourseViewer({
       try { pdfDoc?.destroy?.(); } catch { /* ignore */ }
       try { container?.replaceChildren?.(); } catch { /* ignore */ }
     };
-  }, [documentBlob, documentContentType, isDocumentLesson, lessonType]);
+  }, [documentBlob, documentContentType, isDocumentLesson, lessonType, watermarkSvgUrl, watermarkString]);
 
   useEffect(() => {
   if (
@@ -1146,6 +1238,8 @@ export default function CourseViewer({
     container.replaceChildren();
   };
 }, [documentBlob, documentContentType, isDocumentLesson, lessonType]);
+
+
 
 
 
@@ -2848,21 +2942,23 @@ export default function CourseViewer({
                         : 'Private Fairmacs training document'}
                     </p>
                   </div>
-                  {pdfPageCount > 0 && (
-                    <span
-                      style={{
-                        background: '#f1f5f9',
-                        color: '#334155',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '999px',
-                        padding: '0.25rem 0.75rem',
-                        fontSize: '0.78rem',
-                        fontWeight: 700
-                      }}
-                    >
-                      {pdfPageCount} {pdfPageCount === 1 ? 'Page' : 'Pages'}
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
+                    {pdfPageCount > 0 && (
+                      <span
+                        style={{
+                          background: '#f1f5f9',
+                          color: '#334155',
+                          border: '1px solid #cbd5e1',
+                          borderRadius: '999px',
+                          padding: '0.25rem 0.75rem',
+                          fontSize: '0.78rem',
+                          fontWeight: 700
+                        }}
+                      >
+                        {pdfPageCount} {pdfPageCount === 1 ? 'Page' : 'Pages'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {(documentLoading || pdfRendering) && (

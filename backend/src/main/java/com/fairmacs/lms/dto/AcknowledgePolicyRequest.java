@@ -18,6 +18,10 @@ public class AcknowledgePolicyRequest {
         this.acknowledgementText = acknowledgementText;
     }
 
+    public static AcknowledgePolicyRequest confirmed() {
+        return new AcknowledgePolicyRequest(true, null);
+    }
+
     public Boolean getConfirmed() { return confirmed; }
     public void setConfirmed(Boolean confirmed) { this.confirmed = confirmed; }
 

@@ -15,11 +15,41 @@ import {
   LibraryBig,
   Megaphone,
   LogOut,
+  FileCheck,
   X
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import UserAvatar from './UserAvatar';
+
+/**
+ * LogoutGlyph - Solid silhouette logout icon matching reference design.
+ * Features a solid dark vertical capsule (door) and a crisp exit arrow pointing right.
+ */
+function LogoutGlyph({ className = '', size = 18 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Solid vertical capsule body (door) */}
+      <rect x="3.5" y="3.5" width="8" height="17" rx="3.5" fill="currentColor" />
+      {/* Horizontal stem exiting to right */}
+      <path
+        d="M9.5 12h11M16.5 8l4 4-4 4"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export default function Sidebar({
   activeTab,
@@ -72,16 +102,19 @@ export default function Sidebar({
           { id: 'allCourses', label: 'All Courses', icon: LibraryBig, path: '/manager/all-courses', animType: 'library-slide' },
           { id: 'catalog', label: 'Course Catalog', icon: Compass, path: '/courses', animType: 'compass-quiver' },
           { id: 'calendar', label: 'Training Calendar', icon: Calendar, path: '/training-calendar', animType: 'calendar-lift' },
+          { id: 'managerPolicies', label: 'Policies & Agreements', icon: FileCheck, path: '/manager/policies', animType: 'doc-write' },
           { id: 'reports', label: 'Team Reports', icon: BarChart3, path: '/reports', animType: 'chart-grow' },
           { id: 'notifications', label: 'Notifications', icon: Bell, path: '/notifications', animType: 'bell-sway' }
         ];
       case 'HR_ADMIN':
+      case 'SUPER_ADMIN':
         return [
           { id: 'overview', label: 'HR Overview', icon: LayoutGrid, path: '/hr/overview', animType: 'grid-pulse' },
           { id: 'employees', label: 'Employees', icon: Users, path: '/hr/employees', animType: 'person-shift' },
           { id: 'departments', label: 'Departments', icon: Building2, path: '/hr/departments', animType: 'building-lift' },
           { id: 'courses', label: 'Course Catalog', icon: BookOpen, path: '/hr/courses', animType: 'book-open' },
           { id: 'drafts', label: 'Course Drafts', icon: FileText, path: '/hr/drafts', animType: 'doc-write' },
+          { id: 'hrPolicies', label: 'Policies & Agreements', icon: FileCheck, path: '/hr/policies', animType: 'doc-write' },
           { id: 'reports', label: 'HR Analytics', icon: BarChart3, path: '/hr/reports', animType: 'chart-grow' },
           { id: 'certificates', label: 'Certificates', icon: Award, path: '/hr/certificates', animType: 'award-sparkle' },
           { id: 'announcements', label: 'Announcements', icon: Megaphone, path: '/hr/announcements', animType: 'bell-ring' },
@@ -286,8 +319,8 @@ export default function Sidebar({
       // 6. Intentional left-edge proximity activation (e.clientX <= 16 threshold)
       if (e.clientX <= 16) {
         emergeSidebar();
-      } else if (isEmergedRef.current && e.clientX > 120 && !retractTimeoutRef.current) {
-        scheduleRetract(350);
+      } else if (isEmergedRef.current && e.clientX > 300 && !retractTimeoutRef.current) {
+        scheduleRetract(400);
       }
     };
 
@@ -298,8 +331,20 @@ export default function Sidebar({
     };
   }, [emergeSidebar, scheduleRetract]);
 
+  // Keyboard accessibility: Escape key immediately collapses sidebar
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isEmergedRef.current) {
+        scheduleRetract(0);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [scheduleRetract]);
+
   const handleNavClick = (item) => {
     setHoveredTooltip(null);
+    scheduleRetract(0); // Immediately collapse sidebar upon navigation selection
     if (item.path) {
       navigate(item.path);
       if (onCloseMobile) onCloseMobile();
@@ -319,19 +364,56 @@ export default function Sidebar({
   };
 
   const isItemActive = (item) => {
-    if (item.path) {
-      if (item.path === '/hr/overview') {
-        return location.pathname === '/hr/overview' || location.pathname === '/admin' || location.pathname === '/hr';
+    if (!item) return false;
+
+    // HR Overview aliases
+    if (item.path === '/hr/overview') {
+      if (location.pathname === '/hr/overview' || location.pathname === '/admin' || location.pathname === '/hr') {
+        return true;
       }
-      if (item.path === '/hr/departments') {
-        return location.pathname.startsWith('/hr/departments');
-      }
-      return location.pathname === item.path;
     }
-    return activeTab === item.id;
+
+    // Role-specific home dashboards
+    if (item.id === 'dashboard') {
+      if (location.pathname === item.path) return true;
+      if (item.path === '/dashboard' && (location.pathname === '/' || location.pathname === '/dashboard')) return true;
+    }
+
+    // Direct path match or nested subroute match (e.g. /courses/OP004/learn -> matches /courses)
+    if (item.path) {
+      if (location.pathname === item.path) {
+        return true;
+      }
+      if (location.pathname.startsWith(`${item.path}/`)) {
+        return true;
+      }
+    }
+
+    // Match activeTab from parent state if provided
+    if (activeTab) {
+      if (activeTab === item.id) return true;
+      if (item.id === 'catalog' && activeTab === 'catalog') return true;
+      if (item.id === 'mylearning' && activeTab === 'mylearning') return true;
+      // HR tab mappings (e.g. hrOverview <-> overview, hrEmployees <-> employees)
+      const capitalized = item.id.charAt(0).toUpperCase() + item.id.slice(1);
+      if (activeTab === `hr${capitalized}`) return true;
+      if (item.id === `hr${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`) return true;
+    }
+
+    return false;
   };
 
-  const roleDisplay = user?.roleLabel || (isHrAdmin ? 'HR / Admin' : user?.role || 'Staff');
+  const formatRoleLabel = (role, label) => {
+    if (label && label.trim()) return label.trim();
+    const r = String(role || '').toUpperCase();
+    if (r === 'HR_ADMIN') return 'HR / Admin';
+    if (r === 'SUPER_ADMIN') return 'Super Admin';
+    if (r === 'MANAGER') return 'Manager';
+    if (r === 'TRAINER') return 'Trainer';
+    if (r === 'EMPLOYEE') return 'Employee';
+    return r ? r.charAt(0) + r.slice(1).toLowerCase() : 'Employee';
+  };
+  const roleDisplay = formatRoleLabel(user?.role, user?.roleLabel);
   const userAvatar =
     user?.avatar ||
     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250';
@@ -402,10 +484,22 @@ export default function Sidebar({
       {/* Extreme Left Edge Proximity Activation Zone (Desktop & Tablet) */}
       <div
         className="sidebar-edge-hotzone"
-        onMouseEnter={handleEdgeZoneInteraction}
-        onMouseMove={handleEdgeZoneInteraction}
+        onMouseEnter={emergeSidebar}
+        onMouseMove={emergeSidebar}
         aria-hidden="true"
       />
+
+      {/* Click-away backdrop overlay when sidebar is emerged (desktop & mobile) */}
+      {(isEmerged || mobileOpen) && (
+        <div
+          className="sidebar-backdrop-overlay"
+          onClick={() => {
+            scheduleRetract(0);
+            if (onCloseMobile) onCloseMobile();
+          }}
+          aria-hidden="true"
+        />
+      )}
 
       {/* Mobile Translucent Overlay Backdrop */}
       {mobileOpen && (
@@ -427,42 +521,33 @@ export default function Sidebar({
           isEmerged ? 'sidebar-emerged' : ''
         } ${mobileOpen ? 'sidebar-mobile-open' : ''}`}
         aria-label="Sidebar Navigation"
-        onMouseEnter={() => {
-          if (isEmergedRef.current) {
-            keepEmerged();
-          }
-        }}
-        onMouseLeave={() => scheduleRetract(350)}
-        onFocus={() => {
-          if (isEmergedRef.current) {
-            keepEmerged();
-          }
-        }}
+        onMouseEnter={keepEmerged}
+        onMouseLeave={() => scheduleRetract(400)}
+        onFocus={keepEmerged}
         onBlur={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget)) {
             scheduleRetract(400);
           }
         }}
       >
-        {/* Section 1: Top Header Area (Mobile only) */}
-        {mobileOpen && (
-          <div className="sidebar-header-area">
-            <div className="sidebar-mobile-header" style={{ marginBottom: '0.5rem' }}>
-              <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#0F172A' }}>Navigation</span>
-              {onCloseMobile && (
-                <button
-                  type="button"
-                  className="glass-icon-button"
-                  onClick={onCloseMobile}
-                  aria-label="Close menu"
-                  style={{ width: 32, height: 32 }}
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
+        {/* Section 1: Header Area with Brand & Close Control */}
+        <div className="sidebar-header-area">
+          <div className="sidebar-brand-row sidebar-mobile-header">
+            <span className="sidebar-brand-title fairmacs-brand-wordmark">FAIRMACS KMS</span>
+            <button
+              type="button"
+              className="sidebar-close-btn"
+              onClick={() => {
+                scheduleRetract(0);
+                if (onCloseMobile) onCloseMobile();
+              }}
+              aria-label="Close navigation"
+              title="Close (Esc)"
+            >
+              <X size={15} />
+            </button>
           </div>
-        )}
+        </div>
 
         {/* Section 2: Scrollable Navigation Menu (Consumes remaining vertical space) */}
         <nav
@@ -485,6 +570,7 @@ export default function Sidebar({
                   key={item.id}
                   style={{
                     position: 'relative',
+                    width: '100%',
                     '--item-index': index
                   }}
                 >
@@ -499,6 +585,7 @@ export default function Sidebar({
                       showTooltip(e, {
                         id: item.id,
                         label: item.label,
+                        sublabel: active ? 'Current Page' : undefined,
                         item
                       })
                     }
@@ -507,18 +594,19 @@ export default function Sidebar({
                       showTooltip(e, {
                         id: item.id,
                         label: item.label,
+                        sublabel: active ? 'Current Page' : undefined,
                         item
                       })
                     }
                     onBlur={hideTooltip}
                   >
                     {active && <span className="glass-nav-active-bar" />}
-                    <span className="glass-nav-icon-wrap">
+                    <span className={`glass-nav-icon-wrap ${active ? 'active' : ''}`}>
                       <Icon
                         className={`sidebar-icon-glyph sidebar-icon-${item.animType || 'grid-pulse'}`}
                         style={{
-                          width: 19,
-                          height: 19,
+                          width: 18,
+                          height: 18,
                           color: active ? '#0F6CBD' : '#475569',
                           flexShrink: 0,
                           transition: 'color 0.18s ease'
@@ -538,11 +626,12 @@ export default function Sidebar({
           className="sidebar-user-footer"
           style={{ '--total-items': navItems.length }}
         >
-          {/* User Profile Avatar Button */}
+          {/* User Profile Card Button */}
           <button
             type="button"
-            className={`sidebar-avatar-btn ${location.pathname === '/profile' ? 'active' : ''}`}
+            className={`sidebar-user-profile-btn ${location.pathname === '/profile' ? 'active' : ''}`}
             onClick={() => {
+              scheduleRetract(0);
               setHoveredTooltip(null);
               navigate('/profile');
               if (onCloseMobile) onCloseMobile();
@@ -556,6 +645,7 @@ export default function Sidebar({
                 label: user?.name || 'Administrator',
                 sublabel: 'View Profile',
                 onClick: () => {
+                  scheduleRetract(0);
                   setHoveredTooltip(null);
                   navigate('/profile');
                   if (onCloseMobile) onCloseMobile();
@@ -570,6 +660,7 @@ export default function Sidebar({
                 label: user?.name || 'Administrator',
                 sublabel: 'View Profile',
                 onClick: () => {
+                  scheduleRetract(0);
                   setHoveredTooltip(null);
                   navigate('/profile');
                   if (onCloseMobile) onCloseMobile();
@@ -579,46 +670,56 @@ export default function Sidebar({
             }
             onBlur={hideTooltip}
           >
-            <UserAvatar
-              name={user?.name}
-              employeeId={user?.employeeId}
-              email={user?.email}
-              size="sm"
-            />
+            <div className="sidebar-avatar-btn">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user?.name || 'User Avatar'}
+                  className="sidebar-avatar-img"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <UserAvatar
+                  name={user?.name}
+                  employeeId={user?.employeeId}
+                  email={user?.email}
+                  size="sm"
+                />
+              )}
+            </div>
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name" title={user?.name || 'Administrator'}>
+                {user?.name || 'Administrator'}
+              </span>
+              <span className="sidebar-user-role" title={roleDisplay}>
+                {roleDisplay}
+              </span>
+            </div>
           </button>
 
-          {/* User Details in Mobile Drawer Only */}
-          {mobileOpen && (
-            <div
-              className="sidebar-mobile-user-info"
-              onClick={() => {
-                setHoveredTooltip(null);
-                navigate('/profile');
-                if (onCloseMobile) onCloseMobile();
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              role="button"
-              tabIndex={0}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className="sidebar-mobile-user-name">{user?.name || 'Administrator'}</div>
-              <div className="sidebar-mobile-user-role">{roleDisplay} • View Profile</div>
-            </div>
-          )}
+          {/* Subtle Horizontal Divider */}
+          <div className="sidebar-footer-divider" />
 
           {/* Logout Action Button */}
           {logout && (
             <button
               type="button"
-              onClick={logout}
+              onClick={() => {
+                scheduleRetract(0);
+                logout();
+              }}
               aria-label="Log out of Fairmacs KMS"
               className="sidebar-logout-btn"
               onMouseEnter={(e) =>
                 showTooltip(e, {
                   id: 'logout',
-                  label: 'Log Out',
-                  sublabel: 'Sign out of Fairmacs KMS',
-                  onClick: logout
+                  label: 'Log Out from KMS',
+                  onClick: () => {
+                    scheduleRetract(0);
+                    logout();
+                  }
                 })
               }
               onMouseLeave={hideTooltip}
@@ -626,13 +727,19 @@ export default function Sidebar({
                 showTooltip(e, {
                   id: 'logout',
                   label: 'Log Out',
-                  sublabel: 'Sign out of Fairmacs KMS',
-                  onClick: logout
+                  sublabel: 'Log Out from KMS',
+                  onClick: () => {
+                    scheduleRetract(0);
+                    logout();
+                  }
                 })
               }
               onBlur={hideTooltip}
             >
-              <LogOut size={16} />
+              <span className="sidebar-logout-icon-wrap">
+                <LogoutGlyph size={18} />
+              </span>
+              <span className="sidebar-logout-label">Log out</span>
             </button>
           )}
         </div>

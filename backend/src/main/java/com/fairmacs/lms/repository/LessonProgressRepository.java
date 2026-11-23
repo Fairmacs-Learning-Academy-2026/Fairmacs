@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +24,21 @@ public interface LessonProgressRepository extends JpaRepository<LessonProgress, 
             Long enrollmentId,
             Long lessonId
     );
+
+    /**
+     * Retrieves all qualifying completed lesson timestamps for an authenticated employee,
+     * excluding revoked enrollments.
+     */
+    @Query("""
+        SELECT lp.completedAt
+        FROM LessonProgress lp
+        WHERE lp.enrollment.user.id = :userId
+          AND lp.completed = true
+          AND lp.completedAt IS NOT NULL
+          AND lp.enrollment.status <> com.fairmacs.lms.entity.EnrollmentStatus.REVOKED
+        ORDER BY lp.completedAt ASC
+    """)
+    List<LocalDateTime> findCompletedLessonTimestampsByUserId(@Param("userId") Long userId);
 
     @Query("""
         SELECT lp

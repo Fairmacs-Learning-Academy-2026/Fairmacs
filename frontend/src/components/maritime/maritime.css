@@ -1,0 +1,1241 @@
+/* ==========================================================================
+   FAIRMACS KMS: CINEMATIC TIME-AWARE MARITIME & APPLE LIQUID GLASS LOGIN CSS
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. MAIN LOGIN PAGE SHELL (LIGHT APPLE LIQUID GLASS)
+   -------------------------------------------------------------------------- */
+.fairmacs-login-page-root {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 2.5rem 6vw 2.5rem 2.5rem;
+  overflow: hidden;
+  background-color: #E8F1FB;
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  color: #193453;
+  box-sizing: border-box;
+}
+
+/* Light Liquid Glass Overall Tint & Subtle Edge Highlights */
+.fairmacs-login-glass-canopy {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: radial-gradient(circle at 85% 50%, rgba(245, 248, 252, 0.45) 0%, transparent 65%),
+              linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(220, 235, 250, 0.28) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+/* Top Navigation: Home Button */
+.fairmacs-login-home-btn {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.15rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 24px -4px rgba(25, 52, 83, 0.12),
+              inset 0 1px 1px rgba(255, 255, 255, 0.95);
+  color: #193453;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  z-index: 25;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.22s ease,
+              box-shadow 0.22s ease;
+}
+
+.fairmacs-login-home-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 28px -4px rgba(25, 52, 83, 0.18),
+              inset 0 1px 1px rgba(255, 255, 255, 1);
+  color: #3478E5;
+}
+
+/* Dev Time-Switcher Pill (Hidden - zero on-screen display per user requirement) */
+.fairmacs-dev-time-pill {
+  display: none !important;
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 14px rgba(25, 52, 83, 0.08);
+  z-index: 25;
+}
+
+.fairmacs-dev-time-btn {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #718198;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fairmacs-dev-time-btn:hover {
+  color: #193453;
+  background: rgba(220, 235, 250, 0.5);
+}
+
+.fairmacs-dev-time-btn.is-active {
+  background: #3478E5;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(52, 120, 229, 0.35);
+}
+
+/* --------------------------------------------------------------------------
+   2. MARITIME SCENE CONTAINER
+   -------------------------------------------------------------------------- */
+.fairmacs-maritime-scene-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* --------------------------------------------------------------------------
+   3. SKY ATMOSPHERE & TIME-BASED ENVIRONMENTS (SEAMLESS CROSSFADE)
+   -------------------------------------------------------------------------- */
+.fairmacs-sky-atmosphere {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 68%;
+  overflow: hidden;
+}
+
+.sky-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
+}
+
+.sky-backdrop.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* A. Morning Sky (05:00 - 10:59) */
+.sky-gradient-morning {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, 
+    #7CAFE2 0%, 
+    #A7CAEC 32%, 
+    #FCE4BE 70%, 
+    #FFA876 92%, 
+    #FF8A50 100%
+  );
+}
+
+.morning-sun-disc {
+  position: absolute;
+  left: 22%;
+  bottom: 8%;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #FFFFFF 0%, #FFF2CC 45%, rgba(255, 204, 128, 0.8) 75%, transparent 100%);
+  box-shadow: 0 0 60px 25px rgba(255, 183, 77, 0.7);
+}
+
+.morning-sun-glow {
+  position: absolute;
+  left: 10%;
+  bottom: 0;
+  width: 32%;
+  height: 70%;
+  background: radial-gradient(ellipse at bottom center, rgba(255, 179, 102, 0.45) 0%, rgba(255, 224, 178, 0.15) 50%, transparent 80%);
+  pointer-events: none;
+}
+
+.morning-mist-layer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35%;
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 235, 215, 0.35) 60%, rgba(255, 200, 160, 0.55) 100%);
+}
+
+.morning-clouds {
+  position: absolute;
+  top: 25%;
+  left: -10%;
+  width: 120%;
+  height: 35%;
+  background: radial-gradient(ellipse at 40% 50%, rgba(255, 255, 255, 0.4) 0%, transparent 60%),
+              radial-gradient(ellipse at 75% 60%, rgba(255, 240, 220, 0.35) 0%, transparent 55%);
+}
+
+/* B. Afternoon Sky (11:00 - 15:59) */
+.sky-gradient-afternoon {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, 
+    #2572C4 0%, 
+    #4A92DE 35%, 
+    #84BCEF 72%, 
+    #CDE4F9 92%, 
+    #EAF3FC 100%
+  );
+}
+
+.afternoon-sun-disc {
+  position: absolute;
+  left: 18%;
+  top: 10%;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #FFFFFF 0%, #FFFDE8 40%, rgba(255, 255, 255, 0.9) 70%, transparent 100%);
+  box-shadow: 0 0 80px 30px rgba(255, 255, 255, 0.85),
+              0 0 140px 60px rgba(122, 193, 255, 0.4);
+}
+
+.afternoon-sun-flare {
+  position: absolute;
+  left: 18%;
+  top: 10%;
+  width: 320px;
+  height: 320px;
+  transform: translate(-35%, -35%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, rgba(186, 224, 255, 0.2) 40%, transparent 70%);
+  pointer-events: none;
+}
+
+.afternoon-clouds-bank {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 55% 25% at 65% 35%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.15) 50%, transparent 80%),
+              radial-gradient(ellipse 45% 20% at 35% 42%, rgba(255, 255, 255, 0.35) 0%, transparent 75%);
+  pointer-events: none;
+}
+
+.afternoon-cumulus-drift {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 20% at 20% 55%, rgba(255, 255, 255, 0.3) 0%, transparent 70%),
+              radial-gradient(ellipse 50% 20% at 80% 50%, rgba(255, 255, 255, 0.28) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+/* C. Evening Sky (16:00 - 18:59) */
+.sky-gradient-evening {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, 
+    #2A2754 0%, 
+    #533968 30%, 
+    #8F4462 55%, 
+    #E05E43 78%, 
+    #FFA842 94%, 
+    #FFC857 100%
+  );
+}
+
+.evening-sunset-disc {
+  position: absolute;
+  left: 20%;
+  bottom: 4%;
+  width: 105px;
+  height: 105px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #FFFFFF 0%, #FFE17D 35%, #FF8D3B 70%, transparent 100%);
+  box-shadow: 0 0 90px 40px rgba(255, 138, 43, 0.85);
+}
+
+.evening-sunset-flare {
+  position: absolute;
+  left: 8%;
+  bottom: 0;
+  width: 40%;
+  height: 60%;
+  background: radial-gradient(ellipse at bottom center, rgba(255, 140, 50, 0.6) 0%, rgba(255, 90, 50, 0.25) 50%, transparent 80%);
+}
+
+.evening-horizon-fire {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 25%;
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 140, 40, 0.5) 70%, rgba(255, 100, 30, 0.7) 100%);
+}
+
+.evening-purple-clouds {
+  position: absolute;
+  top: 15%;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: radial-gradient(ellipse at 30% 40%, rgba(120, 60, 95, 0.5) 0%, transparent 60%),
+              radial-gradient(ellipse at 75% 35%, rgba(90, 50, 85, 0.45) 0%, transparent 55%);
+}
+
+/* D. Night Sky (19:00 - 04:59) */
+.sky-gradient-night {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, 
+    #050E1A 0%, 
+    #0B1B32 40%, 
+    #122A4E 75%, 
+    #17345D 92%, 
+    #1E406F 100%
+  );
+}
+
+.night-moon-disc {
+  position: absolute;
+  left: 24%;
+  top: 16%;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #FFFFFF 0%, #EFF6FF 65%, #DBEAFE 100%);
+  box-shadow: 0 0 50px 20px rgba(220, 235, 255, 0.8),
+              0 0 100px 50px rgba(96, 165, 250, 0.35);
+}
+
+.night-moon-halo {
+  position: absolute;
+  left: 24%;
+  top: 16%;
+  width: 260px;
+  height: 260px;
+  transform: translate(-36%, -36%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(220, 235, 255, 0.25) 0%, rgba(147, 197, 253, 0.1) 45%, transparent 75%);
+  pointer-events: none;
+}
+
+.night-stars-field {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(1.2px 1.2px at 8% 15%, #FFFFFF 100%, transparent),
+    radial-gradient(1.5px 1.5px at 15% 32%, #E0F2FE 100%, transparent),
+    radial-gradient(1px 1px at 30% 12%, #FFFFFF 100%, transparent),
+    radial-gradient(1.4px 1.4px at 45% 24%, #E0F2FE 100%, transparent),
+    radial-gradient(1px 1px at 58% 18%, #FFFFFF 100%, transparent),
+    radial-gradient(1.8px 1.8px at 68% 10%, #FFFFFF 100%, transparent),
+    radial-gradient(1px 1px at 78% 28%, #E0F2FE 100%, transparent),
+    radial-gradient(1.2px 1.2px at 88% 16%, #FFFFFF 100%, transparent),
+    radial-gradient(1.4px 1.4px at 94% 35%, #E0F2FE 100%, transparent),
+    radial-gradient(1px 1px at 12% 52%, #FFFFFF 100%, transparent),
+    radial-gradient(1.6px 1.6px at 38% 46%, #FFFFFF 100%, transparent),
+    radial-gradient(1px 1px at 82% 48%, #E0F2FE 100%, transparent);
+  background-repeat: no-repeat;
+  opacity: 0.85;
+}
+
+.night-ambient-clouds {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 55% 25% at 45% 30%, rgba(30, 58, 95, 0.3) 0%, transparent 70%),
+              radial-gradient(ellipse 45% 20% at 80% 25%, rgba(20, 42, 72, 0.35) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.sky-ambient-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(15, 30, 50, 0.15) 100%);
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   4. MARITIME OCEAN STAGE & 3 ANIMATED WATER LAYERS
+   -------------------------------------------------------------------------- */
+.maritime-ocean-stage {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 42%;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.maritime-foreground-waves-stage {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22%;
+  overflow: hidden;
+  z-index: 4; /* Overlaps lower hull waterline */
+  pointer-events: none;
+}
+
+.fairmacs-ocean-system {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ocean-layer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  width: 100%;
+  will-change: transform;
+}
+
+.ocean-svg {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Layer 1: Background Ocean */
+.ocean-background {
+  bottom: 0;
+  height: 100%;
+  z-index: 1;
+}
+
+.ocean-stop-bg-top {
+  stop-color: #174878;
+  transition: stop-color 1.8s ease;
+}
+.ocean-stop-bg-bottom {
+  stop-color: #0E2C4C;
+  transition: stop-color 1.8s ease;
+}
+
+.time-morning .ocean-stop-bg-top { stop-color: #3C638A; }
+.time-morning .ocean-stop-bg-bottom { stop-color: #1C3856; }
+.time-afternoon .ocean-stop-bg-top { stop-color: #1A5FA0; }
+.time-afternoon .ocean-stop-bg-bottom { stop-color: #0F3860; }
+.time-evening .ocean-stop-bg-top { stop-color: #4A3258; }
+.time-evening .ocean-stop-bg-bottom { stop-color: #1D1832; }
+.time-night .ocean-stop-bg-top { stop-color: #0D1E34; }
+.time-night .ocean-stop-bg-bottom { stop-color: #060D18; }
+
+.ocean-specular-track {
+  position: absolute;
+  left: 18%;
+  top: 0;
+  width: 140px;
+  height: 100%;
+  background: linear-gradient(180deg, 
+    rgba(255, 255, 255, 0.4) 0%, 
+    rgba(255, 240, 200, 0.25) 30%, 
+    rgba(255, 255, 255, 0.08) 75%, 
+    transparent 100%
+  );
+  filter: blur(14px);
+  pointer-events: none;
+  transition: all 1.8s ease;
+}
+
+.time-morning .ocean-specular-track {
+  left: 20%;
+  background: linear-gradient(180deg, rgba(255, 210, 140, 0.65) 0%, rgba(255, 170, 90, 0.25) 45%, transparent 100%);
+}
+.time-afternoon .ocean-specular-track {
+  left: 16%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(186, 224, 255, 0.25) 50%, transparent 100%);
+}
+.time-evening .ocean-specular-track {
+  left: 19%;
+  background: linear-gradient(180deg, rgba(255, 180, 80, 0.75) 0%, rgba(255, 110, 40, 0.35) 50%, transparent 100%);
+}
+.time-night .ocean-specular-track {
+  left: 23%;
+  background: linear-gradient(180deg, rgba(220, 235, 255, 0.5) 0%, rgba(147, 197, 253, 0.2) 50%, transparent 100%);
+}
+
+.wave-path-bg {
+  animation: oceanDriftBg 22s ease-in-out infinite alternate;
+}
+
+@keyframes oceanDriftBg {
+  0% { transform: translate3d(-20px, 0, 0) scaleY(1); }
+  50% { transform: translate3d(15px, -3px, 0) scaleY(1.04); }
+  100% { transform: translate3d(-20px, 0, 0) scaleY(1); }
+}
+
+/* Layer 2: Midground Ocean */
+.ocean-midground {
+  bottom: 0;
+  height: 84%;
+  z-index: 2;
+}
+
+.ocean-stop-mid-top { stop-color: #1D588E; transition: stop-color 1.8s ease; }
+.ocean-stop-mid-mid { stop-color: #123C64; transition: stop-color 1.8s ease; }
+.ocean-stop-mid-bottom { stop-color: #0A223B; transition: stop-color 1.8s ease; }
+
+.time-morning .ocean-stop-mid-top { stop-color: #35628C; }
+.time-morning .ocean-stop-mid-bottom { stop-color: #17324D; }
+.time-afternoon .ocean-stop-mid-top { stop-color: #1B65A9; }
+.time-afternoon .ocean-stop-mid-bottom { stop-color: #0C3459; }
+.time-evening .ocean-stop-mid-top { stop-color: #422F50; }
+.time-evening .ocean-stop-mid-bottom { stop-color: #18152B; }
+.time-night .ocean-stop-mid-top { stop-color: #0C1A2E; }
+.time-night .ocean-stop-mid-bottom { stop-color: #050A13; }
+
+.wave-path-mid-1 {
+  animation: waveFlowMid1 14s ease-in-out infinite alternate;
+}
+.wave-path-mid-2 {
+  animation: waveFlowMid2 11s ease-in-out infinite alternate;
+}
+
+@keyframes waveFlowMid1 {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-35px, -4px, 0); }
+  100% { transform: translate3d(15px, 2px, 0); }
+}
+
+@keyframes waveFlowMid2 {
+  0% { transform: translate3d(20px, -2px, 0); }
+  50% { transform: translate3d(-20px, 3px, 0); }
+  100% { transform: translate3d(20px, -2px, 0); }
+}
+
+/* Layer 3: Foreground Waves (Overlaps the lower vessel hull) */
+.ocean-foreground {
+  bottom: 0;
+  height: 100%;
+  z-index: 4; /* Above ship hull */
+  pointer-events: none;
+}
+
+.ocean-stop-fg-top { stop-color: #174874; transition: stop-color 1.8s ease; }
+.ocean-stop-fg-bottom { stop-color: #0B243D; transition: stop-color 1.8s ease; }
+
+.time-morning .ocean-stop-fg-top { stop-color: #2F5377; }
+.time-morning .ocean-stop-fg-bottom { stop-color: #13273C; }
+.time-afternoon .ocean-stop-fg-top { stop-color: #165692; }
+.time-afternoon .ocean-stop-fg-bottom { stop-color: #0B2A4B; }
+.time-evening .ocean-stop-fg-top { stop-color: #372744; }
+.time-evening .ocean-stop-fg-bottom { stop-color: #131024; }
+.time-night .ocean-stop-fg-top { stop-color: #091526; }
+.time-night .ocean-stop-fg-bottom { stop-color: #03070E; }
+
+.wave-path-fg-1 {
+  animation: waveFlowFg1 7.2s ease-in-out infinite alternate;
+}
+.wave-foam-crest {
+  animation: waveFlowFg1 7.2s ease-in-out infinite alternate;
+}
+.wave-path-fg-2 {
+  animation: waveFlowFg2 8.8s ease-in-out infinite alternate;
+}
+
+@keyframes waveFlowFg1 {
+  0% { transform: translate3d(-30px, 0, 0); }
+  50% { transform: translate3d(25px, -5px, 0); }
+  100% { transform: translate3d(-30px, 0, 0); }
+}
+
+@keyframes waveFlowFg2 {
+  0% { transform: translate3d(30px, -3px, 0); }
+  50% { transform: translate3d(-25px, 4px, 0); }
+  100% { transform: translate3d(30px, -3px, 0); }
+}
+
+.ocean-foam-flecks {
+  position: absolute;
+  bottom: 12%;
+  left: 0;
+  right: 0;
+  height: 25%;
+  background-image: 
+    radial-gradient(1.5px 1.5px at 15% 40%, rgba(255,255,255,0.7) 100%, transparent),
+    radial-gradient(2px 2px at 32% 65%, rgba(255,255,255,0.6) 100%, transparent),
+    radial-gradient(1px 1px at 52% 45%, rgba(255,255,255,0.75) 100%, transparent),
+    radial-gradient(2.2px 2.2px at 70% 55%, rgba(255,255,255,0.65) 100%, transparent),
+    radial-gradient(1.4px 1.4px at 86% 70%, rgba(255,255,255,0.7) 100%, transparent);
+  animation: foamGlints 4.5s ease-in-out infinite alternate;
+}
+
+@keyframes foamGlints {
+  0% { opacity: 0.35; transform: translate3d(-10px, 0, 0); }
+  50% { opacity: 0.85; transform: translate3d(10px, -2px, 0); }
+  100% { opacity: 0.35; transform: translate3d(-10px, 0, 0); }
+}
+
+/* --------------------------------------------------------------------------
+   5. CENTRAL BRANDED CARGO VESSEL & CONTINUOUS START-TO-END VOYAGE
+   "make the ship move completely like starting to the end like and rotation
+    the flow of the ship should be continuous and do not break in between."
+   -------------------------------------------------------------------------- */
+.maritime-ship-voyage-lane {
+  position: absolute;
+  bottom: 6%;
+  left: 0;
+  width: 100%;
+  height: 380px;
+  z-index: 3; /* Between midground and foreground water */
+  pointer-events: none;
+  overflow: visible;
+}
+
+.voyage-carrier {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 60%;
+  max-width: 1040px;
+  min-width: 680px;
+  will-change: transform;
+}
+
+.carrier-alpha {
+  animation: continuousShipVoyage 56s linear infinite;
+}
+
+.carrier-beta {
+  animation: continuousShipVoyage 56s linear infinite -28s;
+}
+
+/* Continuous voyage across the entire ocean from start to end */
+@keyframes continuousShipVoyage {
+  0% {
+    transform: translate3d(-105%, 0, 0);
+  }
+  100% {
+    transform: translate3d(calc(100vw + 25%), 0, 0);
+  }
+}
+
+/* Continuous Natural Buoyancy Heave & Wave Rotation (Pitch & Roll) */
+.vessel-rotation-rig {
+  position: relative;
+  width: 100%;
+  animation: vesselRotationAndSwell 6.4s ease-in-out infinite;
+  transform-origin: 52% 82%;
+  will-change: transform;
+}
+
+@keyframes vesselRotationAndSwell {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  22% {
+    transform: translateY(-9px) rotate(-1.5deg); /* Bow climbs wave crest */
+  }
+  48% {
+    transform: translateY(2px) rotate(0.4deg);
+  }
+  70% {
+    transform: translateY(7px) rotate(1.3deg); /* Bow dips into wave trough */
+  }
+  86% {
+    transform: translateY(-3px) rotate(-0.5deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+.vessel-svg-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 18px 28px rgba(8, 22, 38, 0.42));
+  transition: filter 1.6s ease;
+}
+
+.time-morning .vessel-svg-canvas {
+  filter: drop-shadow(0 18px 28px rgba(8, 22, 38, 0.42)) brightness(1.05) saturate(1.1) sepia(0.06);
+}
+
+.time-afternoon .vessel-svg-canvas {
+  filter: drop-shadow(0 18px 28px rgba(8, 22, 38, 0.42)) brightness(1.02) saturate(1.06);
+}
+
+.time-evening .vessel-svg-canvas {
+  filter: drop-shadow(0 18px 28px rgba(8, 22, 38, 0.42)) brightness(0.96) saturate(1.2) hue-rotate(-6deg);
+}
+
+.time-night .vessel-svg-canvas {
+  filter: drop-shadow(0 18px 28px rgba(8, 22, 38, 0.48)) brightness(0.72) saturate(0.85) contrast(1.1);
+}
+
+/* Official Fairmacs Logo placed prominently on the white hull band */
+.vessel-hull-official-logo-img {
+  height: 26px;
+  width: auto;
+  max-width: 95%;
+  object-fit: contain;
+  transition: filter 0.8s ease;
+}
+
+/* Dynamic Foaming Bow Breaker Spray at Stem Waterline */
+.vessel-bow-breaker-spray {
+  position: absolute;
+  right: 11%;
+  bottom: 30%;
+  width: 90px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 65% 75%, rgba(255, 255, 255, 0.95) 0%, rgba(210, 235, 255, 0.55) 45%, transparent 75%);
+  filter: blur(2px);
+  animation: bowSprayPulse 2.8s ease-in-out infinite alternate;
+}
+
+@keyframes bowSprayPulse {
+  0% { transform: scale(0.85) translate3d(-5px, 3px, 0); opacity: 0.65; }
+  100% { transform: scale(1.2) translate3d(7px, -4px, 0); opacity: 0.98; }
+}
+
+/* Waterline Churn along Lower Hull & Stern Propeller Wash */
+.vessel-stern-wash {
+  position: absolute;
+  left: 2%;
+  bottom: 14%;
+  width: 160px;
+  height: 36px;
+  background: radial-gradient(ellipse at 30% 60%, rgba(255, 255, 255, 0.75) 0%, rgba(200, 230, 255, 0.35) 50%, transparent 80%);
+  filter: blur(3px);
+  animation: sternWashShift 3.6s ease-in-out infinite alternate;
+}
+
+@keyframes sternWashShift {
+  0% { transform: translate3d(-12px, 0, 0) scaleX(0.9); opacity: 0.55; }
+  100% { transform: translate3d(14px, -2px, 0) scaleX(1.2); opacity: 0.92; }
+}
+
+/* --------------------------------------------------------------------------
+   6. NIGHT MODE LIGHTING & ILLUMINATION BEACONS
+   -------------------------------------------------------------------------- */
+.vessel-night-beacons {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.vessel-beacon {
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Masthead Main Light (White on Radar Mast) */
+.beacon-main-mast {
+  position: absolute;
+  left: 22.2%;
+  top: 11.5%;
+  width: 9px;
+  height: 9px;
+  background: #FFFFFF;
+  box-shadow: 0 0 18px 8px rgba(255, 255, 255, 0.95),
+              0 0 42px 18px rgba(186, 224, 255, 0.5);
+  animation: navBeaconBlink 3s ease-in-out infinite;
+}
+
+/* Forecastle Forward Navigation Light (White on Bow Mast) */
+.beacon-fore-mast {
+  position: absolute;
+  left: 88.4%;
+  top: 34%;
+  width: 8px;
+  height: 8px;
+  background: #FFFFFF;
+  box-shadow: 0 0 15px 7px rgba(255, 255, 255, 0.9);
+  animation: navBeaconBlink 3.2s ease-in-out infinite 0.4s;
+}
+
+/* Port Sidelight (Ruby Red on bridge wing) */
+.beacon-port-wing {
+  position: absolute;
+  left: 14.5%;
+  top: 27.5%;
+  width: 7px;
+  height: 7px;
+  background: #FF3B30;
+  box-shadow: 0 0 14px 6px rgba(255, 59, 48, 0.95);
+  animation: navBeaconBlink 2.4s ease-in-out infinite;
+}
+
+/* Starboard Sidelight (Emerald Green on bridge wing) */
+.beacon-starboard-wing {
+  position: absolute;
+  left: 27.2%;
+  top: 27.5%;
+  width: 7px;
+  height: 7px;
+  background: #34C759;
+  box-shadow: 0 0 14px 6px rgba(52, 199, 89, 0.95);
+  animation: navBeaconBlink 2.4s ease-in-out infinite 0.6s;
+}
+
+/* Stern White Light */
+.beacon-stern {
+  position: absolute;
+  left: 4.3%;
+  top: 54%;
+  width: 6px;
+  height: 6px;
+  background: #FFFFFF;
+  box-shadow: 0 0 12px 5px rgba(255, 255, 255, 0.85);
+}
+
+@keyframes navBeaconBlink {
+  0%, 100% { opacity: 0.95; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+.bridge-windows-night-glow {
+  transition: fill 1.5s ease;
+  filter: drop-shadow(0 0 10px rgba(255, 229, 127, 0.9));
+}
+.bridge-windows-day-tint {
+  transition: fill 1.5s ease;
+}
+
+/* --------------------------------------------------------------------------
+   7. COMPLETE LIGHT APPLE LIQUID GLASS LOGIN PANEL
+   -------------------------------------------------------------------------- */
+.fairmacs-login-card-assembly {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 440px;
+  margin-right: 2vw;
+  box-sizing: border-box;
+}
+
+.fairmacs-liquid-glass-card {
+  position: relative;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.84) 0%, rgba(240, 246, 255, 0.72) 100%);
+  backdrop-filter: blur(36px) saturate(210%);
+  -webkit-backdrop-filter: blur(36px) saturate(210%);
+  border-radius: 26px;
+  padding: 2.35rem 2.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 30px 60px -12px rgba(15, 34, 58, 0.28),
+              0 12px 24px -6px rgba(15, 34, 58, 0.16),
+              0 0 0 1px rgba(220, 235, 250, 0.65),
+              inset 0 1.5px 2px rgba(255, 255, 255, 1),
+              inset 0 -1px 2px rgba(190, 215, 245, 0.4);
+  animation: loginPanelEntrance 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes loginPanelEntrance {
+  0% { opacity: 0; transform: translate3d(0, 24px, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Brand Header */
+.fairmacs-login-brand-header {
+  text-align: center;
+  margin-bottom: 1.65rem;
+}
+
+.fairmacs-login-full-brand-lockup {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 1.15rem;
+}
+
+.fairmacs-login-brand-img {
+  width: auto;
+  max-width: 220px;
+  height: auto;
+  max-height: 105px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(25, 52, 83, 0.10));
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fairmacs-login-brand-img:hover {
+  transform: translateY(-2px) scale(1.02);
+}
+
+.fairmacs-login-badge-lockup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: #FFFFFF;
+  box-shadow: 0 10px 24px -4px rgba(25, 52, 83, 0.16),
+              0 0 0 1px rgba(255, 255, 255, 0.95),
+              inset 0 1px 1px rgba(255, 255, 255, 1);
+  padding: 10px;
+  margin-bottom: 1rem;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fairmacs-login-badge-lockup:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+.fairmacs-login-title-h1 {
+  font-family: var(--font-brand, 'League Spartan', sans-serif);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #193453;
+  letter-spacing: 0.04em;
+  margin: 0;
+  line-height: 1.15;
+}
+
+.fairmacs-login-tagline-p {
+  font-family: var(--font-brand, 'League Spartan', sans-serif);
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: #3478E5;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0.35rem 0 0;
+}
+
+/* Time-Aware Greeting Badge */
+.fairmacs-time-greeting-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 9999px;
+  background: rgba(220, 235, 250, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #193453;
+}
+
+.greeting-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3478E5;
+  box-shadow: 0 0 6px rgba(52, 120, 229, 0.6);
+}
+
+/* Error Alert */
+.fairmacs-login-error-alert {
+  background: rgba(254, 242, 242, 0.92);
+  border: 1px solid rgba(254, 202, 202, 0.9);
+  color: #DC2626;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.08);
+}
+
+/* Form Layout */
+.fairmacs-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.fairmacs-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fairmacs-input-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #193453;
+}
+
+.fairmacs-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fairmacs-input-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: #718198;
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.fairmacs-input-field {
+  width: 100%;
+  padding: 0.78rem 1rem 0.78rem 2.65rem;
+  border-radius: 12px;
+  border: 1px solid #CBD5E1;
+  background: rgba(255, 255, 255, 0.85);
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #0F172A;
+  outline: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.fairmacs-input-field:focus {
+  border-color: #3478E5;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 4px rgba(52, 120, 229, 0.16);
+}
+
+.fairmacs-input-wrapper:focus-within .fairmacs-input-icon {
+  color: #3478E5;
+}
+
+.fairmacs-password-toggle-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  padding: 4px;
+  color: #718198;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.2s ease;
+}
+
+.fairmacs-password-toggle-btn:hover {
+  color: #193453;
+}
+
+/* Forgot Password Row */
+.fairmacs-forgot-pw-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -0.35rem;
+}
+
+.fairmacs-forgot-pw-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #3478E5;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.fairmacs-forgot-pw-btn:hover {
+  color: #1D5BBF;
+  text-decoration: underline;
+}
+
+/* Primary Sign In Button */
+.fairmacs-signin-submit-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.5rem;
+  margin-top: 0.5rem;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #3478E5 0%, #1D5BBF 100%);
+  color: #FFFFFF;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 10px 22px -4px rgba(52, 120, 229, 0.45);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s ease,
+              background 0.22s ease;
+}
+
+.fairmacs-signin-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -4px rgba(52, 120, 229, 0.55);
+}
+
+.fairmacs-signin-submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.fairmacs-signin-submit-btn:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.fairmacs-btn-arrow {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fairmacs-signin-submit-btn:hover:not(:disabled) .fairmacs-btn-arrow {
+  transform: translateX(4px);
+}
+
+/* Footer Security Lockup */
+.fairmacs-login-security-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 1.5rem;
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: #718198;
+}
+
+/* --------------------------------------------------------------------------
+   8. RESPONSIVE BREAKPOINTS
+   -------------------------------------------------------------------------- */
+@media (max-width: 1080px) {
+  .fairmacs-login-page-root {
+    justify-content: center;
+    padding: 2rem 1.5rem;
+  }
+
+  .fairmacs-login-card-assembly {
+    margin-right: 0;
+    max-width: 440px;
+  }
+
+  .maritime-ship-cruising-lane {
+    left: -5%;
+    width: 85%;
+    bottom: 8%;
+    opacity: 0.75;
+  }
+}
+
+@media (max-width: 768px) {
+  .fairmacs-login-page-root {
+    align-items: flex-end;
+    padding: 1rem;
+    padding-top: 4.5rem;
+    overflow-y: auto;
+  }
+
+  .fairmacs-login-home-btn {
+    top: 14px;
+    left: 14px;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+  }
+
+  .fairmacs-dev-time-pill {
+    top: 14px;
+    right: 14px;
+    padding: 0.2rem 0.35rem;
+  }
+
+  .fairmacs-dev-time-btn {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .maritime-ocean-stage {
+    height: 48%;
+  }
+
+  .maritime-foreground-waves-stage {
+    height: 20%;
+  }
+
+  .maritime-ship-cruising-lane {
+    left: -10%;
+    width: 110%;
+    bottom: 12%;
+    opacity: 0.75;
+  }
+
+  .fairmacs-login-card-assembly {
+    width: 100%;
+    margin-top: 1rem;
+  }
+
+  .fairmacs-liquid-glass-card {
+    padding: 1.75rem 1.35rem;
+    border-radius: 20px;
+  }
+
+  .fairmacs-login-title-h1 {
+    font-size: 1.5rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   9. ACCESSIBILITY: PREFERS REDUCED MOTION
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .fairmacs-cargo-ship-assembly,
+  .fairmacs-cargo-ship-wrapper,
+  .vessel-buoyancy-rig,
+  .fairmacs-vessel-hull-assembly,
+  .wave-path-bg,
+  .wave-path-mid-1,
+  .wave-path-mid-2,
+  .wave-path-fg-1,
+  .wave-path-fg-2,
+  .wave-foam-crest,
+  .ocean-foam-flecks,
+  .vessel-bow-spray,
+  .vessel-stern-churn,
+  .ship-bow-wake-spray,
+  .ship-hull-waterline-foam,
+  .beacon-light,
+  .beacon-masthead,
+  .beacon-port,
+  .beacon-starboard {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .sky-backdrop,
+  .fairmacs-liquid-glass-card {
+    transition: none !important;
+    animation: none !important;
+  }
+}

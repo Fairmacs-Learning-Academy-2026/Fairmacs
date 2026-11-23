@@ -1,5 +1,7 @@
 package com.fairmacs.lms.service;
 
+import com.fairmacs.lms.dto.PolicyOrgOverviewDTO;
+import com.fairmacs.lms.dto.PolicyDeptOverviewDTO;
 import com.fairmacs.lms.entity.*;
 import com.fairmacs.lms.repository.*;
 import org.slf4j.Logger;
@@ -48,6 +50,33 @@ public class NotificationSchedulerService {
     @Autowired(required = false)
     private PolicyAcknowledgementRepository policyAcknowledgementRepository;
 
+    @Autowired(required = false)
+    private PolicyService policyService;
+
+    @Autowired(required = false)
+    private DepartmentRepository departmentRepository;
+
+    @Value("${app.notifications.policies.enabled:true}")
+    private boolean policyNotificationsEnabled = true;
+
+    @Value("${app.notifications.policies.due-soon-days:5}")
+    private int policyDueSoonDays = 5;
+
+    @Value("${app.notifications.policies.overdue-initial-days:1}")
+    private int policyOverdueInitialDays = 1;
+
+    @Value("${app.notifications.policies.overdue-reminder-interval-days:7}")
+    private int policyOverdueIntervalDays = 7;
+
+    @Value("${app.notifications.policies.escalation-manager-days:1}")
+    private int policyEscalationManagerDays = 1;
+
+    @Value("${app.notifications.policies.escalation-hr-days:7}")
+    private int policyEscalationHrDays = 7;
+
+    @Value("${app.notifications.policies.remind-on-leave:true}")
+    private boolean remindOnLeave = true;
+
     @Value("${app.notifications.scheduler.enabled:true}")
     private boolean schedulerEnabled = true;
 
@@ -87,7 +116,9 @@ public class NotificationSchedulerService {
             return;
         }
         processDeadlineAndOverdueReminders(currentLocalDate(), false);
-        processPolicyDeadlineReminders(currentLocalDate(), false);
+        if (policyNotificationsEnabled) {
+            processPolicyDeadlineReminders(currentLocalDate(), false);
+        }
     }
 
     /**
@@ -105,7 +136,7 @@ public class NotificationSchedulerService {
     }
 
     /**
-     * Weekly compliance digest for Department Managers and HR Admins.
+     * Weekly compliance digest for Department Managers and HR Admins (Course/Learning Engine).
      * Default schedule: Mondays at 08:30 AM (Asia/Kolkata).
      */
     @Scheduled(
@@ -117,6 +148,22 @@ public class NotificationSchedulerService {
             return;
         }
         processWeeklyComplianceDigests(currentLocalDate(), false);
+    }
+
+    /**
+     * Weekly compliance digest for Policies & Agreements.
+     * Generates HR/Admin organization summary and Manager department-scoped compliance summaries.
+     * Default schedule: Mondays at 09:00 AM (Asia/Kolkata).
+     */
+    @Scheduled(
+            cron = "${app.notifications.policies.digest-cron:0 0 9 * * MON}",
+            zone = "${app.notifications.scheduler.timezone:Asia/Kolkata}"
+    )
+    public void scheduledWeeklyPolicyDigests() {
+        if (!schedulerEnabled || !policyNotificationsEnabled) {
+            return;
+        }
+        processWeeklyPolicyDigests(currentLocalDate(), false);
     }
 
     /**
@@ -149,7 +196,23 @@ public class NotificationSchedulerService {
             }
         }
 
-        // On Mondays, check if weekly compliance digest was missed
+        // Daily policy deadline and overdue reminders check
+        if (policyNotificationsEnabled) {
+            String dailyPolicyKey = "POLICY_DEADLINE_REMINDERS:" + today;
+            boolean dailyPolicyRan = jobLogRepository != null
+                    && jobLogRepository.existsByExecutionKeyAndStatus(dailyPolicyKey, "COMPLETED");
+
+            if (!dailyPolicyRan) {
+                log.info("Startup check: Today's policy deadline & overdue reminder scan ({}) has not completed. Triggering catch-up.", dailyPolicyKey);
+                try {
+                    processPolicyDeadlineReminders(today, false);
+                } catch (Exception ex) {
+                    log.warn("Startup catch-up for {} failed: {}", dailyPolicyKey, ex.getMessage());
+                }
+            }
+        }
+
+        // On Mondays, check if weekly compliance digests were missed
         if (today.getDayOfWeek() == java.time.DayOfWeek.MONDAY) {
             int year = today.get(IsoFields.WEEK_BASED_YEAR);
             int week = today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
@@ -164,6 +227,22 @@ public class NotificationSchedulerService {
                     processWeeklyComplianceDigests(today, false);
                 } catch (Exception ex) {
                     log.warn("Startup catch-up for {} failed: {}", digestKey, ex.getMessage());
+                }
+            }
+
+            // Check if policy compliance digest was missed
+            if (policyNotificationsEnabled) {
+                String policyDigestKey = "POLICY_WEEKLY_DIGEST:" + weekKey;
+                boolean policyDigestRan = jobLogRepository != null
+                        && jobLogRepository.existsByExecutionKeyAndStatus(policyDigestKey, "COMPLETED");
+
+                if (!policyDigestRan) {
+                    log.info("Startup check: Weekly policy compliance digest ({}) has not completed. Triggering catch-up.", policyDigestKey);
+                    try {
+                        processWeeklyPolicyDigests(today, false);
+                    } catch (Exception ex) {
+                        log.warn("Startup catch-up for {} failed: {}", policyDigestKey, ex.getMessage());
+                    }
                 }
             }
         }
@@ -879,10 +958,138 @@ public class NotificationSchedulerService {
     }
 
     /**
-     * Evaluates active policy assignments with due dates and emits due-soon and overdue notifications.
+     * Verifies whether an active policy assignment is currently eligible for scheduled notifications.
+     * Excludes:
+     * - Open-ended assignments (dueDate == null, never marked overdue)
+     * - Unpublished or archived policy documents
+     * - Inactive or terminated employees
+     * - Employees currently ON_LEAVE (unless remindOnLeave is explicitly enabled)
+     * - Assignments that are already compliant/acknowledged (or minor version covered by major)
+     */
+    public boolean isEligibleForPolicyNotification(PolicyAssignment a) {
+        if (a == null || a.getDueDate() == null) {
+            return false;
+        }
+        if (a.getPolicyDocument() == null || a.getPolicyDocument().getDocumentStatus() != PolicyDocumentStatus.PUBLISHED) {
+            return false;
+        }
+        User employee = a.getEmployeeUser();
+        if (employee == null) {
+            return false;
+        }
+        if (employee.getStatus() == UserStatus.INACTIVE || employee.getStatus() == UserStatus.TERMINATED) {
+            return false;
+        }
+        if (employee.getStatus() == UserStatus.ON_LEAVE && !remindOnLeave) {
+            return false;
+        }
+        if (isPolicyAssignmentCompliant(a)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Resolves all eligible Department Managers for a given employee.
+     * Uses manager's primary department and recursively traverses descendant child departments.
+     */
+    public List<User> findEligibleManagersForEmployee(User employee, Long departmentIdSnapshot) {
+        if (employee == null) {
+            return Collections.emptyList();
+        }
+
+        List<User> allManagers = userRepository.findByRoleAndStatus(Role.MANAGER, UserStatus.ACTIVE);
+        if (allManagers == null || allManagers.isEmpty()) {
+            List<User> byRole = userRepository.findByRole(Role.MANAGER);
+            if (byRole != null) {
+                allManagers = byRole.stream()
+                        .filter(u -> u.getStatus() != UserStatus.INACTIVE && u.getStatus() != UserStatus.TERMINATED)
+                        .toList();
+            } else {
+                allManagers = Collections.emptyList();
+            }
+        }
+
+        if (allManagers.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Long empDeptId = departmentIdSnapshot;
+        String empDeptName = employee.getDepartment();
+
+        if (empDeptId == null && empDeptName != null && !empDeptName.isBlank() && departmentRepository != null) {
+            empDeptId = departmentRepository.findByNameIgnoreCase(empDeptName.trim())
+                    .map(Department::getId)
+                    .orElse(null);
+        }
+
+        List<User> matchingManagers = new ArrayList<>();
+        for (User manager : allManagers) {
+            if (manager.getDepartment() == null || manager.getDepartment().isBlank()) {
+                continue;
+            }
+
+            if (empDeptName != null && manager.getDepartment().trim().equalsIgnoreCase(empDeptName.trim())) {
+                matchingManagers.add(manager);
+                continue;
+            }
+
+            if (empDeptId != null && departmentRepository != null) {
+                Set<Long> managerDeptIds = resolveDepartmentHierarchyForManager(manager);
+                if (managerDeptIds.contains(empDeptId)) {
+                    matchingManagers.add(manager);
+                }
+            }
+        }
+        return matchingManagers;
+    }
+
+    /**
+     * Resolves the department hierarchy (primary + child departments) for a Department Manager.
+     */
+    public Set<Long> resolveDepartmentHierarchyForManager(User manager) {
+        Set<Long> deptIds = new HashSet<>();
+        if (manager == null || manager.getDepartment() == null || manager.getDepartment().isBlank() || departmentRepository == null) {
+            return deptIds;
+        }
+
+        departmentRepository.findByNameIgnoreCase(manager.getDepartment().trim()).ifPresent(d -> deptIds.add(d.getId()));
+        if (deptIds.isEmpty()) {
+            return deptIds;
+        }
+
+        List<Department> allDepts = departmentRepository.findAll();
+        boolean addedNew;
+        do {
+            addedNew = false;
+            for (Department d : allDepts) {
+                if (d.getParentDepartment() != null && deptIds.contains(d.getParentDepartment().getId())) {
+                    if (deptIds.add(d.getId())) {
+                        addedNew = true;
+                    }
+                }
+            }
+        } while (addedNew);
+
+        return deptIds;
+    }
+
+    /**
+     * Evaluates active policy assignments with due dates and emits:
+     * 1. Due-soon reminders (configurable, default 5 days before deadline).
+     * 2. Due-today reminders (on deadline day).
+     * 3. First overdue reminders (configurable, default 1 day overdue).
+     * 4. Subsequent overdue reminders (every configurable interval, default 7 days).
+     * 5. Level 2 Manager Escalations (when overdue, scoped strictly to department manager).
+     * 6. Level 3 HR/Admin Escalations (prolonged overdue, escalated to HR_ADMIN / SUPER_ADMIN).
+     *
      * Note: Assignments without a due date (open-ended) are strictly ignored and never flagged as overdue.
      */
     public Map<String, Object> processPolicyDeadlineReminders(LocalDate referenceDate, boolean manualTrigger) {
+        if (!policyNotificationsEnabled) {
+            log.debug("Policy deadline reminders are disabled by configuration.");
+            return Map.of("status", "DISABLED");
+        }
         if (policyAssignmentRepository == null || policyAcknowledgementRepository == null) {
             log.debug("Policy repositories not present; skipping policy deadline reminders.");
             return Map.of("status", "SKIPPED_NO_REPOSITORIES");
@@ -904,75 +1111,111 @@ public class NotificationSchedulerService {
         int failures = 0;
 
         try {
-            // Find all active policy assignments that have an explicit due date (strictly ignore null due dates!)
-            LocalDate dueIn5Days = today.plusDays(5);
-            LocalDate dueIn2Days = today.plusDays(2);
+            LocalDate dueSoonDate = today.plusDays(policyDueSoonDays);
 
-            // 1. Due in 5 days
-            List<PolicyAssignment> dueSoon5 = policyAssignmentRepository.findActiveAssignmentsDueOn(dueIn5Days);
-            for (PolicyAssignment a : dueSoon5) {
+            // 1. Due Soon (policyDueSoonDays before deadline, default 5 days)
+            List<PolicyAssignment> dueSoonList = policyAssignmentRepository.findActiveAssignmentsDueOn(dueSoonDate);
+            for (PolicyAssignment a : dueSoonList) {
                 processed++;
+                if (!isEligibleForPolicyNotification(a)) continue;
                 try {
-                    boolean acked = policyAcknowledgementRepository.existsByPolicyVersionIdAndEmployeeUserId(
-                            a.getPolicyVersion().getId(),
-                            a.getEmployeeUser().getId()
-                    );
-                    if (!acked) {
-                        String title = "Policy Due Soon: " + a.getPolicyDocument().getTitle();
-                        String message = "The policy \"" + a.getPolicyDocument().getTitle() + "\" is due for acknowledgement in 5 days (" + a.getDueDate() + ").";
-                        String dedupKey = "policy-due-5d:" + a.getId();
+                    String title = "Policy Due Soon: " + a.getPolicyDocument().getTitle();
+                    String message = "The policy \"" + a.getPolicyDocument().getTitle() + "\" (v" +
+                            a.getPolicyVersion().getVersionNumber() + ") is due for acknowledgement in " +
+                            policyDueSoonDays + " days (" + a.getDueDate() + "). Please review and acknowledge in My Profile.";
+                    String dedupKey = "policy-due-" + policyDueSoonDays + "d:" + a.getId();
 
-                        Notification n = notificationService.createNotification(
-                                a.getEmployeeUser().getId(),
-                                title,
-                                message,
-                                NotificationType.POLICY_DUE_SOON,
-                                "NORMAL",
-                                "POLICY",
-                                a.getPolicyDocument().getId().toString(),
-                                "/profile#policies",
-                                dedupKey,
-                                Map.of("policyId", a.getPolicyDocument().getId(), "dueDate", a.getDueDate().toString())
-                        );
-                        if (n != null) created++;
-                    }
+                    Notification n = notificationService.createNotificationSafely(
+                            a.getEmployeeUser().getId(),
+                            title,
+                            message,
+                            NotificationType.POLICY_DUE_SOON,
+                            NotificationPriority.NORMAL,
+                            "POLICY",
+                            a.getPolicyDocument().getId().toString(),
+                            "/profile#policies",
+                            dedupKey,
+                            Map.of(
+                                    "policyId", a.getPolicyDocument().getId(),
+                                    "dueDate", a.getDueDate().toString(),
+                                    "versionNumber", a.getPolicyVersion().getVersionNumber()
+                            )
+                    );
+                    if (n != null) created++;
                 } catch (Exception ex) {
                     failures++;
-                    log.warn("Error sending 5-day policy reminder for assignmentId={}: {}", a.getId(), ex.getMessage());
+                    log.warn("Error sending due-soon policy reminder for assignmentId={}: {}", a.getId(), ex.getMessage());
                 }
             }
 
-            // 2. Due in 2 days
+            // 1b. Due in 2 days (urgent due soon)
+            LocalDate dueIn2Days = today.plusDays(2);
             List<PolicyAssignment> dueSoon2 = policyAssignmentRepository.findActiveAssignmentsDueOn(dueIn2Days);
             for (PolicyAssignment a : dueSoon2) {
                 processed++;
+                if (!isEligibleForPolicyNotification(a)) continue;
                 try {
-                    boolean acked = policyAcknowledgementRepository.existsByPolicyVersionIdAndEmployeeUserId(
-                            a.getPolicyVersion().getId(),
-                            a.getEmployeeUser().getId()
-                    );
-                    if (!acked) {
-                        String title = "Urgent: Policy Due Soon - " + a.getPolicyDocument().getTitle();
-                        String message = "The policy \"" + a.getPolicyDocument().getTitle() + "\" is due for acknowledgement in 2 days (" + a.getDueDate() + "). Please review and acknowledge promptly.";
-                        String dedupKey = "policy-due-2d:" + a.getId();
+                    String title = "Urgent: Policy Due Soon - " + a.getPolicyDocument().getTitle();
+                    String message = "The policy \"" + a.getPolicyDocument().getTitle() + "\" (v" +
+                            a.getPolicyVersion().getVersionNumber() + ") is due for acknowledgement in 2 days (" +
+                            a.getDueDate() + "). Please review and acknowledge promptly.";
+                    String dedupKey = "policy-due-2d:" + a.getId();
 
-                        Notification n = notificationService.createNotification(
-                                a.getEmployeeUser().getId(),
-                                title,
-                                message,
-                                NotificationType.POLICY_DUE_SOON,
-                                "HIGH",
-                                "POLICY",
-                                a.getPolicyDocument().getId().toString(),
-                                "/profile#policies",
-                                dedupKey,
-                                Map.of("policyId", a.getPolicyDocument().getId(), "dueDate", a.getDueDate().toString())
-                        );
-                        if (n != null) created++;
-                    }
+                    Notification n = notificationService.createNotificationSafely(
+                            a.getEmployeeUser().getId(),
+                            title,
+                            message,
+                            NotificationType.POLICY_DUE_SOON,
+                            NotificationPriority.HIGH,
+                            "POLICY",
+                            a.getPolicyDocument().getId().toString(),
+                            "/profile#policies",
+                            dedupKey,
+                            Map.of(
+                                    "policyId", a.getPolicyDocument().getId(),
+                                    "dueDate", a.getDueDate().toString(),
+                                    "versionNumber", a.getPolicyVersion().getVersionNumber()
+                            )
+                    );
+                    if (n != null) created++;
                 } catch (Exception ex) {
                     failures++;
                     log.warn("Error sending 2-day policy reminder for assignmentId={}: {}", a.getId(), ex.getMessage());
+                }
+            }
+
+            // 2. Due Today (on deadline date)
+            List<PolicyAssignment> dueTodayList = policyAssignmentRepository.findActiveAssignmentsDueOn(today);
+            for (PolicyAssignment a : dueTodayList) {
+                processed++;
+                if (!isEligibleForPolicyNotification(a)) continue;
+                try {
+                    String title = "Policy Due Today: " + a.getPolicyDocument().getTitle();
+                    String message = "The policy \"" + a.getPolicyDocument().getTitle() + "\" (v" +
+                            a.getPolicyVersion().getVersionNumber() + ") is due for acknowledgement today (" +
+                            a.getDueDate() + "). Please review and submit your acknowledgement in My Profile.";
+                    String dedupKey = "policy-due-today:" + a.getId() + ":" + today;
+
+                    Notification n = notificationService.createNotificationSafely(
+                            a.getEmployeeUser().getId(),
+                            title,
+                            message,
+                            NotificationType.POLICY_DUE_SOON,
+                            NotificationPriority.HIGH,
+                            "POLICY",
+                            a.getPolicyDocument().getId().toString(),
+                            "/profile#policies",
+                            dedupKey,
+                            Map.of(
+                                    "policyId", a.getPolicyDocument().getId(),
+                                    "dueDate", a.getDueDate().toString(),
+                                    "versionNumber", a.getPolicyVersion().getVersionNumber()
+                            )
+                    );
+                    if (n != null) created++;
+                } catch (Exception ex) {
+                    failures++;
+                    log.warn("Error sending due-today policy reminder for assignmentId={}: {}", a.getId(), ex.getMessage());
                 }
             }
 
@@ -980,33 +1223,135 @@ public class NotificationSchedulerService {
             List<PolicyAssignment> overdueList = policyAssignmentRepository.findActiveOverdueAssignments(today);
             for (PolicyAssignment a : overdueList) {
                 processed++;
+                if (!isEligibleForPolicyNotification(a)) continue;
                 try {
-                    boolean acked = policyAcknowledgementRepository.existsByPolicyVersionIdAndEmployeeUserId(
-                            a.getPolicyVersion().getId(),
-                            a.getEmployeeUser().getId()
-                    );
-                    if (!acked) {
-                        String title = "Policy Overdue: " + a.getPolicyDocument().getTitle();
-                        String message = "The acknowledgement for \"" + a.getPolicyDocument().getTitle() + "\" is overdue since " + a.getDueDate() + ". Please review and submit your acknowledgement.";
+                    long daysOverdue = ChronoUnit.DAYS.between(a.getDueDate(), today);
+                    if (daysOverdue <= 0) continue;
+
+                    // Level 1: Employee Overdue Reminders
+                    // Evaluates initial overdue (1 day overdue) and subsequent recurring interval (every 7 days)
+                    boolean isInitialOverdue = (daysOverdue == policyOverdueInitialDays);
+                    boolean isRecurringOverdue = (daysOverdue > policyOverdueInitialDays && (daysOverdue - policyOverdueInitialDays) % policyOverdueIntervalDays == 0);
+
+                    if (isInitialOverdue || isRecurringOverdue) {
+                        String priority = daysOverdue >= 14 ? NotificationPriority.CRITICAL : NotificationPriority.HIGH;
+                        String title = (daysOverdue > 1 ? ("Urgent: Policy Overdue (" + daysOverdue + " days) — ") : "Policy Overdue: ") + a.getPolicyDocument().getTitle();
+                        String message = "The acknowledgement for \"" + a.getPolicyDocument().getTitle() + "\" (v" +
+                                a.getPolicyVersion().getVersionNumber() + ") is " + daysOverdue + " day(s) overdue (due date was " +
+                                a.getDueDate() + "). Please review and submit your acknowledgement.";
                         String dedupKey = "policy-overdue:" + a.getId() + ":" + today;
 
-                        Notification n = notificationService.createNotification(
+                        Notification n = notificationService.createNotificationSafely(
                                 a.getEmployeeUser().getId(),
                                 title,
                                 message,
                                 NotificationType.POLICY_OVERDUE,
-                                "HIGH",
+                                priority,
                                 "POLICY",
                                 a.getPolicyDocument().getId().toString(),
                                 "/profile#policies",
                                 dedupKey,
-                                Map.of("policyId", a.getPolicyDocument().getId(), "dueDate", a.getDueDate().toString())
+                                Map.of(
+                                    "policyId", a.getPolicyDocument().getId(),
+                                    "dueDate", a.getDueDate().toString(),
+                                    "daysOverdue", daysOverdue
+                                )
                         );
                         if (n != null) created++;
                     }
+
+                    // Level 2: Department Manager Escalation
+                    // Triggered when daysOverdue == policyEscalationManagerDays or matching recurring interval
+                    if (daysOverdue == policyEscalationManagerDays || (daysOverdue > policyEscalationManagerDays && (daysOverdue - policyEscalationManagerDays) % policyOverdueIntervalDays == 0)) {
+                        List<User> managers = findEligibleManagersForEmployee(a.getEmployeeUser(), a.getDepartmentIdSnapshot());
+                        if (!managers.isEmpty()) {
+                            for (User mgr : managers) {
+                                String mgrTitle = "Manager Escalation: Overdue Policy Acknowledgement — " + a.getEmployeeUser().getFullName();
+                                String mgrMessage = "Employee " + a.getEmployeeUser().getFullName() + " (" + a.getEmployeeIdSnapshot() +
+                                        ") in " + (a.getDepartmentNameSnapshot() != null ? a.getDepartmentNameSnapshot() : "Department") +
+                                        " has not acknowledged \"" + a.getPolicyDocument().getTitle() + "\" (v" +
+                                        a.getPolicyVersion().getVersionNumber() + "). The acknowledgement is " + daysOverdue +
+                                        " day(s) overdue (due date was " + a.getDueDate() + "). Please follow up with your team member.";
+                                String mgrDedupKey = "policy-escalate-mgr:" + mgr.getId() + ":" + a.getId() + ":" + daysOverdue;
+
+                                Notification n = notificationService.createNotificationSafely(
+                                        mgr.getId(),
+                                        mgrTitle,
+                                        mgrMessage,
+                                        NotificationType.POLICY_ESCALATION,
+                                        NotificationPriority.HIGH,
+                                        "POLICY",
+                                        a.getPolicyDocument().getId().toString(),
+                                        "/manager/policies",
+                                        mgrDedupKey,
+                                        Map.of(
+                                            "policyId", a.getPolicyDocument().getId(),
+                                            "assignmentId", a.getId(),
+                                            "employeeId", a.getEmployeeUser().getId(),
+                                            "daysOverdue", daysOverdue
+                                        )
+                                );
+                                if (n != null) created++;
+                            }
+                        } else {
+                            // Fallback: If no eligible manager found, safely escalate directly to HR/Admin
+                            String fallbackDedupPrefix = "policy-escalate-mgr-fallback:" + a.getId() + ":" + daysOverdue;
+                            String fbTitle = "Manager Escalation Fallback (Unmanaged Department) — " + a.getEmployeeUser().getFullName();
+                            String fbMessage = "Employee " + a.getEmployeeUser().getFullName() + " (" + a.getEmployeeIdSnapshot() +
+                                    ", " + (a.getDepartmentNameSnapshot() != null ? a.getDepartmentNameSnapshot() : "Department") +
+                                    ") has an overdue policy \"" + a.getPolicyDocument().getTitle() + "\" (" + daysOverdue +
+                                    " day(s) overdue, due: " + a.getDueDate() + "). No active department manager was found; escalating to HR.";
+                            int hrNotifs = notificationService.notifyHrAdmins(
+                                    fbTitle,
+                                    fbMessage,
+                                    NotificationType.POLICY_ESCALATION,
+                                    NotificationPriority.HIGH,
+                                    "POLICY",
+                                    a.getPolicyDocument().getId().toString(),
+                                    "/hr/policies",
+                                    fallbackDedupPrefix,
+                                    Map.of(
+                                        "policyId", a.getPolicyDocument().getId(),
+                                        "assignmentId", a.getId(),
+                                        "employeeId", a.getEmployeeUser().getId(),
+                                        "daysOverdue", daysOverdue
+                                    )
+                            );
+                            created += hrNotifs;
+                        }
+                    }
+
+                    // Level 3: HR/Admin Escalation for Prolonged Overdue
+                    // Triggered when daysOverdue == policyEscalationHrDays (default 7 days) or matching recurring interval
+                    if (daysOverdue == policyEscalationHrDays || (daysOverdue > policyEscalationHrDays && (daysOverdue - policyEscalationHrDays) % policyOverdueIntervalDays == 0)) {
+                        String hrDedupPrefix = "policy-escalate-hr:" + a.getId() + ":" + daysOverdue;
+                        String hrTitle = "HR Escalation (Level 3): Prolonged Overdue Policy — " + a.getEmployeeUser().getFullName();
+                        String hrMessage = "Prolonged overdue policy acknowledgement: Employee " + a.getEmployeeUser().getFullName() +
+                                " (" + a.getEmployeeIdSnapshot() + ", Department: " + (a.getDepartmentNameSnapshot() != null ? a.getDepartmentNameSnapshot() : "N/A") +
+                                ") is " + daysOverdue + " days overdue for \"" + a.getPolicyDocument().getTitle() +
+                                "\" (v" + a.getPolicyVersion().getVersionNumber() + ", Due: " + a.getDueDate() +
+                                "). Escalation stage: Level 3 (Prolonged Overdue).";
+                        int hrNotifs = notificationService.notifyHrAdmins(
+                                hrTitle,
+                                hrMessage,
+                                NotificationType.POLICY_ESCALATION,
+                                NotificationPriority.CRITICAL,
+                                "POLICY",
+                                a.getPolicyDocument().getId().toString(),
+                                "/hr/policies",
+                                hrDedupPrefix,
+                                Map.of(
+                                    "policyId", a.getPolicyDocument().getId(),
+                                    "assignmentId", a.getId(),
+                                    "employeeId", a.getEmployeeUser().getId(),
+                                    "daysOverdue", daysOverdue
+                                )
+                        );
+                        created += hrNotifs;
+                    }
                 } catch (Exception ex) {
                     failures++;
-                    log.warn("Error sending policy overdue reminder for assignmentId={}: {}", a.getId(), ex.getMessage());
+                    log.warn("Error processing overdue policy assignmentId={}: {}", a.getId(), ex.getMessage());
                 }
             }
 
@@ -1039,6 +1384,179 @@ public class NotificationSchedulerService {
         return summary;
     }
 
+    /**
+     * Weekly compliance digest for Policies & Agreements.
+     * Evaluates organization-wide metrics for HR/Admin and department-scoped metrics for Managers.
+     */
+    public Map<String, Object> processWeeklyPolicyDigests(LocalDate referenceDate, boolean manualTrigger) {
+        if (!policyNotificationsEnabled || policyService == null) {
+            log.debug("Policy weekly digests disabled or PolicyService not available.");
+            return Map.of("status", "SKIPPED");
+        }
+
+        LocalDate today = referenceDate != null ? referenceDate : currentLocalDate();
+        int year = today.get(IsoFields.WEEK_BASED_YEAR);
+        int week = today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+        String weekKey = String.format("%d-W%02d", year, week);
+
+        String executionKey = manualTrigger
+                ? "POLICY_WEEKLY_DIGEST:MANUAL:" + System.currentTimeMillis()
+                : "POLICY_WEEKLY_DIGEST:" + weekKey;
+
+        if (!manualTrigger && jobLogRepository != null && jobLogRepository.existsByExecutionKeyAndStatus(executionKey, "COMPLETED")) {
+            log.debug("Policy weekly digest already ran for key={}", executionKey);
+            return Map.of("status", "SKIPPED_ALREADY_RAN", "executionKey", executionKey);
+        }
+
+        NotificationJobLog jobLog = startJobLog("POLICY_WEEKLY_DIGEST", executionKey);
+        int created = 0;
+        int failures = 0;
+
+        try {
+            // 1. HR/Admin Organization-Wide Policy Compliance Digest
+            PolicyOrgOverviewDTO orgOverview = policyService.getOrganizationOverview();
+            if (orgOverview != null) {
+                List<User> hrAdmins = userRepository.findByRoleAndStatus(Role.HR_ADMIN, UserStatus.ACTIVE);
+                if (hrAdmins == null || hrAdmins.isEmpty()) {
+                    List<User> byRole = userRepository.findByRole(Role.HR_ADMIN);
+                    if (byRole != null) {
+                        hrAdmins = byRole.stream()
+                                .filter(u -> u.getStatus() != UserStatus.INACTIVE && u.getStatus() != UserStatus.TERMINATED)
+                                .toList();
+                    } else {
+                        hrAdmins = Collections.emptyList();
+                    }
+                }
+
+                double completion = orgOverview.getCompletionPercentage() != null ? orgOverview.getCompletionPercentage() : 0.0;
+                long totalAcked = orgOverview.getTotalAcknowledged() != null ? orgOverview.getTotalAcknowledged() : 0L;
+                long totalAssigned = orgOverview.getTotalAssigned() != null ? orgOverview.getTotalAssigned() : 0L;
+                long totalPending = orgOverview.getTotalPending() != null ? orgOverview.getTotalPending() : 0L;
+                long totalOverdue = orgOverview.getTotalOverdue() != null ? orgOverview.getTotalOverdue() : 0L;
+                long totalPublished = orgOverview.getTotalPublished() != null ? orgOverview.getTotalPublished() : 0L;
+
+                String hrTitle = String.format("Weekly Policy Compliance Digest — Organization (%.0f%%)", completion);
+                String hrMessage = String.format(
+                        "Weekly Policies & Agreements Summary (%s): %d/%d acknowledged (%.1f%%), %d pending, %d overdue across %d published documents.",
+                        weekKey, totalAcked, totalAssigned, completion, totalPending, totalOverdue, totalPublished
+                );
+                String hrPriority = totalOverdue > 0 ? NotificationPriority.HIGH : NotificationPriority.NORMAL;
+
+                for (User admin : hrAdmins) {
+                    String dedupKey = String.format("policy-digest-hr:%d:%s", admin.getId(), weekKey);
+                    Notification n = notificationService.createNotificationSafely(
+                            admin.getId(),
+                            hrTitle,
+                            hrMessage,
+                            NotificationType.POLICY_DIGEST,
+                            hrPriority,
+                            "POLICY_DIGEST",
+                            "ORG:" + weekKey,
+                            "/hr/policies",
+                            dedupKey,
+                            Map.of(
+                                    "week", weekKey,
+                                    "completionPercentage", completion,
+                                    "totalAcknowledged", totalAcked,
+                                    "totalAssigned", totalAssigned,
+                                    "totalPending", totalPending,
+                                    "totalOverdue", totalOverdue,
+                                    "totalPublished", totalPublished
+                            )
+                    );
+                    if (n != null) created++;
+                }
+            }
+
+            // 2. Department Manager Weekly Policy Compliance Digest (Strictly department-scoped)
+            List<User> managers = userRepository.findByRoleAndStatus(Role.MANAGER, UserStatus.ACTIVE);
+            if (managers == null || managers.isEmpty()) {
+                List<User> byRole = userRepository.findByRole(Role.MANAGER);
+                if (byRole != null) {
+                    managers = byRole.stream()
+                            .filter(u -> u.getStatus() != UserStatus.INACTIVE && u.getStatus() != UserStatus.TERMINATED)
+                            .toList();
+                } else {
+                    managers = Collections.emptyList();
+                }
+            }
+            for (User manager : managers) {
+                try {
+                    PolicyDeptOverviewDTO deptOverview = policyService.getDepartmentOverview(manager.getId());
+                    if (deptOverview == null) {
+                        continue;
+                    }
+
+                    String deptName = deptOverview.getDepartmentName() != null ? deptOverview.getDepartmentName() : "Department";
+                    double deptCompletion = deptOverview.getCompletionPercentage() != null ? deptOverview.getCompletionPercentage() : 0.0;
+                    long deptAcked = deptOverview.getTotalAcknowledged() != null ? deptOverview.getTotalAcknowledged() : 0L;
+                    long deptAssigned = deptOverview.getTotalAssigned() != null ? deptOverview.getTotalAssigned() : 0L;
+                    long deptPending = deptOverview.getTotalPending() != null ? deptOverview.getTotalPending() : 0L;
+                    long deptOverdue = deptOverview.getTotalOverdue() != null ? deptOverview.getTotalOverdue() : 0L;
+
+                    String mgrTitle = String.format("Weekly Department Policy Compliance — %s (%.0f%%)", deptName, deptCompletion);
+                    String mgrMessage = String.format(
+                            "Department %s policy compliance summary (%s): %d/%d acknowledged (%.1f%%), %d pending, %d overdue.",
+                            deptName, weekKey, deptAcked, deptAssigned, deptCompletion, deptPending, deptOverdue
+                    );
+                    String mgrPriority = deptOverdue > 0 ? NotificationPriority.HIGH : NotificationPriority.NORMAL;
+
+                    String dedupKey = String.format("policy-digest-mgr:%d:%s", manager.getId(), weekKey);
+                    Notification n = notificationService.createNotificationSafely(
+                            manager.getId(),
+                            mgrTitle,
+                            mgrMessage,
+                            NotificationType.POLICY_DIGEST,
+                            mgrPriority,
+                            "POLICY_DIGEST",
+                            "DEPT:" + manager.getId() + ":" + weekKey,
+                            "/manager/policies",
+                            dedupKey,
+                            Map.of(
+                                    "department", deptName,
+                                    "week", weekKey,
+                                    "completionPercentage", deptCompletion,
+                                    "totalAcknowledged", deptAcked,
+                                    "totalAssigned", deptAssigned,
+                                    "totalPending", deptPending,
+                                    "totalOverdue", deptOverdue
+                            )
+                    );
+                    if (n != null) created++;
+                } catch (Exception ex) {
+                    failures++;
+                    log.warn("Error creating policy digest for managerId={}: {}", manager.getId(), ex.getMessage());
+                }
+            }
+
+            completeJobLog(
+                    jobLog,
+                    "COMPLETED",
+                    1 + managers.size(),
+                    created,
+                    failures,
+                    "Policy weekly digest completed: " + created + " digests emitted."
+            );
+        } catch (Exception ex) {
+            failures++;
+            completeJobLog(
+                    jobLog,
+                    "FAILED",
+                    0,
+                    created,
+                    failures,
+                    "Policy weekly digest failed: " + ex.getMessage()
+            );
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("jobName", "POLICY_WEEKLY_DIGEST");
+        summary.put("weekKey", weekKey);
+        summary.put("digestsCreated", created);
+        summary.put("failures", failures);
+        return summary;
+    }
+
     private void notifySystemJobFailure(String jobLabel, String periodKey) {
         try {
             notificationService.notifyHrAdmins(
@@ -1055,4 +1573,33 @@ public class NotificationSchedulerService {
         } catch (Exception ignored) {
         }
     }
+
+    private boolean isPolicyAssignmentCompliant(PolicyAssignment a) {
+        if (a == null || a.getPolicyVersion() == null || a.getEmployeeUser() == null) {
+            return false;
+        }
+        if (policyService != null) {
+            return policyService.isCompliant(a.getPolicyVersion().getId(), a.getEmployeeUser().getId());
+        }
+        if (policyAcknowledgementRepository != null) {
+            return policyAcknowledgementRepository.existsByPolicyVersionIdAndEmployeeUserId(
+                    a.getPolicyVersion().getId(),
+                    a.getEmployeeUser().getId()
+            );
+        }
+        return false;
+    }
+
+    // Setters and getters for testing and configuration customization
+    public void setPolicyAssignmentRepository(PolicyAssignmentRepository repo) { this.policyAssignmentRepository = repo; }
+    public void setPolicyAcknowledgementRepository(PolicyAcknowledgementRepository repo) { this.policyAcknowledgementRepository = repo; }
+    public void setPolicyService(PolicyService service) { this.policyService = service; }
+    public void setDepartmentRepository(DepartmentRepository repo) { this.departmentRepository = repo; }
+    public void setPolicyNotificationsEnabled(boolean enabled) { this.policyNotificationsEnabled = enabled; }
+    public void setPolicyDueSoonDays(int days) { this.policyDueSoonDays = days; }
+    public void setPolicyOverdueInitialDays(int days) { this.policyOverdueInitialDays = days; }
+    public void setPolicyOverdueIntervalDays(int days) { this.policyOverdueIntervalDays = days; }
+    public void setPolicyEscalationManagerDays(int days) { this.policyEscalationManagerDays = days; }
+    public void setPolicyEscalationHrDays(int days) { this.policyEscalationHrDays = days; }
+    public void setRemindOnLeave(boolean remindOnLeave) { this.remindOnLeave = remindOnLeave; }
 }

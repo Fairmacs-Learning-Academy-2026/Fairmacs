@@ -12,7 +12,7 @@ console.log('--- Fairmacs KMS Intelligent Hover-Based Sidebar Verification ---')
 const sidebarContent = fs.readFileSync(path.join(srcDir, 'components', 'Sidebar.jsx'), 'utf8');
 const appCssContent = fs.readFileSync(path.join(srcDir, 'App.css'), 'utf8');
 
-// 1. Verify constant compact width rail without manual expand/collapse
+// 1. Verify auto-hide dynamic overlay without manual expand/collapse buttons
 assert(
   !sidebarContent.includes('isCollapsed') &&
   !sidebarContent.includes('setIsCollapsed') &&
@@ -22,11 +22,11 @@ assert(
   'Sidebar.jsx must eliminate all manual expand/collapse buttons and states'
 );
 assert(
-  appCssContent.includes('width: 74px') &&
-  appCssContent.includes('transition: none; /* Fixed width at all times - never expand container */'),
-  'App.css must enforce a permanent 74px icon rail width that never expands on hover'
+  appCssContent.includes('.sidebar-edge-hotzone') &&
+  appCssContent.includes('.sidebar.sidebar-emerged'),
+  'App.css must enforce auto-hide by default and dynamic emergence on left-edge trigger'
 );
-console.log('[PASS] 1. Sidebar remains permanently in compact icon rail without manual expand/collapse.');
+console.log('[PASS] 1. Sidebar auto-hides by default and emerges dynamically on left-edge hover.');
 
 // 2. Verify individual-item floating tooltip portal implementation
 assert(

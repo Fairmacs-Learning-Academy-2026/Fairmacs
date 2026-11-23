@@ -15,6 +15,8 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import FairmacsFooter from './footer/FairmacsFooter';
+import FairmacsEmblem from './FairmacsEmblem';
 
 const leadershipMessages = [
   {
@@ -86,14 +88,14 @@ export default function PublicHome() {
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               className="flex items-center gap-3"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-md p-1.5 border border-white/20">
-                <img src="/fairmacs-logo.png" alt="Fairmacs" className="h-full w-auto object-contain" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-md p-1.5 border border-white/20 flex-shrink-0">
+                <FairmacsEmblem size={24} fill="#1B365D" />
               </div>
 
               <div className="text-left">
-                <div className="font-bold tracking-wide">FAIRMACS</div>
-                <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
-                  Knowledge Management System
+                <div className="fairmacs-brand-wordmark text-lg text-white font-bold tracking-wide">FAIRMACS</div>
+                <div className="fairmacs-brand-tagline text-[10px] uppercase tracking-[0.16em] text-slate-300">
+                  ACROSS ALL BOUNDARIES
                 </div>
               </div>
             </button>
@@ -186,6 +188,10 @@ export default function PublicHome() {
           <div className="absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-blue-600/20 blur-[120px]" />
           <div className="absolute top-1/3 -right-40 h-[450px] w-[450px] rounded-full bg-cyan-500/10 blur-[120px]" />
           <div className="absolute bottom-0 left-1/3 h-[350px] w-[350px] rounded-full bg-indigo-500/10 blur-[100px]" />
+          {/* Ambient Fairmacs Sail Logo Watermark in Background */}
+          <div className="absolute right-[-40px] top-[14%] -z-10 opacity-[0.06] select-none pointer-events-none">
+            <FairmacsEmblem size={560} fill="#60A5FA" />
+          </div>
         </div>
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
@@ -195,7 +201,7 @@ export default function PublicHome() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-xs font-medium text-blue-200 mb-7">
                 <Sparkles size={14} />
-                Fairmacs Learning & Development
+                Knowledge Management System
               </div>
 
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight">
@@ -256,7 +262,7 @@ export default function PublicHome() {
 
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <div className="text-sm text-slate-400">
+                      <div className="fairmacs-brand-wordmark text-sm text-slate-400">
                         FAIRMACS KMS
                       </div>
                       <div className="mt-1 text-xl font-semibold">
@@ -528,59 +534,17 @@ export default function PublicHome() {
       </section>
 
       {/* =====================================================
-          FOOTER
+          SHARED ANIMATED FOOTER (PUBLIC VARIANT)
       ====================================================== */}
-      <footer className="border-t border-white/10 py-10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-
-          <div className="flex flex-col md:flex-row justify-between gap-8">
-
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-white shadow-sm flex items-center justify-center p-1.5 border border-white/10">
-                  <img src="/fairmacs-logo.png" alt="Fairmacs" className="h-full w-auto object-contain" />
-                </div>
-
-                <div>
-                  <div className="font-semibold">FAIRMACS</div>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">
-                    Knowledge Management System
-                  </div>
-                </div>
-              </div>
-
-              <p className="mt-4 max-w-md text-sm leading-6 text-slate-500">
-                A central learning and knowledge platform for Fairmacs
-                employees.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-slate-500">
-              <button onClick={() => scrollToSection('about')}>
-                About
-              </button>
-
-              <button onClick={() => scrollToSection('leadership')}>
-                Leadership
-              </button>
-
-              <button onClick={() => scrollToSection('insights')}>
-                Insights
-              </button>
-
-              <button onClick={goToLogin}>
-                Login
-              </button>
-            </div>
-
-          </div>
-
-          <div className="mt-10 pt-6 border-t border-white/5 text-xs text-slate-600">
-            © {new Date().getFullYear()} Fairmacs. Learning & Development.
-          </div>
-
-        </div>
-      </footer>
+      <FairmacsFooter
+        variant="public"
+        onNavigate={(path) => {
+          setMobileMenu(false);
+          navigate(path);
+          window.scrollTo({ top: 0, behavior: 'auto' });
+        }}
+        onScrollToSection={scrollToSection}
+      />
 
     </div>
   );

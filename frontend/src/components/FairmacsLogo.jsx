@@ -1,4 +1,5 @@
 import React from 'react';
+import FairmacsEmblem from './FairmacsEmblem';
 
 export default function FairmacsLogo({ variant = 'default', height = 40, showText = true }) {
   const isDarkBg = variant === 'header' || variant === 'dark';
@@ -6,19 +7,40 @@ export default function FairmacsLogo({ variant = 'default', height = 40, showTex
 
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
-      <img
-        src="/fairmacs-logo.png"
-        alt="Fairmacs"
-        style={{ height: height, width: 'auto', objectFit: 'contain', filter: isDarkBg ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' : 'none' }}
+      <FairmacsEmblem
+        size={height}
+        fill={isDarkBg ? '#38BDF8' : '#1B365D'}
+        style={{ filter: isDarkBg ? 'drop-shadow(0 2px 6px rgba(56, 189, 248, 0.4))' : 'none' }}
       />
       {showText && (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ fontSize: '1.2rem', fontWeight: 900, color: textColor, letterSpacing: '1.5px', lineHeight: 1 }}>
+            <span
+              className="fairmacs-brand-wordmark"
+              style={{
+                fontFamily: 'var(--font-brand)',
+                fontSize: '1.2rem',
+                fontWeight: 700,
+                color: textColor,
+                letterSpacing: '0.04em',
+                lineHeight: 1
+              }}
+            >
               FAIRMACS
             </span>
           </div>
-          <span style={{ fontSize: '0.62rem', color: isDarkBg ? '#94a3b8' : '#64748b', fontWeight: 600, letterSpacing: '0.5px', marginTop: '0.15rem' }}>
+          <span
+            className="fairmacs-brand-tagline"
+            style={{
+              fontFamily: 'var(--font-brand)',
+              fontSize: '0.62rem',
+              color: isDarkBg ? '#94a3b8' : '#64748b',
+              fontWeight: 400,
+              letterSpacing: '0.14em',
+              marginTop: '0.18rem',
+              lineHeight: 1.1
+            }}
+          >
             ACROSS ALL BOUNDARIES
           </span>
         </div>

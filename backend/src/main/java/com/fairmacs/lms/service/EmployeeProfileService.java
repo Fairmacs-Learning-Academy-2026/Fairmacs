@@ -1,5 +1,6 @@
 package com.fairmacs.lms.service;
 
+import com.fairmacs.lms.dto.CertificateDTO;
 import com.fairmacs.lms.entity.*;
 import com.fairmacs.lms.exception.ResourceNotFoundException;
 import com.fairmacs.lms.repository.*;
@@ -338,7 +339,30 @@ public class EmployeeProfileService {
         learningMap.put("certificatesEarned", certificatesEarned);
         learningMap.put("learningHours", roundedHours);
         learningMap.put("totalLearningHours", roundedHours);
-        learningMap.put("certificates", certificates);
+        List<CertificateDTO> certDTOs = new ArrayList<>();
+        for (Certificate c : certificates) {
+            CertificateDTO cDto = new CertificateDTO();
+            cDto.setId(c.getId());
+            cDto.setCertificateId(c.getCertificateId());
+            cDto.setUserId(targetUser.getId());
+            cDto.setEmployeeId(targetUser.getEmployeeId());
+            cDto.setUserName(targetUser.getName());
+            cDto.setDepartment(targetUser.getDepartment());
+            cDto.setDesignation(targetUser.getDesignation());
+            if (c.getCourse() != null) {
+                try {
+                    cDto.setCourseId(c.getCourse().getId());
+                    cDto.setCourseTitle(c.getCourse().getTitle());
+                } catch (Exception ex) {
+                    log.warn("Could not lazily load course details for certificate {}: {}", c.getId(), ex.getMessage());
+                }
+            }
+            cDto.setScore(c.getScore());
+            cDto.setPdfUrl(c.getPdfUrl());
+            cDto.setIssuedAt(c.getIssuedAt());
+            certDTOs.add(cDto);
+        }
+        learningMap.put("certificates", certDTOs);
         response.put("learning", learningMap);
         response.put("learningDevelopment", learningMap);
 

@@ -39,6 +39,8 @@ public class PolicyAssignmentDTO {
     private Long departmentIdSnapshot;
     private Boolean acknowledged = false;
     private Long acknowledgementId;
+    private Boolean isExplicit;
+    private String derivedFromVersionNumber;
 
     public PolicyAssignmentDTO() {}
 
@@ -134,4 +136,10 @@ public class PolicyAssignmentDTO {
 
     public String getComplianceStatus() { return acknowledgementStatus; }
     public void setComplianceStatus(String complianceStatus) { this.acknowledgementStatus = complianceStatus; }
+
+    public Boolean getIsExplicit() { return isExplicit; }
+    public void setIsExplicit(Boolean isExplicit) { this.isExplicit = isExplicit; }
+
+    public String getDerivedFromVersionNumber() { return derivedFromVersionNumber; }
+    public void setDerivedFromVersionNumber(String derivedFromVersionNumber) { this.derivedFromVersionNumber = derivedFromVersionNumber; }
 }

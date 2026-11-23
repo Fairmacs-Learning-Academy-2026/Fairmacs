@@ -30,9 +30,13 @@ public final class NotificationType {
     public static final String AGREEMENT_ASSIGNED = "AGREEMENT_ASSIGNED";
     public static final String POLICY_DUE_SOON = "POLICY_DUE_SOON";
     public static final String POLICY_OVERDUE = "POLICY_OVERDUE";
+    public static final String POLICY_REMINDER = "POLICY_REMINDER";
+    public static final String POLICY_UPDATED = "POLICY_UPDATED";
     public static final String POLICY_NEW_VERSION = "POLICY_NEW_VERSION";
     public static final String POLICY_APPROVAL_REQ = "POLICY_APPROVAL_REQ";
     public static final String POLICY_DECISION = "POLICY_DECISION";
+    public static final String POLICY_ESCALATION = "POLICY_ESCALATION";
+    public static final String POLICY_DIGEST = "POLICY_DIGEST";
 
     private NotificationType() {
     }

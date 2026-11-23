@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "test": "node test-roadmap-smoke.js && node test-hr-routes-navigation.js && node test-intelligent-hover-sidebar.js && node test-assigned-learning-redesign.js && node test-create-course-modal-positioning.js && node test-course-overview-system-replacement.js && node test-hero-thumbnail-visibility-scenarios.js && node test-phase1-course-carousel-fix.js && node test-phase2-course-carousel-refinement.js && node test-phase3-assigned-course-sync.js && node test-phase4-course-overview-navigation.js && node test-phase5-cross-module-integration.js",
+    "test": "node test-roadmap-smoke.js && node test-hr-routes-navigation.js && node test-intelligent-hover-sidebar.js && node test-assigned-learning-redesign.js && node test-create-course-modal-positioning.js && node test-course-overview-system-replacement.js && node test-hero-thumbnail-visibility-scenarios.js && node test-phase1-course-carousel-fix.js && node test-phase2-course-carousel-refinement.js && node test-phase3-assigned-course-sync.js && node test-phase4-course-overview-navigation.js && node test-phase5-cross-module-integration.js && node test-stage4-manager-policies.js && node test-stage5-employee-policies.js && node test-stage6-secure-viewer-acknowledgement.js && node test-stage7-policy-automations.js && node test-stage8-reports-tracking.js && node test-policy-wise-excel-export.js && node test-course-document-watermark.js && node test-watermark-clipping-fix.js && node test-dynamic-sidebar-behaviour.js",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -23,6 +23,7 @@
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.4",
     "tailwindcss": "^4.3.3",
+    "three": "^0.187.0",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

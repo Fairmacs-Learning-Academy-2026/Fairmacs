@@ -5,7 +5,7 @@ import {
   API_BASE_URL,
   getAuthHeaders,
   handleUnauthorized,
-} from '../utils/apiConfig';
+} from '../utils/apiConfig.js';
 
 const handleAuthFailure = () => handleUnauthorized(true);
 
@@ -40,6 +40,13 @@ export const NOTIFICATION_CATEGORIES = [
   { value: 'HR_ADMIN_ALERT', label: 'HR & Admin Alerts' },
   { value: 'SYSTEM_ALERT', label: 'System Alerts' },
   { value: 'GENERAL_ANNOUNCEMENT', label: 'Announcements' },
+  { value: 'POLICY_ASSIGNED', label: 'Policy Assigned' },
+  { value: 'POLICY_DUE_SOON', label: 'Policy Due Soon' },
+  { value: 'POLICY_OVERDUE', label: 'Policy Overdue' },
+  { value: 'POLICY_REMINDER', label: 'Policy Reminder' },
+  { value: 'POLICY_UPDATED', label: 'Policy Updated' },
+  { value: 'POLICY_ESCALATION', label: 'Policy Escalation' },
+  { value: 'POLICY_DIGEST', label: 'Policy Compliance Digest' },
 ];
 
 export const NOTIFICATION_PRIORITIES = [
@@ -84,6 +91,11 @@ export const resolveNotificationNavigation = (notification) => {
     if (explicitUrl === '/calendar' || explicitUrl === '/training-calendar') return { path: '/training-calendar', tab: 'calendar' };
     if (explicitUrl === '/courses') return { path: '/courses', tab: 'catalog' };
     if (explicitUrl === '/notifications') return { path: '/notifications', tab: 'notifications' };
+    if (explicitUrl === '/profile#policies' || explicitUrl === '/profile' || explicitUrl === '/employee/policies') {
+      return { path: '/profile#policies', tab: 'profile' };
+    }
+    if (explicitUrl === '/hr/policies') return { path: '/hr/policies', tab: 'hrPolicies' };
+    if (explicitUrl === '/manager/policies') return { path: '/manager/policies', tab: 'managerPolicies' };
   }
 
   const type = String(notification.type || '').toUpperCase();
@@ -120,9 +132,27 @@ export const resolveNotificationNavigation = (notification) => {
     case 'HR_ADMIN_ALERT':
     case 'SYSTEM_ALERT':
       return { path: '/hr/overview', tab: 'hrOverview' };
+    case 'POLICY_ASSIGNED':
+    case 'POLICY_DUE_SOON':
+    case 'POLICY_OVERDUE':
+    case 'POLICY_REMINDER':
+    case 'POLICY_UPDATED':
+      return { path: '/profile#policies', tab: 'profile' };
+    case 'POLICY_APPROVAL_REQ':
+      return { path: '/hr/policies', tab: 'hrPolicies' };
+    case 'POLICY_DECISION':
+      return { path: '/manager/policies', tab: 'managerPolicies' };
+    case 'POLICY_ESCALATION':
+    case 'POLICY_DIGEST':
+      if (explicitUrl === '/manager/policies') return { path: '/manager/policies', tab: 'managerPolicies' };
+      if (explicitUrl === '/hr/policies') return { path: '/hr/policies', tab: 'hrPolicies' };
+      return { path: '/profile#policies', tab: 'profile' };
     default:
       if (refType === 'TRAINING_SESSION') {
         return { path: '/training-calendar', tab: 'calendar' };
+      }
+      if (refType === 'POLICY') {
+        return { path: '/profile#policies', tab: 'profile' };
       }
       return { path: '/notifications', tab: 'notifications' };
   }
