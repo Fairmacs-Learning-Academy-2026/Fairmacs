@@ -82,14 +82,25 @@
   --shadow-elevation-hover: 0 10px 25px -3px rgba(16, 42, 67, 0.08), 0 4px 10px -2px rgba(16, 42, 67, 0.04);
   --shadow-glow-blue: 0 0 20px rgba(22, 119, 255, 0.16);
 
-  /* Transitions */
+  /* Transitions (Emil Kowalski / animate skill precision curves) */
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-press: 120ms;
   --duration-fast: 180ms;
   --duration-normal: 260ms;
   --duration-slow: 380ms;
 }
 
 @layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overscroll-behavior-y: none;
+  }
+
   * {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     box-sizing: border-box;
@@ -104,8 +115,25 @@
     background-attachment: fixed;
     color: var(--text-primary);
     min-height: 100vh;
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  @media (max-width: 768px), (pointer: coarse) {
+    body {
+      background-attachment: scroll;
+    }
+  }
+
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
 
   button {
@@ -113,7 +141,16 @@
     border: none;
     outline: none;
     font-family: inherit;
-    transition: all var(--duration-fast) var(--ease-spring);
+    transition: transform var(--duration-press) var(--ease-out),
+      background-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
+  }
+
+  button:active:not(:disabled) {
+    transform: scale(0.97);
   }
 
   a {
@@ -653,6 +690,67 @@
 .elevation-hover:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-elevation-hover);
+}
+
+/* =========================================================
+   MOBILE-NATIVE PLATFORM LAYER & TOUCH CAPABILITY GATING
+   (Emil Kowalski / mobile-native & gestures skill rules)
+========================================================= */
+
+/* Prevent iOS Safari auto-zoom on form focus by ensuring >= 16px on touch/mobile */
+@media (pointer: coarse), (max-width: 768px) {
+  input,
+  textarea,
+  select,
+  .glass-input,
+  .input-modern,
+  .select-modern,
+  .course-builder-input,
+  .hr-ops-select {
+    font-size: 16px !important;
+  }
+}
+
+/* Isolate scroll inside drawers, modals, dropdowns, and horizontal tables */
+.modal-content,
+.glass-modal,
+.glass-dropdown,
+.table-scroll,
+.sidebar-nav-container {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent sticky :hover states on touch devices while preserving :active press feedback */
+@media (hover: none) {
+  .glass-card:hover,
+  .elevation-hover:hover,
+  .glass-button-primary:hover,
+  .btn-primary:hover,
+  .glass-button-secondary:hover,
+  .btn-secondary:hover,
+  .glass-icon-button:hover:not(:disabled),
+  .header-profile-trigger:hover,
+  .phase5-widget-card:hover,
+  .phase7-deadline-row:hover,
+  .phase7-elective-item-card:hover,
+  .hr-ops-kpi-card:hover,
+  .hr-ops-launch-tile:hover,
+  .hr-ops-dept-row:hover,
+  .hr-ops-cert-card:hover,
+  .snapshot-card:hover {
+    transform: none !important;
+  }
+
+  .glass-card:active,
+  .hr-ops-launch-tile:active,
+  .hr-ops-dept-row:active,
+  .hr-ops-cert-card:active,
+  .phase7-deadline-row:active,
+  .phase7-elective-item-card:active {
+    transform: scale(0.985) !important;
+    transition: transform 100ms var(--ease-out) !important;
+  }
 }
 
 /* Reduced Motion Preference Support */

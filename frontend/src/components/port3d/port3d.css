@@ -383,25 +383,39 @@
    RESPONSIVE BREAKPOINTS (Desktop, Tablet & Mobile)
    ========================================================================== */
 @media (max-width: 760px) {
+  .fairmacs-login-page-root {
+    min-height: 100svh;
+    padding: calc(3.75rem + env(safe-area-inset-top, 0px)) 0.85rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .fairmacs-login-home-btn {
-    top: 14px;
-    left: 14px;
-    padding: 0.4rem 0.85rem;
-    font-size: 0.76rem;
+    top: max(14px, env(safe-area-inset-top, 14px));
+    left: max(14px, env(safe-area-inset-left, 14px));
+    padding: 0.48rem 0.95rem;
+    min-height: 40px;
+    font-size: 0.78rem;
   }
 
   .fairmacs-port3d-login-assembly {
-    max-width: 318px;
-    padding: 0.5rem;
+    max-width: min(100%, 380px);
+    padding: 0.35rem;
   }
 
   .fairmacs-port3d-liquid-glass-card {
-    padding: 1.25rem 1.2rem;
+    padding: 1.45rem 1.3rem;
     border-radius: 22px;
   }
 
   .fairmacs-login-brand-img {
-    max-height: 58px;
+    max-height: 62px;
+  }
+
+  .fairmacs-floating-input {
+    font-size: 16px;
+  }
+
+  .fairmacs-signin-submit-btn {
+    min-height: 48px;
   }
 }
 

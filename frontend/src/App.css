@@ -1294,6 +1294,7 @@
   width: 100%;
   min-width: 0;
   padding: 10px 4px 16px 4px;
+  touch-action: pan-y;
 }
 
 .glass-carousel-track {
@@ -1612,6 +1613,7 @@
   background: #FFFFFF;
   border: 1px solid rgba(226, 235, 245, 0.95);
   box-shadow: 0 16px 44px rgba(31, 70, 120, 0.08), 0 2px 8px rgba(31, 70, 120, 0.04);
+  touch-action: pan-y;
 }
 
 .cinematic-slides-track {
@@ -2389,48 +2391,68 @@
   .assigned-learning-section.cinematic-carousel-shell {
     width: 100%;
     max-width: 100%;
-    min-height: 440px;
+    height: auto;
+    min-height: 380px;
     border-radius: 20px;
   }
 
   .cinematic-track-viewport {
-    min-height: 440px;
+    height: auto;
+    min-height: 380px;
     border-radius: 20px;
   }
 
   .assigned-course-hero-card {
-    padding: 1.1rem;
-    border-radius: 16px;
+    padding: 0;
+    border-radius: 20px;
+    align-items: stretch;
+  }
+
+  .carousel-card-split.cinematic-card-split {
+    padding: 1.15rem 1.15rem 3.85rem;
+    align-items: flex-start;
   }
 
   .cinematic-hero-scrim-gradient {
     background: linear-gradient(180deg, 
-      rgba(245, 248, 252, 0.98) 0%, 
-      rgba(245, 248, 252, 0.94) 62%, 
-      rgba(245, 248, 252, 0.85) 100%
+      rgba(245, 248, 252, 0.96) 0%, 
+      rgba(245, 248, 252, 0.93) 60%, 
+      rgba(245, 248, 252, 0.90) 100%
     );
   }
 
   .carousel-card-info.cinematic-info-col {
     width: 100%;
+    gap: 0.6rem;
   }
 
-  .carousel-card-bottom {
+  .carousel-card-title.cinematic-hero-title {
+    font-size: 1.25rem;
+    line-height: 1.28;
+  }
+
+  .carousel-card-bottom,
+  .carousel-card-bottom.cinematic-hero-bottom {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.85rem;
+    gap: 0.75rem;
   }
 
-  .carousel-card-action-btn {
+  .carousel-card-progress {
+    flex: 1 1 auto;
     width: 100%;
+  }
+
+  .carousel-card-action-btn,
+  .carousel-card-action-btn.cinematic-action-btn {
+    width: 100%;
+    min-height: 44px;
     justify-content: center;
   }
 
+  /* Hide overlapping right-edge stack on phone widths so course text & CTA are 100% unobstructed */
   .cinematic-previews-container {
-    display: flex;
-    right: 8px;
-    top: 36%;
-    opacity: 0.92;
+    display: none;
   }
 
   .cinematic-preview-card {
@@ -2455,13 +2477,13 @@
   }
 
   .cinematic-controls-cluster {
-    bottom: 12px;
-    padding: 3px 8px;
+    bottom: 10px;
+    padding: 4px 10px;
   }
 
   .carousel-nav-btn {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
   }
 
   .carousel-nav-prev {
@@ -3293,18 +3315,27 @@
 
 /* Mobile: Curved slide-out glass drawer + compact floating header */
 @media (max-width: 768px) {
+  .app-container {
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
   .app-main-layout {
-    padding: 10px;
+    padding: max(10px, env(safe-area-inset-top, 10px)) max(10px, env(safe-area-inset-right, 10px)) max(16px, env(safe-area-inset-bottom, 16px)) max(10px, env(safe-area-inset-left, 10px));
     gap: 12px;
   }
 
   .app-workspace-column {
     gap: 12px;
     min-height: calc(100vh - 20px);
+    min-height: calc(100dvh - 20px);
   }
 
   .mobile-menu-toggle {
     display: inline-flex;
+    min-width: 40px;
+    min-height: 40px;
   }
 
   .sidebar-top-bar {
@@ -3320,27 +3351,39 @@
     margin-bottom: 0.5rem;
   }
 
+  .sidebar-close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
   .sidebar,
   .floating-glass-sidebar,
   .sidebar.sidebar-collapsed {
     position: fixed;
-    top: 12px;
-    left: 12px;
-    bottom: 12px;
-    width: min(286px, calc(100vw - 24px));
-    height: calc(100vh - 24px);
+    top: max(10px, env(safe-area-inset-top, 10px));
+    left: max(10px, env(safe-area-inset-left, 10px));
+    bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    width: min(286px, calc(100vw - 20px));
+    height: calc(100vh - 20px);
+    height: calc(100dvh - max(10px, env(safe-area-inset-top, 10px)) - max(10px, env(safe-area-inset-bottom, 10px)));
+    max-height: calc(100dvh - max(10px, env(safe-area-inset-top, 10px)) - max(10px, env(safe-area-inset-bottom, 10px)));
     border-radius: 26px;
     z-index: 999;
     transform: translateX(calc(-100% - 28px));
-    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1),
+                opacity 0.24s cubic-bezier(0.23, 1, 0.32, 1),
+                visibility 0.34s;
     box-shadow: 0 20px 48px rgba(16, 42, 67, 0.24),
                 inset 0 1px 0 rgba(255, 255, 255, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.92);
     flex-direction: column;
     overflow-y: auto;
-    padding: 1.15rem 1rem;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding: 1.15rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
     display: flex;
-    background: rgba(242, 248, 255, 0.90);
+    background: rgba(242, 248, 255, 0.94);
     backdrop-filter: blur(24px) saturate(160%);
     -webkit-backdrop-filter: blur(24px) saturate(160%);
   }
@@ -3452,23 +3495,27 @@
   }
 
   .course-modal-overlay {
-    padding: 6px;
+    padding: 0;
+    align-items: flex-end;
   }
 
   .course-modal-container {
     width: 100vw;
-    height: 98vh;
-    max-height: 98vh;
-    border-radius: 12px;
+    height: 96vh;
+    height: 96dvh;
+    max-height: 96vh;
+    max-height: 96dvh;
+    border-radius: 20px 20px 0 0;
   }
 
   .course-modal-header {
-    padding: 0.85rem 1rem;
+    padding: 0.9rem 1.05rem;
   }
 
   .course-modal-steps {
     padding: 0.6rem 0.85rem;
     gap: 8px;
+    touch-action: pan-x;
   }
 
   .course-modal-step-item {
@@ -3481,8 +3528,57 @@
   }
 
   .course-modal-footer {
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
     gap: 8px;
+  }
+
+  /* Mobile alignment for Trainer, Manager & HR Dashboards, Heroes, Tables & Dropdowns */
+  .trainer-hero {
+    padding: 1.25rem 1.15rem !important;
+    border-radius: 16px !important;
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .trainer-hero > div:last-child {
+    width: 100%;
+    display: flex;
+    gap: 0.55rem;
+  }
+
+  .trainer-hero > div:last-child button {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .trainer-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
+  }
+
+  .table-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    border-radius: 10px;
+  }
+
+  .header-menu.glass-dropdown {
+    position: fixed !important;
+    top: 72px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .trainer-stats-grid {
+    grid-template-columns: 1fr;
   }
 }
 

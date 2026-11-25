@@ -91,6 +91,7 @@ export default function AssignedLearningCarousel({
   // Touch gesture state
   const [touchStart, setTouchStart] = useState(null);
   const [isSwiping, setIsSwiping] = useState(false);
+  const touchStartTimeRef = useRef(0);
 
   const containerRef = useRef(null);
   const interactionTimerRef = useRef(null);
@@ -216,10 +217,11 @@ export default function AssignedLearningCarousel({
     }
   };
 
-  // Touch gesture handlers for mobile & tablet swiping
+  // Touch gesture handlers for mobile & tablet swiping (distance OR velocity flick)
   const handleTouchStart = (e) => {
     if (totalCourses <= 1) return;
     setTouchStart(e.targetTouches[0].clientX);
+    touchStartTimeRef.current = performance.now();
     setIsSwiping(false);
     handleInteractionStart();
   };
@@ -237,9 +239,13 @@ export default function AssignedLearningCarousel({
     if (touchStart !== null && totalCourses > 1) {
       const currentX = e.changedTouches[0]?.clientX ?? touchStart;
       const diff = touchStart - currentX;
-      if (diff > 45) {
+      const elapsed = Math.max(1, performance.now() - (touchStartTimeRef.current || performance.now()));
+      const velocity = Math.abs(diff) / elapsed; // px/ms
+      const isFastFlick = Math.abs(diff) > 20 && velocity > 0.35;
+
+      if (diff > 45 || (diff > 0 && isFastFlick)) {
         handleNext();
-      } else if (diff < -45) {
+      } else if (diff < -45 || (diff < 0 && isFastFlick)) {
         handlePrev();
       }
     }
