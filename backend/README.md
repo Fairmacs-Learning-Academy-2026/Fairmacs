@@ -75,7 +75,7 @@ export FRONTEND_BASE_URL=https://lms.fairmacs.com
 export ZOHO_CLIENT_ID=<your-zoho-client-id>
 export ZOHO_CLIENT_SECRET=<your-zoho-client-secret>
 export ZOHO_TOKEN_ENCRYPTION_KEY=<32-byte-base64-encryption-key>
-export ZOHO_REDIRECT_URI=https://<backend-domain>/api/integrations/zoho/callback
+export ZOHO_REDIRECT_URI=https://fairmacs-lms-api.onrender.com/api/integrations/zoho/callback
 
 # Transactional Email Notification Channel (ZeptoMail)
 export NOTIFICATION_EMAIL_ENABLED=false

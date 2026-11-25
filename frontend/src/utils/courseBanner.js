@@ -50,7 +50,7 @@ export function isDefaultThumbnail(bannerOrCourse) {
 function getApiHost() {
   const envBase = (
     (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_BASE_URL) ||
-    (typeof import.meta !== 'undefined' && import.meta?.env?.PROD ? '' : 'http://localhost:8080/api')
+    (typeof import.meta !== 'undefined' && import.meta?.env?.PROD ? 'https://fairmacs-lms-api.onrender.com/api' : 'http://localhost:8080/api')
   ).trim();
   if (envBase.startsWith('http://') || envBase.startsWith('https://')) {
     return envBase.replace(/\/api\/?$/, '');

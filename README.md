@@ -351,7 +351,7 @@ Configure the following environment variables on your system, or supply them in 
 | `JWT_SECRET` | 256-bit secret key for HMAC SHA JWT | **Yes** | `404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970` |
 | `ZOHO_CLIENT_ID` | Zoho WorkDrive API Client ID | Optional | `1000.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX` |
 | `ZOHO_CLIENT_SECRET` | Zoho WorkDrive API Client Secret | Optional | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `ZOHO_REDIRECT_URI` | Zoho OAuth 2.0 Redirect URI | Optional | `http://localhost:8080/api/integrations/zoho/callback` |
+| `ZOHO_REDIRECT_URI` | Zoho OAuth 2.0 Redirect URI | Optional | `https://fairmacs-lms-api.onrender.com/api/integrations/zoho/callback` |
 | `ZOHO_TOKEN_ENCRYPTION_KEY` | 32-byte Base64 AES key for OAuth tokens | Optional | `k8yW5f8f9Q3b4+6fX+7t8Y8Z...` |
 | `ZOHO_COURSE_DOCUMENTS_FOLDER_ID` | Target folder ID in Zoho WorkDrive | Optional | `uqi2q368e8c06e5bc44de87954550476aa546` |
 | `server.port` / `PORT` | Spring Boot HTTP port (Render injects `$PORT`) | No | `8080` (default) |
@@ -363,7 +363,8 @@ Configure the following environment variables on your system, or supply them in 
 Create a file named `.env` in the `frontend/` folder (or copy from `.env.example`):
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080/api
+VITE_API_BASE_URL=https://fairmacs-lms-api.onrender.com/api
+# Or for local backend: http://localhost:8080/api
 ```
 
 ---

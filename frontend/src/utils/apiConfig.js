@@ -26,7 +26,7 @@ export function getApiBaseUrl() {
 
   const isProd = typeof import.meta !== 'undefined' && import.meta?.env?.PROD;
   if (isProd) {
-    return '/api';
+    return 'https://fairmacs-lms-api.onrender.com/api';
   }
 
   return 'http://localhost:8080/api';

@@ -12,7 +12,7 @@ spring.application.name=fairmacs-lms
 # Zoho WorkDrive Integration (OAuth 2.0)
 zoho.client-id=${ZOHO_CLIENT_ID:your_zoho_client_id}
 zoho.client-secret=${ZOHO_CLIENT_SECRET:your_zoho_client_secret}
-zoho.redirect-uri=${ZOHO_REDIRECT_URI:http://localhost:8080/api/integrations/zoho/callback}
+zoho.redirect-uri=${ZOHO_REDIRECT_URI:https://fairmacs-lms-api.onrender.com/api/integrations/zoho/callback}
 zoho.accounts-url=https://accounts.zoho.com
 zoho.api-base-url=https://www.zohoapis.com/workdrive
 zoho.download-base-url=https://download.zoho.com
