@@ -2,10 +2,12 @@ package com.fairmacs.lms.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -478,7 +480,11 @@ public class HrAdminService {
             mandatoryComplianceRate = (mandatoryCompleted * 100.0) / mandatoryEnrollments.size();
         }
 
-        List<Map<String, Object>> departmentStats = buildDepartmentStats(employees, enrollments);
+        List<User> activeEmployeesList = employees.stream()
+                .filter(user -> user.getStatus() == UserStatus.ACTIVE)
+                .toList();
+
+        List<Map<String, Object>> departmentStats = buildDepartmentStats(activeEmployeesList, enrollments);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("totalEmployees", totalEmployees);
@@ -494,44 +500,66 @@ public class HrAdminService {
     }
 
     private List<Map<String, Object>> buildDepartmentStats(
-            List<User> employees,
+            List<User> activeEmployees,
             List<Enrollment> enrollments
     ) {
-        return employees.stream()
+        return activeEmployees.stream()
                 .map(User::getDepartment)
                 .filter(department -> department != null && !department.isBlank())
                 .distinct()
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .map(department -> {
-                    List<User> departmentEmployees = employees.stream()
+                    List<User> departmentEmployees = activeEmployees.stream()
                             .filter(user -> department.equalsIgnoreCase(user.getDepartment()))
                             .toList();
 
                     long total = departmentEmployees.size();
                     long completed = 0;
+                    int totalAssignedCourses = 0;
+                    List<Double> learnerProgressList = new ArrayList<>();
 
                     for (User employee : departmentEmployees) {
-                        List<Enrollment> mandatory = enrollments.stream()
+                        List<Enrollment> assignedEnrollments = enrollments.stream()
                                 .filter(e -> e.getUser() != null && employee.getId().equals(e.getUser().getId()))
-                                .filter(e -> e.getEnrollmentType() == EnrollmentType.MANDATORY)
+                                .filter(e -> e.getEnrollmentType() == EnrollmentType.MANDATORY
+                                        || e.getEnrollmentType() == EnrollmentType.RECOMMENDED)
                                 .toList();
 
-                        if (!mandatory.isEmpty()) {
-                            boolean allCompleted = mandatory.stream()
-                                    .allMatch(e -> e.getStatus() == EnrollmentStatus.COMPLETED);
-                            if (allCompleted) {
+                        if (!assignedEnrollments.isEmpty()) {
+                            totalAssignedCourses += assignedEnrollments.size();
+
+                            boolean hasCompletedAssignedCourse = assignedEnrollments.stream()
+                                    .anyMatch(e -> e.getStatus() == EnrollmentStatus.COMPLETED);
+                            if (hasCompletedAssignedCourse) {
                                 completed++;
                             }
+
+                            double employeeAvgProgress = assignedEnrollments.stream()
+                                    .mapToInt(e -> (e.getStatus() == EnrollmentStatus.COMPLETED)
+                                            ? 100
+                                            : (e.getProgressPercent() != null ? e.getProgressPercent() : 0))
+                                    .average()
+                                    .orElse(0.0);
+                            learnerProgressList.add(employeeAvgProgress);
                         }
                     }
 
-                    double rate = total == 0 ? 0 : (completed * 100.0) / total;
+                    double rate = learnerProgressList.isEmpty()
+                            ? 0.0
+                            : learnerProgressList.stream()
+                                    .mapToDouble(Double::doubleValue)
+                                    .average()
+                                    .orElse(0.0);
+
+                    boolean hasAssignedTraining = totalAssignedCourses > 0;
 
                     Map<String, Object> stat = new LinkedHashMap<>();
                     stat.put("department", department);
                     stat.put("total", total);
                     stat.put("completed", completed);
                     stat.put("rate", round(rate));
+                    stat.put("assignedCoursesCount", totalAssignedCourses);
+                    stat.put("hasAssignedTraining", hasAssignedTraining);
 
                     return stat;
                 })

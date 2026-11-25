@@ -125,7 +125,7 @@ export const hrAdminService = {
   },
 
   async downloadImportTemplate() {
-    const token = getToken();
+    const token = getAuthToken();
     const response = await fetch(`${API_BASE}/employees/import-template`, {
       method: "GET",
       headers: {

@@ -1,7 +1,8 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useState, useEffect } from 'react';
 import HrAnnouncementsPanel from './HrAnnouncementsPanel';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = SHARED_API_BASE_URL;
 
 export default function HrAnnouncementsPage() {
   const [departments, setDepartments] = useState([]);
@@ -11,7 +12,7 @@ export default function HrAnnouncementsPage() {
     async function loadDepartments() {
       try {
         const token = localStorage.getItem('fairmacs_token') || localStorage.getItem('token');
-        const response = await fetch(`${API_BASE_URL}/departments`, {
+        const response = await authFetch(`${API_BASE_URL}/departments`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (!response.ok) return;

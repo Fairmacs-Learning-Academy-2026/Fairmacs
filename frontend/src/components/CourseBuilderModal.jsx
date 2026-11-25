@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -151,7 +152,7 @@ const makeModule = (orderIndex = 1) => ({
   lessons: [makeLesson()], quiz: null
 });
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+const API_BASE = SHARED_API_BASE_URL;
 
 function readToken() {
   return localStorage.getItem('fairmacs_token') || localStorage.getItem('token') || '';
@@ -159,7 +160,7 @@ function readToken() {
 
 async function apiRequest(path, options = {}) {
   const token = readToken();
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await authFetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -192,7 +193,7 @@ async function uploadLessonDocument(file) {
   formData.append('file', file);
   const token = readToken();
 
-  const response = await fetch(`${API_BASE}/integrations/zoho/documents/upload`, {
+  const response = await authFetch(`${API_BASE}/integrations/zoho/documents/upload`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData
@@ -220,7 +221,7 @@ async function uploadThumbnailImage(file) {
   formData.append('file', file);
   const token = readToken();
 
-  const response = await fetch(`${API_BASE}/courses/thumbnails/upload`, {
+  const response = await authFetch(`${API_BASE}/courses/thumbnails/upload`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData

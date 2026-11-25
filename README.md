@@ -1,17 +1,8 @@
-# Fairmacs Knowledge Management System
+# Fairmacs Knowledge Management System (KMS)
 
-[![Spring Boot 3](https://img.shields.io/badge/Spring%20Boot-3.2.0-brightgreen.svg?logo=springboot)](https://spring.io/projects/spring-boot)
-[![React 19](https://img.shields.io/badge/React-19.2.8-blue.svg?logo=react)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-8.3.0-646CFF.svg?logo=vite)](https://vite.dev/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-4169E1.svg?logo=postgresql)](https://supabase.com/)
-[![Zoho WorkDrive](https://img.shields.io/badge/Zoho-WorkDrive%20OAuth2-FF6600.svg?logo=zoho)](https://workdrive.zoho.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-v4-38B2AC.svg?logo=tailwind-css)](https://tailwindcss.com/)
-[![Java](https://img.shields.io/badge/Java-17%20LTS-ED8B00.svg?logo=openjdk)](https://adoptium.net/)
-[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](#license)
+**Fairmacs KMS** is a modern, enterprise-grade Knowledge Management System engineered specifically for corporate workforce training, role-based skill development, regulatory compliance auditing, corporate policy governance, and verifiable credentialing across global freight forwarding, shipping, and logistics operations.
 
-**Fairmacs KMS** is a modern, enterprise-grade Knowledge Management System engineered specifically for corporate workforce training, role-based skill development, mandatory compliance tracking, and verifiable credentialing across global freight forwarding and logistics operations.
-
-Built on an asynchronous, decoupled architecture with a **React 19 + Vite** single-page application on the frontend and a **Spring Boot 3 + PostgreSQL (Supabase)** microservice-ready backend, with integrated cloud document storage via **Zoho WorkDrive OAuth 2.0**.
+Built on an asynchronous, decoupled architecture with a **React 19 + Vite** single-page application on the frontend and a **Spring Boot 3 + PostgreSQL (Supabase)** microservice-ready backend, featuring integrated cloud document storage via **Zoho WorkDrive OAuth 2.0** and dynamic confidential document watermarking.
 
 ---
 
@@ -30,7 +21,23 @@ Built on an asynchronous, decoupled architecture with a **React 19 + Vite** sing
 - [Getting Started Locally](#-getting-started-locally)
   - [1. Backend Setup (Spring Boot)](#1-backend-setup-spring-boot)
   - [2. Frontend Setup (React + Vite)](#2-frontend-setup-react--vite)
+- [Automated Verification & Test Suites](#-automated-verification--test-suites)
 - [Complete REST API Reference](#-complete-rest-api-reference)
+  - [1. Authentication & User Profile](#1-authentication--user-profile)
+  - [2. Course Catalog & Curriculum](#2-course-catalog--curriculum)
+  - [3. Course Drafts (Authoring in Progress)](#3-course-drafts-authoring-in-progress)
+  - [4. Course Assignment Engine](#4-course-assignment-engine)
+  - [5. Enrollments & Learning Progress](#5-enrollments--learning-progress)
+  - [6. Quizzes & Assessments](#6-quizzes--assessments)
+  - [7. Certificates & Verification](#7-certificates--verification)
+  - [8. Corporate Policies & Agreements (Employee)](#8-corporate-policies--agreements-employee)
+  - [9. Department Policies & Supervision (Manager)](#9-department-policies--supervision-manager)
+  - [10. Enterprise Policy Governance (HR / Admin)](#10-enterprise-policy-governance-hr--admin)
+  - [11. Department Management & Roster](#11-department-management--roster)
+  - [12. HR Admin & Employee Directory](#12-hr-admin--employee-directory)
+  - [13. Reports & Analytics](#13-reports--analytics)
+  - [14. Learning & Compliance Calendar](#14-learning--compliance-calendar)
+  - [15. Zoho WorkDrive Integration](#15-zoho-workdrive-integration)
 - [Production Build & Deployment](#-production-build--deployment)
 - [Security Auditing & Clean Git Policies](#-security-auditing--clean-git-policies)
 - [License](#-license)
@@ -39,76 +46,84 @@ Built on an asynchronous, decoupled architecture with a **React 19 + Vite** sing
 
 ## 🚀 Core Capabilities & Highlights
 
-### 1. 🎓 Course Authoring & Curriculum Management
-- **Hierarchical Course Structure**: Author full courses partitioned into sequential Modules and Lessons.
-- **Rich Media & Multi-Format Content**: Embed video lectures (YouTube, MP4 streams) and cloud-hosted documents (PDF, DOCX) directly into lesson steps.
-- **Draft & Versioning Flow**: Save multi-module drafts incrementally with auto-save before publishing to the active catalog.
-- **Zoho WorkDrive Cloud Uploads**: Seamlessly attach documents to course lessons directly via the Zoho WorkDrive integration.
+### 1. 🎓 Course Authoring & Curriculum Wizard
+- **Step-by-Step Course Builder Wizard**: Author courses through a polished Fairmacs blue glassmorphism wizard with cached reference data preloading.
+- **Hierarchical Curriculum**: Partition courses into sequential Modules and Lessons with fine-grained sequencing controls.
+- **Rich Media & Document Integration**: Embed video lectures (YouTube, MP4 streams) and cloud-hosted documents (PDF, DOCX) directly into lesson steps.
+- **Multi-Module Draft Management**: Save multi-module drafts incrementally with auto-save before publishing to the active catalog.
+- **Zoho WorkDrive Cloud Integration**: Seamlessly upload and stream training documents via enterprise Zoho WorkDrive folders.
 
-### 2. 🎯 Course Assignment & Targeted Enrollment Engine
-- **Targeted Training Delivery**: Assign courses by **Department**, **Employee Group**, or **Individual Employees**.
-- **Mandatory vs. Elective Designations**: Enforce strict completion due dates on compliance-critical courses with automated overdue tracking.
-- **Self-Paced Learning**: Employees can explore the open catalog, self-enroll, and track individual skill milestones.
+### 2. 🎯 Course Assignment & Carousel Engine
+- **Targeted Training Delivery**: Assign courses by **Department**, **Employee Group**, or **Individual Employees** with mandatory/elective designations.
+- **Universal Assigned Learning Carousel**: Animated course carousel on the Employee, Manager, and HR/Admin dashboards displaying only courses assigned to the signed-in user, gracefully handling 0, 1, or N enrollments without blank spaces or loop errors.
+- **Self-Paced Learning**: Employees can explore the catalog, self-enroll in electives, and monitor curriculum milestones.
 
-### 3. 🧪 Server-Authoritative Quiz & Assessment Engine
-- **Anti-Cheat & Server-Side Evaluation**: Quiz questions, answers, and scoring thresholds are securely evaluated on the backend.
+### 3. 🧪 Server-Authoritative Assessments & Bulk Quiz Import
+- **Anti-Cheat Server-Side Evaluation**: Quiz questions, answers, and scoring thresholds are securely evaluated on the backend.
 - **Timed Attempts**: Configurable timers and attempt ceilings with automated result calculations.
-- **Real-Time Grade Feedback**: Detailed score summaries, passing grade verifications, and instant review capabilities.
+- **Bulk Quiz Import (`.xlsx`)**: Rapidly import multi-question assessments using standardized Excel templates with automatic question parsing and validation.
 
 ### 4. 📜 Automated Verifiable PDF Certification
-- **Dynamic Certificate Generation**: Upon course completion and passing grade validation, an official PDF certificate is generated server-side using OpenPDF.
+- **Dynamic PDF Certificate Generation**: Automatically generated upon course completion and passing score validation using OpenPDF.
 - **Unique Verification Identifier**: Every certificate receives a tamper-resistant serial ID (e.g., `FM-CERT-2026-9516`).
-- **In-App Viewer & Downloader**: Interactive modal certificate preview with direct PDF download and browser-side verification.
+- **Interactive Verification Registry**: Public and authenticated credential verification with live in-app preview.
 
-### 5. 🏢 Department Management & Course Matrix
-- **Department Drilldowns**: Inspect departmental headcounts, active courses, average completion metrics, and managers.
-- **Course Matrix View**: Matrix mapping of department members against assigned courses to pinpoint knowledge gaps.
+### 5. 📑 Corporate Policies & SOP Agreements Module
+- **End-to-End Acknowledgement Flow**: Distribute mandatory and recommended compliance policies with legal acknowledgement capture (IP address, user agent, timestamp).
+- **Manager Policy Oversight (`/manager/policies`)**: Scoped departmental dashboard with overview metrics, document library, submission tracking, pending reminder dispatch, and Excel reports.
+- **HR Policy Administration (`/hr/policies`)**: Centralized policy lifecycle management, batch department assignment, compliance audit tracking, automated reminders, and policy-wise Excel export.
+- **Secure PDF Viewer with Dynamic Watermarking**: In-browser document viewer stamping dynamic rotated non-clipping watermarks (`PROPERTY OF FAIRMACS - CONFIDENTIAL`, employee name, ID, timestamp) using exact trigonometric bounding calculations across portrait, landscape, and custom page sizes.
 
-### 6. 👥 Comprehensive Employee Lifecycle & Bulk Import
+### 6. 📅 Learning & Compliance Calendar
+- **Multi-Source Event Aggregation**: Unifies scheduled live sessions (`/api/training-calendar`), assigned course deadlines, and policy acknowledgement deadlines into a single corporate calendar.
+- **Strict Policy Due Date Rule**: Policies without due dates are strictly excluded from calendar events, preventing open-ended documents from displaying as overdue milestones.
+- **Timezone-Safe Parsing**: Employs local date decomposition (`parseLocalDate`) to eliminate UTC midnight date-shifting across timezones.
+- **Month, Week & Agenda Views**: Standardized desktop calendar with an Agenda view optimized for mobile devices.
+- **Compact Dashboard Widget (`UpcomingTrainingWidget`)**: Embedded on the Employee, Manager, and HR/Admin dashboards with overdue prioritization and direct contextual actions (*Join*, *Continue*, *Review*).
+
+### 7. 🏢 Departmental Training Analytics & Drilldown
+- **Operational Progress Analytics**: Department completion rate calculated across active learners with assigned training, accurately distinguishing *"No Training Assigned"* from *"0% Needs Focus"*.
+- **Fairmacs Blue Glassmorphism Drilldown Modal**: Portaled viewport modal (`createPortal` to `document.body`) completely immune to sticky header clipping or parent overflow boundaries, with direct *"Go to Courses"* navigation.
+
+### 8. 👥 Workforce Lifecycle & Bulk Excel Import
 - **Lifecycle Status Tracking**: Full lifecycle states (`ACTIVE`, `INACTIVE`, `ON_LEAVE`, `TERMINATED`).
 - **Bulk Excel Import (`.xlsx`)**: High-performance batch onboarding powered by Apache POI with fuzzy column matching, automated validation, department assignment, and initial password generation.
-- **Role Assignment**: Dynamically allocate and update employee roles (`EMPLOYEE`, `TRAINER`, `MANAGER`, `HR_ADMIN`).
+- **Role Allocation**: Dynamically allocate and update employee roles (`EMPLOYEE`, `TRAINER`, `MANAGER`, `HR_ADMIN`, `SUPER_ADMIN`).
 
-### 7. 📊 Advanced Analytics & Multi-Format Reporting
-- **HR Compliance Hub**: System-wide completion rates, department-level compliance metrics, and overdue training registries.
-- **Manager Team Transcripts**: Granular team reporting with employee-by-employee progress, scores, and completion histories.
-- **One-Click Multi-Format Export**: Export any analytics table instantly to **Microsoft Excel (`.xlsx`)** via `exceljs` or **PDF** via `jspdf` & `jspdf-autotable`.
-
-### 8. 📅 Corporate Training Calendar & Notifications
-- **Event Scheduling**: Schedule Workshops, Webinars, Assessments, and Deadlines with targeted audiences (`ALL`, `DEPARTMENT`, or `EMPLOYEES`).
-- **Interactive Calendar UI**: Monthly, weekly, and day-filtered views of upcoming corporate training sessions.
-- **Real-Time Notification Center**: Push notifications for new course assignments, deadline reminders, quiz attempts, and certificates.
-
-### 9. ☁️ Zoho WorkDrive Cloud Storage Integration
-- **OAuth 2.0 Authorization**: Secure authorization flow with authorization code exchange and automated background token renewal.
-- **AES-256 Encrypted Token Persistence**: OAuth refresh tokens are encrypted at rest in the database using AES-GCM.
-- **Document Streaming Proxy**: Documents are streamed securely from Zoho WorkDrive through the backend without exposing raw cloud credentials to clients.
+### 9. 🧭 Intelligent Hover-Based Proximity Sidebar
+- **Proximity Detection**: Auto-hides by default and emerges smoothly when the cursor enters an 8–16px left-edge proximity threshold, with debounced retraction.
+- **Liquid Glass Aesthetic**: Apple-inspired Liquid Glass material with specular highlights and fluid icon keyframe animations.
+- **Body-Mounted Tooltip Portal**: Hover tooltips mount directly to `document.body`, ensuring 100% immunity to overflow clipping.
+- **Dedicated HR Architecture**: 9 standalone dedicated HR administration routes (`/hr/overview`, `/hr/courses`, `/hr/drafts`, `/hr/employees`, `/hr/departments`, `/hr/certificates`, `/hr/policies`, `/hr/announcements`, `/hr/settings`).
 
 ---
 
 ## 👥 Role-Based Access Control (RBAC)
 
-The system enforces strict Spring Security method-level authorization (`@PreAuthorize`) and frontend route guards across four distinct user roles:
+The system enforces strict Spring Security method-level authorization (`@PreAuthorize`) and frontend route guards across five distinct user roles:
 
-| Capability / Resource | Employee | Trainer | Manager | HR Admin |
-|---|:---:|:---:|:---:|:---:|
-| Browse Public Course Catalog | ✅ | ✅ | ✅ | ✅ |
-| Track Personal Learning & Progress | ✅ | ✅ | ✅ | ✅ |
-| Take Quizzes & Download Certificates | ✅ | ✅ | ✅ | ✅ |
-| Access In-App Notifications | ✅ | ✅ | ✅ | ✅ |
-| View Corporate Training Calendar | ✅ | ✅ | ✅ | ✅ |
-| Course Builder & Curriculum Authoring | ❌ | ✅ | ❌ | ✅ |
-| Manage Draft Courses | ❌ | ✅ | ❌ | ✅ |
-| Upload Course Documents to Zoho | ❌ | ✅ | ❌ | ✅ |
-| View Direct Reports' Training Transcripts | ❌ | ❌ | ✅ | ✅ |
-| Monitor Team Compliance & Overdue Status | ❌ | ❌ | ✅ | ✅ |
-| Department Management & Course Matrix | ❌ | ❌ | ❌ | ✅ |
-| Assign Courses (Department / Employee) | ❌ | ❌ | ❌ | ✅ |
-| Employee Directory & Profile Management | ❌ | ❌ | ❌ | ✅ |
-| Bulk Excel Employee Import (`.xlsx`) | ❌ | ❌ | ❌ | ✅ |
-| Connect / Manage Zoho WorkDrive OAuth | ❌ | ❌ | ❌ | ✅ |
-| Schedule Training Sessions & Deadlines | ❌ | ✅ | ✅ | ✅ |
-| System-Wide Audit & HR Analytics | ❌ | ❌ | ❌ | ✅ |
+| Capability / Resource | Employee | Trainer | Manager | HR Admin | Super Admin |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Browse Public Course Catalog | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Track Personal Learning & Progress | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Take Quizzes & Download Certificates | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Acknowledge Corporate Policies | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Access In-App Notifications | ✅ | ✅ | ✅ | ✅ | ✅ |
+| View Learning & Compliance Calendar | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Course Builder & Curriculum Authoring | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Manage Draft Courses | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Upload Course Documents to Zoho | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Manage Course Assignments | ❌ | ✅ | ❌ | ✅ | ✅ |
+| View Team Transcripts & Progress | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Department Policy Supervision (`/manager/policies`) | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Verify Certificates in Registry | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Enterprise Policy Administration (`/hr/policies`) | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Department Management & Drilldowns | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Employee Directory & Profile Management | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Bulk Excel Employee Import (`.xlsx`) | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Connect / Manage Zoho WorkDrive OAuth | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Schedule Training Sessions & Deadlines | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Organization-Wide Audit & HR Analytics | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ---
 
@@ -117,34 +132,39 @@ The system enforces strict Spring Security method-level authorization (`@PreAuth
 ```mermaid
 flowchart TD
     subgraph Client["Frontend Client (React 19 + Vite)"]
-        UI[Tailwind CSS & Lucide Icons]
-        Router[React Router v7 Guards]
-        State[Zustand Stores & AuthContext]
-        Docs[Docx & PDF Previews / Export]
+        UI["Tailwind CSS & Liquid Glass Design"]
+        Sidebar["Intelligent Proximity-Hover Sidebar"]
+        Router["React Router v7 Protected Routes"]
+        State["Zustand Stores & AuthContext"]
+        Widgets["UpcomingTrainingWidget & Carousels"]
+        Viewer["Secure PDF Viewer with Dynamic Watermarking"]
+        Calendar["Learning & Compliance Calendar"]
     end
 
     subgraph Security["Security & API Gateway"]
-        CORS[CORS Filter]
-        JWT[JwtAuthenticationFilter]
-        RBAC[Spring Security RBAC @PreAuthorize]
+        CORS["CORS Filter"]
+        JWT["JwtAuthenticationFilter"]
+        RBAC["Spring Security RBAC (@PreAuthorize)"]
     end
 
     subgraph Backend["Spring Boot 3 REST Application"]
-        AuthCtrl[Auth Controller]
-        CourseCtrl[Course & Authoring Controller]
-        AssignCtrl[Course Assignment Controller]
-        EnrollCtrl[Enrollment & Progress Controller]
-        QuizCtrl[Quiz & Assessment Controller]
-        CertCtrl[Certificate Engine]
-        DeptCtrl[Department & HR Controller]
-        TrainCtrl[Training Session Controller]
-        ZohoCtrl[Zoho WorkDrive Proxy & OAuth]
-        PoiService[Apache POI Excel Importer]
+        AuthCtrl["Auth Controller"]
+        CourseCtrl["Course & Authoring Controller"]
+        AssignCtrl["Course Assignment Controller"]
+        EnrollCtrl["Enrollment & Progress Controller"]
+        QuizCtrl["Quiz & Assessment Controller"]
+        CertCtrl["Certificate Controller"]
+        PolicyCtrl["Policy Employee / Manager / HR Controllers"]
+        DeptCtrl["Department & HR Controller"]
+        CalCtrl["Training Session & Calendar Controller"]
+        ZohoCtrl["Zoho WorkDrive Proxy & OAuth Controller"]
+        PoiService["Apache POI Excel Importer"]
+        WatermarkService["Policy Watermark Service"]
     end
 
     subgraph Storage["External Cloud & Persistence"]
-        DB[(PostgreSQL / Supabase)]
-        Zoho[(Zoho WorkDrive API)]
+        DB[("PostgreSQL (Supabase)")]
+        Zoho[("Zoho WorkDrive Cloud API")]
     end
 
     Client -->|HTTPS + Bearer JWT| Security
@@ -160,16 +180,18 @@ flowchart TD
 ### Frontend Architecture
 | Component | Technology | Version | Description |
 |---|---|---|---|
-| **Framework** | [React](https://react.dev/) | `19.2.8` | Declarative component UI library |
+| **Framework** | [React](https://react.dev/) | `19.2.8` | Component UI library |
 | **Bundler & Server** | [Vite](https://vite.dev/) | `8.3.0` | Ultra-fast build tool and HMR dev server |
 | **Routing** | [React Router](https://reactrouter.com/) | `7.x` | Client-side declarative routing and role guards |
 | **State Management** | [Zustand](https://zustand.docs.pmnd.rs/) | `5.x` | Minimalist and fast centralized state management |
 | **Styling** | [Tailwind CSS](https://tailwindcss.com/) | `4.x` | Utility-first styling framework |
-| **Icons** | [Lucide React](https://lucide.dev/) | `1.47.0` | Modern, consistent icon library |
-| **Excel Export** | [ExcelJS](https://github.com/exceljs/exceljs) | `4.4.0` | Client-side spreadsheet generation |
-| **PDF Export** | [jsPDF](https://github.com/parallax/jsPDF) + AutoTable | `4.2.1` | In-browser PDF generation and table exports |
+| **Icons** | [Lucide React](https://lucide.dev/) | `1.47.0` | Modern, consistent enterprise icon library |
+| **Spreadsheet Ingestion & Export** | [ExcelJS](https://github.com/exceljs/exceljs) | `4.4.0` | Client-side spreadsheet generation and exports |
+| **PDF Rendering & Export** | [jsPDF](https://github.com/parallax/jsPDF) + AutoTable | `4.2.1` | In-browser PDF generation and table exports |
+| **PDF Processing & Worker** | [pdfjs-dist](https://github.com/mozilla/pdf.js) | `6.5.438` | High-performance PDF parsing and canvas rendering |
 | **Document Viewer** | [docx-preview](https://github.com/Volser/docx-preview) | `0.4.1` | Client-side DOCX rendering without server dependency |
 | **Micro-Animations** | [canvas-confetti](https://www.npmjs.com/package/canvas-confetti) | `1.9.4` | Visual celebration upon course completion |
+| **3D Rendering** | [Three.js](https://threejs.org/) | `0.187.0` | Maritime port backdrop visuals |
 
 ### Backend Architecture
 | Component | Technology | Version | Description |
@@ -180,7 +202,7 @@ flowchart TD
 | **Database ORM** | Spring Data JPA / Hibernate | `6.x` | Relational data mapping and repository abstraction |
 | **Database** | PostgreSQL ([Supabase](https://supabase.com/)) | `15+` | Enterprise-grade cloud relational database |
 | **PDF Generation** | [OpenPDF](https://github.com/LibrePDF/OpenPDF) | `1.3.39` | High-fidelity server-side certificate rendering |
-| **Excel Ingestion** | [Apache POI](https://poi.apache.org/) (poi-ooxml) | `5.4.1` | High-performance Excel (`.xlsx`) bulk employee parser |
+| **Excel Ingestion** | [Apache POI](https://poi.apache.org/) (poi-ooxml) | `5.4.1` | High-performance Excel (`.xlsx`) bulk employee and quiz parser |
 | **HTTP Client** | Spring `RestTemplate` | `3.2.0` | Secure integration client for Zoho WorkDrive |
 | **Build Tool** | Apache Maven | `3.8+` | Dependency management and build automation |
 
@@ -198,33 +220,44 @@ fairmacs-lms/
 │   ├── public/                                # Public assets & branding icons
 │   ├── src/
 │   │   ├── components/                        # Modular React views and widgets
+│   │   │   ├── AssignedLearningCarousel.jsx   # Role-aware assigned course carousel
 │   │   │   ├── CourseAssignmentModal.jsx      # Department & employee course assignment
-│   │   │   ├── CourseBuilderModal.jsx         # Curriculum creator (Modules, Lessons, Docs)
-│   │   │   ├── CourseViewer.jsx               # Interactive video & document lesson player
-│   │   │   ├── DepartmentCourseEmployees.jsx  # Department course employee matrix
-│   │   │   ├── DepartmentDetails.jsx          # Department-specific metrics & team
+│   │   │   ├── CourseBuilderModal.jsx         # Glassmorphism course authoring wizard
+│   │   │   ├── CourseViewer.jsx               # Lesson player with secure PDF watermark
 │   │   │   ├── DepartmentManagement.jsx       # Department list, metrics & actions
-│   │   │   ├── Drafts.jsx                     # Saved course drafts editor
-│   │   │   ├── EmployeeManagement.jsx         # Employee CRUD & Excel import modal
-│   │   │   ├── HrAdminDashboard.jsx           # Main HR administration control center
-│   │   │   ├── ManagerAllCourses.jsx          # Manager catalog oversight view
-│   │   │   ├── ManagerDashboard.jsx           # Manager team progress dashboard
-│   │   │   ├── MyLearning.jsx                 # Learner enrolled courses and progress
-│   │   │   ├── Overview.jsx                   # High-level learner dashboard summary
-│   │   │   ├── QuizModal.jsx                  # Timed assessment engine
-│   │   │   ├── ReportsView.jsx                # Multi-format report center (Excel & PDF)
-│   │   │   ├── TrainerDashboard.jsx           # Trainer course catalog & draft control
-│   │   │   ├── TrainingAssignmentModal.jsx    # Session scheduling & attendee selection
-│   │   │   ├── TrainingCalendar.jsx           # Interactive corporate calendar
-│   │   │   └── ...
+│   │   │   ├── HrAdminDashboard.jsx           # Redesigned HR/Admin operations workspace
+│   │   │   ├── HrCoursesPage.jsx              # Dedicated HR assigned courses view
+│   │   │   ├── HrDraftsPage.jsx               # Dedicated HR course drafts view
+│   │   │   ├── HrCertificatesPage.jsx         # Dedicated HR certificate registry
+│   │   │   ├── HrAnnouncementsPage.jsx        # Dedicated HR broadcast announcements
+│   │   │   ├── HrSettingsPage.jsx             # Dedicated HR governance & settings
+│   │   │   ├── ManagerDashboard.jsx           # Redesigned team supervision workspace
+│   │   │   ├── Overview.jsx                   # Redesigned employee overview workspace
+│   │   │   ├── TrainerDashboard.jsx           # Redesigned trainer authoring workspace
+│   │   │   ├── TrainingCalendar.jsx           # Learning & Compliance Calendar (Month, Week, Agenda)
+│   │   │   ├── dashboard/                     # Shared modular dashboard widgets
+│   │   │   │   ├── UpcomingTrainingWidget.jsx # Compact unified training & deadlines widget
+│   │   │   │   ├── LearningStreaks.jsx        # Activity consistency rings
+│   │   │   │   ├── LearningProgress.jsx       # Curriculum snapshot and metric cards
+│   │   │   │   ├── SmartLearningCard.jsx      # Priority-driven next-up action card
+│   │   │   │   └── PoliciesWidget.jsx         # Overview policy acknowledgement widget
+│   │   │   └── policies/                      # Corporate policies & agreements module
+│   │   │       ├── PolicyHrManagement.jsx     # Centralized HR policy control hub
+│   │   │       ├── PolicyPdfViewerModal.jsx   # Secure PDF viewer with dynamic watermark
+│   │   │       └── manager/                   # Managerial policy supervision tabs
 │   │   ├── context/
 │   │   │   └── AuthContext.jsx                # User session, login, logout, password change
-│   │   ├── services/                          # API clients (Axios/Fetch abstractions)
-│   │   │   ├── enrollmentService.js           # Learning progress & course enrollments
+│   │   ├── services/                          # API clients (Fetch / authFetch abstractions)
+│   │   │   ├── calendarService.js             # Unified calendar data pipeline & aggregation
+│   │   │   ├── courseService.js               # Courses, authoring, and trainer insights
 │   │   │   ├── hrAdminService.js              # HR and employee administrative calls
-│   │   │   ├── quizService.js                 # Quiz start, progress & submission
+│   │   │   ├── policyService.js               # Policy retrieval, acknowledgement & exports
 │   │   │   └── zohoService.js                 # Zoho WorkDrive connect & status APIs
 │   │   ├── stores/                            # Zustand reactive stores
+│   │   ├── utils/                             # Utility helpers & mathematical calculations
+│   │   │   ├── watermarkUtil.js               # Rotated bounding-box watermark calculations
+│   │   │   ├── deadlines.js                   # Timezone-safe deadline urgency evaluators
+│   │   │   └── courseDuration.js              # Standardized course duration formatting
 │   │   ├── App.jsx                            # Root layout, role routing & navigation
 │   │   └── main.jsx                           # Application entry point
 │   ├── package.json
@@ -235,8 +268,6 @@ fairmacs-lms/
     └── src/main/
         ├── java/com/fairmacs/lms/
         │   ├── config/                        # Spring configuration & data seeders
-        │   │   ├── DepartmentDataInitializer.java
-        │   │   └── LmsDataInitializer.java
         │   ├── controller/                    # REST API Controllers
         │   │   ├── AuthController.java
         │   │   ├── CertificateController.java
@@ -246,49 +277,32 @@ fairmacs-lms/
         │   │   ├── DraftController.java
         │   │   ├── EnrollmentController.java
         │   │   ├── HrAdminController.java
-        │   │   ├── HrReportController.java
-        │   │   ├── LessonDocumentController.java
-        │   │   ├── LessonProgressController.java
-        │   │   ├── ManagerAllCoursesController.java
-        │   │   ├── ManagerReportController.java
-        │   │   ├── NotificationController.java
+        │   │   ├── PolicyEmployeeController.java
+        │   │   ├── PolicyHrController.java
+        │   │   ├── PolicyManagerController.java
         │   │   ├── QuizController.java
-        │   │   ├── QuizProgressController.java
-        │   │   └── TrainingSessionController.java
+        │   │   ├── TrainerReportController.java
+        │   │   ├── TrainingSessionController.java
+        │   │   └── ZohoOAuthController.java
         │   ├── dto/                           # Data Transfer Objects
         │   ├── entity/                        # JPA Database Entities
+        │   │   ├── PolicyDocument.java
+        │   │   ├── PolicyAssignment.java
+        │   │   ├── PolicyAcknowledgement.java
         │   │   ├── Course.java
-        │   │   ├── Department.java
         │   │   ├── Enrollment.java
-        │   │   ├── Lesson.java
-        │   │   ├── Module.java
-        │   │   ├── Notification.java
-        │   │   ├── Quiz.java
-        │   │   ├── QuizAttempt.java
-        │   │   ├── TrainingSession.java
-        │   │   └── User.java
+        │   │   ├── User.java
+        │   │   └── ...
         │   ├── integration/zoho/              # Zoho WorkDrive Cloud Integration
-        │   │   ├── ZohoOAuthController.java
-        │   │   ├── ZohoOAuthService.java      # AES-256 encrypted token handling
-        │   │   ├── ZohoWorkDriveDownloadService.java
-        │   │   ├── ZohoWorkDriveService.java
-        │   │   └── ZohoWorkDriveTestController.java
         │   ├── repository/                    # Spring Data JPA Repositories
         │   ├── security/                      # JWT authentication & Spring Security
-        │   │   ├── JwtAuthenticationFilter.java
-        │   │   ├── JwtTokenProvider.java
-        │   │   ├── SecurityConfig.java
-        │   │   └── SecurityContextUtil.java
         │   └── service/                       # Business Logic Layer
+        │       ├── PolicyService.java
+        │       ├── PolicyWatermarkService.java
         │       ├── CourseAuthoringService.java
-        │       ├── DepartmentService.java
-        │       ├── DraftService.java
-        │       ├── EmployeeExcelImportService.java
         │       ├── EnrollmentService.java
         │       ├── HrAdminService.java
-        │       ├── LessonDocumentAccessService.java
         │       ├── ManagerReportService.java
-        │       ├── QuizService.java
         │       └── TrainingSessionService.java
         └── resources/
             ├── application.properties         # Environment-driven configuration
@@ -299,14 +313,14 @@ fairmacs-lms/
 
 ## 🔐 Security & Credential Management
 
-Fairmacs KMS is architected under **Zero-Credential-in-Code** principles:
+Fairmacs KMS is architected under strict **Zero-Credential-in-Code** principles:
 
 1. **Pure Environment Variable Injection**: No database credentials, API keys, client secrets, or cryptographic tokens are ever committed to the repository.
-2. **Local Configuration Decoupling**: Developers can optionally use `application-local.properties` (which is strictly ignored by Git) to override local settings without risking accidental commits.
+2. **Local Configuration Decoupling**: Developers can optionally use `application-local.properties` (strictly ignored by Git) to override local settings without risking accidental commits.
 3. **AES-256 Cloud Token Encryption**: Zoho OAuth refresh tokens are encrypted using AES-GCM-256 before being stored in the database.
 4. **BCrypt Password Security**: All employee passwords are salted and hashed using BCrypt. The system never stores or transmits plaintext passwords.
 5. **Stateless JWT Authorization**: Requests are secured via signed HMAC-SHA-256 JSON Web Tokens with strict expiry checks and user status verification.
-6. **Git Protection Rules**: Database dumps (`*.dump`, `*.sql`), user upload directories (`backend/uploads/`), IDE artifacts (`.trae/`, `.vscode/`), and local environment files (`.env`, `*local.properties`) are all registered in `.gitignore`.
+6. **Dynamic Non-Clipping Watermarking**: Confidential course materials and corporate policies are dynamically watermarked in-browser and server-side with verified employee credentials and timestamps to prevent unauthorized leaks.
 
 ---
 
@@ -419,6 +433,42 @@ VITE_API_BASE_URL=http://localhost:8080/api
 
 ---
 
+## 🧪 Automated Verification & Test Suites
+
+Fairmacs KMS includes **23 comprehensive automated verification suites** covering architecture, security, routing, calculations, and visual regression prevention:
+
+```bash
+# Run all 23 frontend test suites sequentially
+npm --prefix frontend test
+```
+
+### Test Suite Directory
+1. `test-roadmap-smoke.js`: Smoke test verifying API URLs, cleanup, import templates, and password modal sync.
+2. `test-hr-routes-navigation.js`: Dedicated HR routes (`/hr/*`), removal of monolithic sub-tabs, and sidebar wiring.
+3. `test-intelligent-hover-sidebar.js`: 8–16px edge proximity detection, body-mounted tooltip portals, and keyboard accessibility.
+4. `test-assigned-learning-redesign.js`: Employee learning snapshot, urgency calculation, and smart learning cards.
+5. `test-create-course-modal-positioning.js`: Course authoring modal rendering and reference caching.
+6. `test-course-overview-system-replacement.js`: Full course overview replacements and lesson progress flows.
+7. `test-hero-thumbnail-visibility-scenarios.js`: Course thumbnail loading, fallback states, and aspect-ratio preservation.
+8. `test-phase1-course-carousel-fix.js`: Single-course and multi-course carousel rendering without duplication.
+9. `test-phase2-course-carousel-refinement.js`: Carousel navigation buttons, looping physics, and touch dragging.
+10. `test-phase3-assigned-course-sync.js`: Real-time cross-tab course assignment synchronization (`lms:enrollment-updated`).
+11. `test-phase4-course-overview-navigation.js`: Deep linking into lesson players with active lesson tracking.
+12. `test-phase5-cross-module-integration.js`: Certificates, policies, announcements, and progress hub integration.
+13. `test-stage4-manager-policies.js`: Manager policy tabs, submission modals, and department-scoped reports.
+14. `test-stage5-employee-policies.js`: Employee policy assignment filtering (`ALL`, `PENDING`, `ACKNOWLEDGED`, `OVERDUE`).
+15. `test-stage6-secure-viewer-acknowledgement.js`: Secure PDF viewer, legal declaration capture, and download permissions.
+16. `test-stage7-policy-automations.js`: Automated overdue reminders, batch notifications, and compliance alerts.
+17. `test-stage8-reports-tracking.js`: Departmental compliance audits, export generation, and progress indicators.
+18. `test-policy-wise-excel-export.js`: Policy-wise spreadsheet export with employee status and acknowledgement dates.
+19. `test-course-document-watermark.js`: Confidential watermark presence on course PDF materials.
+20. `test-watermark-clipping-fix.js`: Exact mathematical non-clipping rotated bounding-box verification across page geometries.
+21. `test-dynamic-sidebar-behaviour.js`: Dynamic role-based navigation mapping and active state resolution.
+22. `test-hr-manager-courses-carousel.js`: HR and Manager assigned course carousels handling 0, 1, or N courses.
+23. `test-learning-compliance-calendar.js`: Multi-source calendar pipeline, strict policy due date rule, and `UpcomingTrainingWidget`.
+
+---
+
 ## 📡 Complete REST API Reference
 
 All backend endpoints are prefixed with `/api`. Protected routes require a Bearer token in the request header:
@@ -439,7 +489,7 @@ All backend endpoints are prefixed with `/api`. Protected routes require a Beare
 | `GET` | `/api/courses/{id}` | Authenticated | Retrieve full course details with modules and lessons |
 | `POST` | `/api/courses/authoring/create` | Trainer, HR Admin | Create and publish a new course with curriculum |
 | `PUT` | `/api/courses/authoring/{id}` | Trainer, HR Admin | Update an existing course and its curriculum |
-| `DELETE` | `/api/courses/authoring/{id}` | Trainer, HR Admin | Delete a course |
+| `DELETE` | `/api/courses/authoring/{id}` | Trainer, HR Admin | Delete a course and all associated modules |
 
 ### 3. Course Drafts (Authoring in Progress)
 | Method | Endpoint | Access | Description |
@@ -452,8 +502,8 @@ All backend endpoints are prefixed with `/api`. Protected routes require a Beare
 ### 4. Course Assignment Engine
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `POST` | `/api/course-assignments/department` | HR Admin | Assign a course to an entire department |
-| `POST` | `/api/course-assignments/employees` | HR Admin | Assign a course to specific individual employees |
+| `POST` | `/api/course-assignments/department` | Trainer, HR Admin | Assign a course to an entire department |
+| `POST` | `/api/course-assignments/employees` | Trainer, HR Admin | Assign a course to specific individual employees |
 
 ### 5. Enrollments & Learning Progress
 | Method | Endpoint | Access | Description |
@@ -472,54 +522,94 @@ All backend endpoints are prefixed with `/api`. Protected routes require a Beare
 | `GET` | `/api/quizzes/{quizId}/unlock-status` | Authenticated | Check if quiz is unlocked for the user |
 | `POST` | `/api/quizzes/submit` | Authenticated | Submit answers and receive server-evaluated score |
 | `GET` | `/api/quizzes/attempt/{attemptId}/result` | Authenticated | Retrieve score details for a completed attempt |
+| `POST` | `/api/quizzes/import` | Trainer, HR Admin | Bulk import quiz questions via Excel (`.xlsx`) |
 
 ### 7. Certificates & Verification
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/api/certificates/my-certificates` | Authenticated | List all certificates earned by the current user |
 | `GET` | `/api/certificates/{id}/download` | Authenticated | Download the official generated PDF certificate |
-| `GET` | `/api/certificates/verify/{certificateNumber}` | Public | Publicly verify certificate authenticity by number |
+| `GET` | `/api/certificates/verify/{certificateNumber}` | Public | Publicly verify certificate authenticity by serial number |
 | `GET` | `/api/certificates/recent` | Manager, HR Admin | View recently issued certificates across the organization |
 
-### 8. Department Management
+### 8. Corporate Policies & Agreements (Employee)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/policies/categories` | Authenticated | List active corporate policy categories |
+| `GET` | `/api/policies/my-assignments` | Authenticated | Fetch user's assigned policies (`ALL`, `PENDING`, `ACKNOWLEDGED`, `OVERDUE`) |
+| `GET` | `/api/policies/assignments/{id}` | Authenticated | Fetch specific policy assignment metadata |
+| `POST` | `/api/policies/assignments/{id}/acknowledge` | Authenticated | Legally acknowledge a policy with IP and timestamp capture |
+| `GET` | `/api/policies/{id}/download` | Authenticated | Download policy document PDF (if download permitted) |
+| `GET` | `/api/policies/{id}/stream` | Authenticated | Stream policy PDF document for secure browser viewing |
+
+### 9. Department Policies & Supervision (Manager)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/manager/policies/overview` | Manager | Scoped departmental policy compliance metrics |
+| `GET` | `/api/manager/policies/departments` | Manager | List department branches supervised by the manager |
+| `GET` | `/api/manager/policies` | Manager | List active policies assigned to the manager's team |
+| `POST` | `/api/manager/policies` | Manager | Propose / submit a new departmental SOP or policy document |
+| `GET` | `/api/manager/policies/submissions` | Manager | List departmental policy submissions and review status |
+| `GET` | `/api/manager/policies/reports` | Manager | Detailed employee policy acknowledgement status report |
+| `GET` | `/api/manager/policies/reports/excel` | Manager | Export departmental policy report to Excel (`.xlsx`) |
+| `POST` | `/api/manager/policies/remind/{assignmentId}` | Manager | Send acknowledgement reminder for an overdue policy |
+
+### 10. Enterprise Policy Governance (HR / Admin)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/hr/policies` | HR Admin, Super Admin | List all company policies with category and status filters |
+| `POST` | `/api/hr/policies` | HR Admin, Super Admin | Upload and publish a new enterprise policy document |
+| `PUT` | `/api/hr/policies/{id}` | HR Admin, Super Admin | Update policy metadata and document parameters |
+| `DELETE` | `/api/hr/policies/{id}` | HR Admin, Super Admin | Archive or delete a policy document |
+| `POST` | `/api/hr/policies/{id}/assign` | HR Admin, Super Admin | Assign policy to all employees or specific departments |
+| `GET` | `/api/hr/policies/overview` | HR Admin, Super Admin | Enterprise policy compliance rates and benchmark overview |
+| `GET` | `/api/hr/policies/reports` | HR Admin, Super Admin | Comprehensive organization-wide acknowledgement audit report |
+| `GET` | `/api/hr/policies/reports/excel` | HR Admin, Super Admin | Export full policy compliance audit report to Excel (`.xlsx`) |
+| `GET` | `/api/hr/policies/reports/policy-wise/excel` | HR Admin, Super Admin | Export policy-by-policy compliance breakdown to Excel |
+| `POST` | `/api/hr/policies/remind/{assignmentId}` | HR Admin, Super Admin | Send targeted policy reminder to a specific employee |
+| `POST` | `/api/hr/policies/remind-all-overdue` | HR Admin, Super Admin | Batch send reminders to all overdue policy assignees |
+
+### 11. Department Management & Roster
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/api/departments` | Authenticated | List all departments with manager & headcount metrics |
 | `GET` | `/api/departments/{id}` | Authenticated | Get specific department details |
-| `GET` | `/api/departments/{id}/summary` | Authenticated | High-level summary of department completion |
-| `GET` | `/api/departments/{id}/courses` | Authenticated | Department courses and assigned training list |
+| `GET` | `/api/departments/{id}/summary` | Authenticated | Summary of department course completion |
+| `GET` | `/api/departments/{id}/courses` | Authenticated | Department courses and assigned training roster |
 | `GET` | `/api/departments/{id}/courses/{courseId}/employees` | HR Admin | Matrix of employees enrolled in a course |
 
-### 9. HR Admin & Employee Directory
+### 12. HR Admin & Employee Directory
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `GET` | `/api/hr-admin/employees` | HR Admin | List and search all company employees |
-| `POST` | `/api/hr-admin/employees` | HR Admin | Create a new employee account |
-| `PUT` | `/api/hr-admin/employees/{id}` | HR Admin | Update employee profile details |
-| `PATCH` | `/api/hr-admin/employees/{id}/status` | HR Admin | Update employee status (`ACTIVE`, `INACTIVE`, etc.) |
-| `POST` | `/api/hr-admin/employees/{id}/reset-password` | HR Admin | Reset an employee's password |
-| `POST` | `/api/hr-admin/employees/import` | HR Admin | Bulk import employees from an Excel file (`.xlsx`) |
-| `GET` | `/api/hr-admin/stats` | HR Admin | System-wide statistics and metrics |
+| `GET` | `/api/hr/employees` | HR Admin, Trainer | List and search all company employees |
+| `POST` | `/api/hr/employees` | HR Admin | Create a new employee profile |
+| `PUT` | `/api/hr/employees/{id}` | HR Admin | Update employee profile details |
+| `PATCH` | `/api/hr/employees/{id}/status` | HR Admin | Update employee status (`ACTIVE`, `INACTIVE`, etc.) |
+| `POST` | `/api/hr/employees/{id}/reset-password` | HR Admin | Reset an employee's password |
+| `POST` | `/api/hr/employees/import` | HR Admin | Bulk import employees from an Excel file (`.xlsx`) |
+| `GET` | `/api/hr/employees/import-template` | HR Admin | Download official Excel employee onboarding template |
+| `GET` | `/api/hr/dashboard/metrics` | HR Admin | Live organization KPI metrics and department statistics |
 
-### 10. Reports & Analytics
+### 13. Reports & Analytics
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/api/reports/hr/summary` | HR Admin | Organization-wide compliance and completion rates |
 | `GET` | `/api/reports/hr/department-compliance` | HR Admin | Department-by-department compliance comparison |
 | `GET` | `/api/reports/hr/overdue` | HR Admin | Overdue mandatory training records |
 | `GET` | `/api/reports/manager/team` | Manager, HR Admin | Team performance report for direct reports |
-| `GET` | `/api/reports/manager/employee/{userId}/transcript` | Manager, HR Admin | Full training transcript for a team member |
-| `GET` | `/api/manager/all-courses` | Manager, HR Admin | View all courses across departments for managerial oversight |
+| `GET` | `/api/manager/reports/{managerId}` | Manager, HR Admin | Manager team report with employee status breakdown |
+| `GET` | `/api/manager/reports/employee/{userId}` | Manager, HR Admin | Full training transcript for a team member |
+| `GET` | `/api/trainer/insights` | Trainer, HR Admin | Trainer KPIs, enrollment counts, and course breakdowns |
 
-### 11. Training Calendar & Sessions
+### 14. Learning & Compliance Calendar
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `GET` | `/api/training-sessions` | Authenticated | Retrieve scheduled training sessions and deadlines |
-| `POST` | `/api/training-sessions` | Trainer, Manager, HR | Schedule a new training session or webinar |
+| `GET` | `/api/training-calendar` | Authenticated | Retrieve live sessions, workshops, and webinars |
+| `POST` | `/api/training-sessions` | Trainer, Manager, HR | Schedule a new live training session or workshop |
 | `DELETE` | `/api/training-sessions/{id}` | Trainer, Manager, HR | Cancel a scheduled training session |
 | `GET` | `/api/training-sessions/employees` | Authenticated | List selectable employees for session invitations |
 
-### 12. Zoho WorkDrive Integration
+### 15. Zoho WorkDrive Integration
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `GET` | `/api/integrations/zoho/connect-url` | HR Admin | Generate OAuth 2.0 authorization URL for Zoho |

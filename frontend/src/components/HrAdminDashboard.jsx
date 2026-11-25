@@ -1,4 +1,6 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2,
@@ -13,14 +15,28 @@ import {
   RefreshCw,
   Clock,
   ChevronRight,
-  FolderGit2
+  FolderGit2,
+  BookOpen,
+  CheckCircle2,
+  AlertTriangle,
+  HelpCircle,
+  FileCheck,
+  Bell,
+  Settings,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 
 import CourseBuilderModal, { preloadCourseBuilderReferenceData } from './CourseBuilderModal';
+import AssignedLearningCarousel from './AssignedLearningCarousel';
+import UpcomingTrainingWidget from './dashboard/UpcomingTrainingWidget';
 import { useAuth } from '../context/AuthContext';
 import { useEnrollmentStore } from '../stores/enrollmentStore';
+import { courseService } from '../services/courseService';
+import { formatCourseDuration } from '../utils/courseDuration';
+import { subscribeEnrollmentSync } from '../utils/enrollmentSync';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+const API_BASE_URL = SHARED_API_BASE_URL;
 
 const EMPTY_METRICS = {
   totalEmployees: 0,
@@ -42,13 +58,21 @@ function normalizeDepartmentStats(items) {
   return items.map((item, index) => {
     const total = Number(item.total ?? item.totalEmployees ?? item.employeeCount ?? 0);
     const completed = Number(item.completed ?? item.completedEmployees ?? 0);
-    const rate = Number(item.rate ?? item.completionRate ?? (total ? (completed / total) * 100 : 0));
+    const rate = Number(item.rate ?? item.completionRate ?? 0);
+    const assignedCoursesCount = Number(item.assignedCoursesCount ?? item.assignedCount ?? 0);
+    const hasAssignedTraining = Boolean(
+      item.hasAssignedTraining !== undefined
+        ? item.hasAssignedTraining
+        : (assignedCoursesCount > 0 || completed > 0 || rate > 0)
+    );
     return {
       ...item,
       department: item.department ?? item.departmentName ?? `Department ${index + 1}`,
       total,
       completed,
-      rate: Math.max(0, Math.min(100, Number.isFinite(rate) ? rate : 0))
+      rate: Math.max(0, Math.min(100, Number.isFinite(rate) ? rate : 0)),
+      assignedCoursesCount,
+      hasAssignedTraining
     };
   });
 }
@@ -68,32 +92,21 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
-const cardStyle = {
-  background: '#FFFFFF',
-  borderRadius: '8px',
-  border: '1px solid #E2E8F0',
-  padding: '1.25rem 1.4rem',
-  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-};
+function getTimeGreeting() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
-const actionBtnStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '0.45rem',
-  padding: '0.52rem 0.95rem',
-  borderRadius: '6px',
-  fontSize: '0.84rem',
-  fontWeight: 600,
-  cursor: 'pointer',
-  transition: 'background-color 0.15s ease, border-color 0.15s ease',
-  border: '1px solid #CBD5E1',
-  background: '#FFFFFF',
-  color: '#0F172A',
-  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
-  whiteSpace: 'nowrap',
-};
+function formatOperationalDate() {
+  return new Date().toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+}
 
 export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
   const navigate = useNavigate();
@@ -102,6 +115,7 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
 
   const [selectedDeptForDrilldown, setSelectedDeptForDrilldown] = useState(null);
   const [showCourseBuilderModal, setShowCourseBuilderModal] = useState(false);
+  const [assignedCourses, setAssignedCourses] = useState([]);
 
   const [metrics, setMetrics] = useState(EMPTY_METRICS);
   const [metricsLoading, setMetricsLoading] = useState(true);
@@ -113,7 +127,7 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
     setMetricsError('');
     try {
       const token = getToken();
-      const response = await fetch(`${API_BASE_URL}/hr/dashboard/metrics`, {
+      const response = await authFetch(`${API_BASE_URL}/hr/dashboard/metrics`, {
         headers: token
           ? { Authorization: `Bearer ${token}`, Accept: 'application/json' }
           : { Accept: 'application/json' },
@@ -141,11 +155,116 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
     }
   }, []);
 
+  const loadAssignedCourses = useCallback(async () => {
+    try {
+      const data = await courseService.getLearningDashboard();
+      if (data && Array.isArray(data.enrolled)) {
+        const seen = new Set();
+        const list = [];
+        for (const raw of data.enrolled) {
+          const isRevoked =
+            ['REVOKED', 'CANCELLED', 'WITHDRAWN', 'INACTIVE'].includes(raw.enrollmentStatus) ||
+            ['REVOKED', 'CANCELLED', 'WITHDRAWN', 'INACTIVE'].includes(raw.status);
+          if (isRevoked) continue;
+          const key = String(raw.dbId || raw.id || raw.courseId);
+          if (seen.has(key)) continue;
+          seen.add(key);
+
+          const modulesList = Array.isArray(raw?.modules) ? raw.modules : [];
+          const calculatedModuleCount = modulesList.length;
+          const calculatedLessonCount = modulesList.reduce(
+            (acc, m) => acc + (Array.isArray(m?.lessons) ? m.lessons.length : 0),
+            0
+          );
+          const moduleCount =
+            typeof raw?.moduleCount === 'number'
+              ? raw.moduleCount
+              : calculatedModuleCount > 0
+              ? calculatedModuleCount
+              : (raw?.moduleCount != null ? Number(raw.moduleCount) : 0);
+          const lessonCount =
+            typeof raw?.lessonCount === 'number'
+              ? raw.lessonCount
+              : calculatedLessonCount > 0
+              ? calculatedLessonCount
+              : (raw?.lessonCount != null ? Number(raw.lessonCount) : 0);
+
+          const bannerUrl = raw?.banner || raw?.thumbnailUrl || raw?.thumbnail || '';
+
+          list.push({
+            ...raw,
+            _key: key,
+            title: raw.title || raw.courseTitle || 'Untitled Course',
+            id: raw.id || raw.courseId || raw.courseCode || '',
+            progressPercent: Number(raw.progressPercent ?? raw.progress ?? 0),
+            status: String(raw.enrollmentStatus || raw.status || '').toUpperCase(),
+            duration: formatCourseDuration(raw.duration, raw.durationHours),
+            banner: bannerUrl,
+            thumbnailUrl: bannerUrl,
+            thumbnail: bannerUrl,
+            moduleCount,
+            lessonCount,
+            department:
+              raw.owningDepartmentName ||
+              raw.department ||
+              (Array.isArray(raw.departments) && raw.departments[0]) ||
+              'Fairmacs Core',
+            trainingType: String(
+              raw.trainingType || raw.enrollmentType || raw.assignmentType || 'MANDATORY'
+            ).toUpperCase()
+          });
+        }
+        setAssignedCourses(list);
+      }
+    } catch {
+      // Non-blocking
+    }
+  }, []);
+
+  const handleOpenCourse = useCallback((course) => {
+    const code = course.id || course.courseId;
+    if (code) {
+      navigate(`/courses/${encodeURIComponent(code)}/overview`, {
+        state: { courseData: course, fromCarousel: true }
+      });
+    }
+  }, [navigate]);
+
   useEffect(() => {
     preloadCourseBuilderReferenceData();
     loadHrMetrics();
+    loadAssignedCourses();
     fetchRecentCertificates(6);
-  }, [loadHrMetrics, fetchRecentCertificates]);
+
+    const handleSync = () => {
+      loadAssignedCourses();
+    };
+    window.addEventListener('lms:enrollment-updated', handleSync);
+    const unsubscribe = subscribeEnrollmentSync(handleSync);
+
+    return () => {
+      window.removeEventListener('lms:enrollment-updated', handleSync);
+      unsubscribe();
+    };
+  }, [loadHrMetrics, loadAssignedCourses, fetchRecentCertificates]);
+
+  // Escape key dismissal and body scroll lock for Department Drilldown modal
+  useEffect(() => {
+    if (!selectedDeptForDrilldown) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setSelectedDeptForDrilldown(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedDeptForDrilldown]);
 
   const exportMetrics = () => {
     const rows = [
@@ -160,64 +279,74 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
       ['Active Employees', metrics.activeEmployees],
       ['Active Learners', metrics.activeLearners],
       ['Overall Completion Rate (%)', `${metrics.overallCompletionRate}%`],
-      ['Average Training Hours', `${metrics.avgTrainingHours} hrs`],
+      ['Estimated Curriculum Hours', `${metrics.avgTrainingHours} hrs`],
       ['Certificates Issued', metrics.certificatesIssued],
       ['Mandatory Compliance Rate (%)', `${metrics.mandatoryComplianceRate}%`]
     ];
     downloadCsv('fairmacs-hr-dashboard-report.csv', rows);
   };
 
+  const isComplianceMet = metrics.mandatoryComplianceRate >= 90;
+
+  // Accurately labeled metric cards
   const statCards = [
     {
       label: 'Total Employees',
       value: metrics.totalEmployees,
-      subtext: '___________________________',
-
+      subtext: `${metrics.activeEmployees} active in directory`,
       icon: Users,
       bg: '#F0F9FF',
+      border: '#BAE6FD',
       color: '#0284C7',
     },
     {
       label: 'Active Learners',
       value: metrics.activeLearners,
-      subtext: 'Enrolled & in training',
+      subtext: 'Currently in progress',
       icon: UserCheck,
-      bg: '#F0F9FF',
+      bg: '#EFF6FF',
+      border: '#BFDBFE',
       color: '#0F6CBD',
     },
     {
       label: 'Completion Rate',
       value: `${metrics.overallCompletionRate}%`,
-      subtext: 'Across all active courses',
+      subtext: 'Across all active enrollments',
       icon: BarChart2,
       bg: '#F0FDF4',
+      border: '#BBF7D0',
       color: '#16A34A',
       showProgress: true,
       progressPercent: metrics.overallCompletionRate,
     },
     {
-      label: 'Average Hours',
+      label: 'Avg Course Duration',
       value: `${metrics.avgTrainingHours} hrs`,
-      subtext: 'Average per employee',
+      subtext: 'Estimated duration per enrollment',
       icon: Clock,
       bg: '#FFFBEB',
+      border: '#FDE68A',
       color: '#D97706',
     },
     {
       label: 'Certificates Awarded',
       value: metrics.certificatesIssued,
-      subtext: 'Credentials verified',
+      subtext: 'Verified credentials issued',
       icon: Award,
       bg: '#F0FDF4',
+      border: '#BBF7D0',
       color: '#16A34A',
     },
     {
       label: 'Mandatory Compliance',
       value: `${metrics.mandatoryComplianceRate}%`,
-      subtext: metrics.mandatoryComplianceRate >= 90 ? 'Target achieved (≥90%)' : 'Action recommended (<90%)',
+      subtext: isComplianceMet ? 'Target achieved (≥90%)' : 'Action recommended (<90%)',
       icon: ShieldCheck,
-      bg: metrics.mandatoryComplianceRate >= 90 ? '#F0FDF4' : '#FEF2F2',
-      color: metrics.mandatoryComplianceRate >= 90 ? '#16A34A' : '#DC2626',
+      bg: isComplianceMet ? '#F0FDF4' : '#FEF2F2',
+      border: isComplianceMet ? '#BBF7D0' : '#FECACA',
+      color: isComplianceMet ? '#16A34A' : '#DC2626',
+      statusBadge: isComplianceMet ? 'Target Met' : 'Below 90% Target',
+      isPositiveStatus: isComplianceMet,
     },
   ];
 
@@ -254,72 +383,210 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
     });
   };
 
+  const firstName = user?.name ? user.name.trim().split(/\s+/)[0] : 'Admin';
+  const greeting = getTimeGreeting();
+  const operationalDate = formatOperationalDate();
+
+  // Categorized HR Launchpad Groups
+  const launchpadGroups = [
+    {
+      category: 'Learning & Authoring',
+      items: [
+        {
+          label: 'Create Course',
+          desc: 'Author modules & quizzes',
+          icon: Plus,
+          action: () => setShowCourseBuilderModal(true),
+          color: '#0F6CBD',
+          bg: '#F0F9FF',
+          border: '#BAE6FD',
+          isPrimary: true,
+        },
+        {
+          label: 'Courses & Catalog',
+          desc: 'Catalog & assignments',
+          icon: BookOpen,
+          action: () => navigate('/hr/courses'),
+          color: '#0284C7',
+          bg: '#F0F9FF',
+          border: '#BAE6FD',
+        },
+        {
+          label: 'Course Drafts',
+          desc: 'Unpublished drafts',
+          icon: FolderGit2,
+          action: () => navigate('/hr/drafts'),
+          color: '#475569',
+          bg: '#F8FAFC',
+          border: '#E2E8F0',
+        },
+      ]
+    },
+    {
+      category: 'Workforce & Organization',
+      items: [
+        {
+          label: 'Manage Staff',
+          desc: 'Directory & roles',
+          icon: Users,
+          action: () => navigate('/hr/employees'),
+          color: '#16A34A',
+          bg: '#F0FDF4',
+          border: '#BBF7D0',
+        },
+        {
+          label: 'Departments',
+          desc: 'Divisions & rosters',
+          icon: Building2,
+          action: () => navigate('/hr/departments'),
+          color: '#4F46E5',
+          bg: '#EEF2FF',
+          border: '#C7D2FE',
+        },
+      ]
+    },
+    {
+      category: 'Compliance & Governance',
+      items: [
+        {
+          label: 'Issued Certificates',
+          desc: 'Credential registry',
+          icon: Award,
+          action: () => navigate('/hr/certificates'),
+          color: '#D97706',
+          bg: '#FFFBEB',
+          border: '#FDE68A',
+        },
+        {
+          label: 'Company Policies',
+          desc: 'SOPs & acknowledgements',
+          icon: ShieldCheck,
+          action: () => navigate('/hr/policies'),
+          color: '#059669',
+          bg: '#ECFDF5',
+          border: '#A7F3D0',
+        },
+        {
+          label: 'Announcements',
+          desc: 'Broadcast notifications',
+          icon: Bell,
+          action: () => navigate('/hr/announcements'),
+          color: '#0284C7',
+          bg: '#F0F9FF',
+          border: '#BAE6FD',
+        },
+      ]
+    }
+  ];
+
   return (
-    <div
-      className="animate-fade-in"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.5rem',
-        minWidth: 0,
-        color: '#14243A',
-      }}
-    >
-      {/* 1. TOP HEADER & ACTIONS BAR */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: '1.45rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-            HR Overview
+    <div className="hr-ops-dashboard animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', minWidth: 0, color: '#0F172A' }}>
+      {/* =========================================================================
+          A. WELCOME BAR & TOP-LEVEL ACTIONS
+         ========================================================================= */}
+      <header className="hr-ops-welcome-bar">
+        {/* Subtle Logistics Route-Line SVG Motif */}
+        <svg
+          className="hr-ops-route-motif"
+          viewBox="0 0 420 120"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            d="M12 96 C 95 96, 115 34, 198 34 C 275 34, 295 78, 396 24"
+            stroke="#0284C7"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+            strokeOpacity="0.35"
+          />
+          <path
+            d="M40 108 C 135 108, 165 58, 255 58 C 325 58, 350 86, 412 52"
+            stroke="#0F6CBD"
+            strokeWidth="1"
+            strokeOpacity="0.2"
+          />
+          <circle cx="198" cy="34" r="3.5" fill="#0284C7" fillOpacity="0.45" />
+          <circle cx="198" cy="34" r="7" stroke="#0284C7" strokeOpacity="0.22" />
+          <circle cx="396" cy="24" r="3.5" fill="#0F6CBD" fillOpacity="0.5" />
+          <circle cx="255" cy="58" r="2.5" fill="#0F6CBD" fillOpacity="0.35" />
+        </svg>
+
+        <div className="hr-ops-welcome-main">
+          <div className="hr-ops-eyebrow-row">
+            <span className="hr-ops-eyebrow-badge">
+              <span className="hr-ops-eyebrow-dot" aria-hidden="true" />
+              Fairmacs Learning Academy
+            </span>
+            <span className="hr-ops-eyebrow-meta">
+              {operationalDate}
+              {user?.department ? ` • ${user.department}` : ''}
+            </span>
+          </div>
+
+          <h1 className="hr-ops-welcome-title">
+            {greeting}, {firstName}
           </h1>
-          <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '3px 0 0 0' }}>
-            Enterprise learning health, active enrollments, and compliance overview
+
+          <p className="hr-ops-welcome-sub">
+            Enterprise workforce training, regulatory compliance monitoring, and central learning operations.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+        <div className="hr-ops-welcome-actions">
           <button
             type="button"
             onClick={exportMetrics}
-            style={actionBtnStyle}
-            title="Export metrics CSV"
+            className="hr-ops-btn"
+            style={{
+              background: '#FFFFFF',
+              color: '#0F172A',
+              borderColor: '#CBD5E1',
+            }}
+            title="Download CSV report of organization metrics"
           >
-            <Download size={14} /> Export Report
+            <Download size={15} aria-hidden="true" />
+            <span>Export Data</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowCourseBuilderModal(true)}
+            className="hr-ops-btn hr-ops-btn-primary"
+            style={{
+              boxShadow: '0 4px 14px rgba(15, 108, 189, 0.35)',
+            }}
+          >
+            <Plus size={16} aria-hidden="true" />
+            <span>Create Course</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Error Banner */}
+      {/* ASSIGNED LEARNING CAROUSEL FOR SIGNED-IN HR/ADMIN */}
+      {assignedCourses.length > 0 && (
+        <section aria-label="Assigned Learning Carousel" style={{ marginBottom: '0.25rem' }}>
+          <AssignedLearningCarousel
+            courses={assignedCourses}
+            onOpenCourse={handleOpenCourse}
+          />
+        </section>
+      )}
+
+      {/* ERROR BANNER IF METRICS LOAD FAILED */}
       {metricsError && (
-        <div
-          role="alert"
-          style={{
-            padding: '0.9rem 1.25rem',
-            borderRadius: '6px',
-            background: '#FEF2F2',
-            border: '1px solid #FECACA',
-            color: '#991B1B',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <span style={{ fontSize: '0.88rem', fontWeight: 600 }}>{metricsError}</span>
+        <div role="alert" className="hr-ops-error-banner">
+          <div className="hr-ops-error-content">
+            <AlertTriangle size={17} aria-hidden="true" />
+            <span>{metricsError}</span>
+          </div>
           <button
             type="button"
             onClick={loadHrMetrics}
+            className="hr-ops-btn"
             style={{
-              ...actionBtnStyle,
-              padding: '0.35rem 0.75rem',
-              fontSize: '0.8rem',
-              background: '#FFFFFF',
+              padding: '0.38rem 0.8rem',
+              fontSize: '0.78rem',
               borderColor: '#FDA4AF',
               color: '#BE123C',
             }}
@@ -329,413 +596,283 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
         </div>
       )}
 
-      {/* 2. 6 CORE LIVE KPI CARDS */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))',
-          gap: '1rem',
-        }}
-      >
+      {/* =========================================================================
+          B. 6 CORE LIVE ORGANIZATION KPI CARDS
+         ========================================================================= */}
+      <section aria-label="Key Performance Indicators" className="hr-ops-kpi-grid">
         {metricsLoading
           ? Array.from({ length: 6 }).map((_, idx) => (
-            <div
-              key={`skel-${idx}`}
-              className="skeleton-shimmer"
-              style={{
-                height: '118px',
-                borderRadius: '8px',
-                padding: '1.25rem',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-              }}
-            />
-          ))
-          : statCards.map((card) => {
-            const Icon = card.icon;
-            return (
               <div
-                key={card.label}
+                key={`skel-${idx}`}
+                className="skeleton-shimmer"
                 style={{
-                  ...cardStyle,
-                  padding: '1.25rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '0.75rem',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.borderColor = '#CBD5E1';
-                  e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.08)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'none';
-                  e.currentTarget.style.borderColor = '#E2E8F0';
-                  e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: '0.8125rem',
-                      fontWeight: 500,
-                      color: '#64748B',
-                      textTransform: 'none',
-                      letterSpacing: 'normal',
-                    }}
-                  >
-                    {card.label}
-                  </span>
-                  <div
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '6px',
-                      background: card.bg,
-                      color: card.color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      border: '1px solid #E2E8F0',
-                    }}
-                  >
-                    <Icon size={18} />
-                  </div>
-                </div>
-
-                <div>
-                  <div
-                    style={{
-                      fontSize: '1.75rem',
-                      fontWeight: 650,
-                      color: '#0F172A',
-                      lineHeight: 1.2,
-                      letterSpacing: '-0.015em',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {card.value}
-                  </div>
-                  {card.showProgress && (
-                    <div
-                      className="progress-bar-bg"
-                      style={{ height: '6px', marginTop: '0.55rem', borderRadius: '4px' }}
-                    >
-                      <div
-                        className="progress-bar-fill"
-                        style={{
-                          width: `${Math.min(100, Math.max(0, card.progressPercent))}%`,
-                          background: '#16A34A',
-                          borderRadius: '4px',
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: '#64748B',
-                      marginTop: card.showProgress ? '0.35rem' : '0.25rem',
-                    }}
-                  >
-                    {card.subtext}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-      </div>
-
-      {/* 3. ROW 1: COMPLIANCE CARD + QUICK ACTION LAUNCHPAD */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '1.25rem',
-        }}
-      >
-        {/* Mandatory Compliance Overview Card */}
-        <section style={{ ...cardStyle, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '1rem',
-                flexWrap: 'wrap',
-                gap: '0.5rem',
-              }}
-            >
-              <div>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-                  Mandatory Training Compliance
-                </h2>
-                <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '4px 0 0 0' }}>
-                  Freight forwarding safety & regulatory benchmarks
-                </p>
-              </div>
-              <span
-                style={{
-                  padding: '0.2rem 0.6rem',
-                  borderRadius: '4px',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  background: metrics.mandatoryComplianceRate >= 90 ? '#F0FDF4' : '#FFFBEB',
-                  color: metrics.mandatoryComplianceRate >= 90 ? '#166534' : '#92400E',
-                  border: `1px solid ${metrics.mandatoryComplianceRate >= 90 ? '#BBF7D0' : '#FDE68A'}`,
-                }}
-              >
-                {metrics.mandatoryComplianceRate >= 90 ? 'Compliance Target Met' : 'Action Recommended'}
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'baseline',
-                gap: '0.75rem',
-                margin: '1rem 0 0.5rem 0',
-              }}
-            >
-              <span
-                style={{
-                  fontSize: '2.5rem',
-                  fontWeight: 700,
-                  color: metrics.mandatoryComplianceRate >= 90 ? '#16A34A' : '#DC2626',
-                  lineHeight: 1,
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {metrics.mandatoryComplianceRate}%
-              </span>
-              <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: 500 }}>
-                overall regulatory compliance
-              </span>
-            </div>
-
-            <div className="progress-bar-bg" style={{ height: '8px', margin: '0.75rem 0 1.25rem 0' }}>
-              <div
-                className="progress-bar-fill"
-                style={{
-                  width: `${Math.min(100, Math.max(0, metrics.mandatoryComplianceRate))}%`,
-                  background: metrics.mandatoryComplianceRate >= 90 ? '#16A34A' : '#D97706',
+                  height: '124px',
+                  borderRadius: '14px',
+                  border: '1px solid #E2E8F0',
+                  background: '#FFFFFF',
                 }}
               />
+            ))
+          : statCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div key={card.label} className="hr-ops-kpi-card">
+                  <div className="hr-ops-kpi-top">
+                    <span className="hr-ops-kpi-label">{card.label}</span>
+                    <div
+                      className="hr-ops-kpi-icon-box"
+                      style={{
+                        background: card.bg,
+                        color: card.color,
+                        borderColor: card.border,
+                      }}
+                      aria-hidden="true"
+                    >
+                      <Icon size={17} />
+                    </div>
+                  </div>
+
+                  <div className="hr-ops-kpi-value">{card.value}</div>
+
+                  <div className="hr-ops-kpi-footer">
+                    {card.showProgress && (
+                      <div
+                        className="hr-ops-progress-track"
+                        role="progressbar"
+                        aria-valuenow={Math.round(card.progressPercent)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${card.label} progress`}
+                      >
+                        <div
+                          className="hr-ops-progress-fill"
+                          style={{
+                            width: `${Math.min(100, Math.max(0, card.progressPercent))}%`,
+                            background: '#16A34A',
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="hr-ops-kpi-subtext">
+                      {card.statusBadge ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.28rem',
+                            fontWeight: 600,
+                            color: card.isPositiveStatus ? '#166534' : '#991B1B',
+                          }}
+                        >
+                          {card.isPositiveStatus ? (
+                            <CheckCircle2 size={13} aria-hidden="true" />
+                          ) : (
+                            <AlertTriangle size={13} aria-hidden="true" />
+                          )}
+                          {card.subtext}
+                        </span>
+                      ) : (
+                        <span>{card.subtext}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+      </section>
+
+      {/* =========================================================================
+          C & D. MANDATORY TRAINING COMPLIANCE + CATEGORIZED HR LAUNCHPAD
+         ========================================================================= */}
+      <div className="hr-ops-mid-grid">
+        {/* C. Mandatory Training Compliance */}
+        <section className="hr-ops-panel" aria-labelledby="hr-compliance-heading">
+          <div>
+            <div className="hr-ops-panel-header">
+              <div>
+                <h2 id="hr-compliance-heading" className="hr-ops-panel-title">
+                  Mandatory Training Compliance
+                </h2>
+                <p className="hr-ops-panel-subtitle">
+                  Freight forwarding safety &amp; regulatory benchmarks
+                </p>
+              </div>
+              <span className={`hr-ops-status-pill ${isComplianceMet ? 'is-met' : 'is-warn'}`}>
+                {isComplianceMet ? (
+                  <CheckCircle2 size={13} aria-hidden="true" />
+                ) : (
+                  <AlertTriangle size={13} aria-hidden="true" />
+                )}
+                {isComplianceMet ? 'Compliance Target Met' : 'Action Recommended'}
+              </span>
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: '0.75rem',
-                background: '#F8FAFC',
-                padding: '0.85rem',
-                borderRadius: '6px',
-                border: '1px solid #E2E8F0',
-              }}
-            >
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
-                  ACTIVE EMPLOYEES
+            <div className="hr-ops-compliance-hero">
+              <div className="hr-ops-compliance-score-row">
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.65rem' }}>
+                  <span
+                    className="hr-ops-compliance-big-num"
+                    style={{ color: isComplianceMet ? '#15803D' : '#DC2626' }}
+                  >
+                    {metrics.mandatoryComplianceRate}%
+                  </span>
+                  <span style={{ fontSize: '0.82rem', color: '#475569', fontWeight: 600 }}>
+                    overall regulatory compliance
+                  </span>
                 </div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 650, color: '#0F172A', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-                  {metrics.activeEmployees}
-                </div>
+                <span className="hr-ops-compliance-target-tag">Benchmark Target: 90%</span>
               </div>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
-                  ACTIVE LEARNERS
+
+              <div className="hr-ops-compliance-bar-wrap">
+                <div
+                  className="hr-ops-progress-track"
+                  style={{ height: '8px' }}
+                  role="progressbar"
+                  aria-valuenow={Math.round(metrics.mandatoryComplianceRate)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Mandatory compliance rate"
+                >
+                  <div
+                    className="hr-ops-progress-fill"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, metrics.mandatoryComplianceRate))}%`,
+                      background: isComplianceMet ? '#16A34A' : '#D97706',
+                    }}
+                  />
                 </div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 650, color: '#0F6CBD', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
+                <div
+                  className="hr-ops-compliance-target-marker"
+                  title="90% Target Threshold"
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
+
+            <div className="hr-ops-compliance-stat-grid">
+              <div className="hr-ops-mini-stat">
+                <span className="hr-ops-mini-stat-label">Active Employees</span>
+                <span className="hr-ops-mini-stat-val">{metrics.activeEmployees}</span>
+              </div>
+              <div className="hr-ops-mini-stat">
+                <span className="hr-ops-mini-stat-label">Active Learners</span>
+                <span className="hr-ops-mini-stat-val" style={{ color: '#0F6CBD' }}>
                   {metrics.activeLearners}
-                </div>
+                </span>
               </div>
             </div>
           </div>
 
-          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.65rem' }}>
+          <div className="hr-ops-compliance-actions">
             <button
               type="button"
               onClick={() => navigate('/hr/courses')}
-              style={{
-                ...actionBtnStyle,
-                background: '#0F6CBD',
-                color: '#FFFFFF',
-                border: '1px solid #0F6CBD',
-                flex: 1,
-              }}
+              className="hr-ops-btn hr-ops-btn-primary"
+              style={{ flex: 1 }}
             >
-              <Plus size={15} /> Assign Course Training
+              <Plus size={15} aria-hidden="true" /> Assign Course Training
             </button>
             <button
               type="button"
               onClick={() => navigate('/hr/departments')}
-              style={{ ...actionBtnStyle, flex: 1 }}
+              className="hr-ops-btn"
+              style={{ flex: 1 }}
             >
               View Departments
             </button>
           </div>
         </section>
 
-        {/* Quick Action Launchpad */}
-        <section style={{ ...cardStyle, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        {/* D. HR Launchpad / Operational Quick Actions */}
+        <section className="hr-ops-panel" aria-labelledby="hr-launchpad-heading">
           <div>
-            <div style={{ marginBottom: '1rem' }}>
-              <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-                Launchpad
-              </h2>
-              <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '4px 0 0 0' }}>
-                Instant navigation to dedicated administrative sections
-              </p>
+            <div className="hr-ops-panel-header">
+              <div>
+                <h2 id="hr-launchpad-heading" className="hr-ops-panel-title">
+                  Launchpad
+                </h2>
+                <p className="hr-ops-panel-subtitle">
+                  Direct access to core HR learning and workforce operations
+                </p>
+              </div>
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-                gap: '0.65rem',
-              }}
-            >
-              {[
-                {
-                  label: 'Create Course',
-                  icon: Plus,
-                  action: () => setShowCourseBuilderModal(true),
-                  color: '#0F6CBD',
-                  bg: '#F0F9FF',
-                },
-                {
-                  label: 'Courses',
-                  icon: Users,
-                  action: () => navigate('/hr/courses'),
-                  color: '#0284C7',
-                  bg: '#F0F9FF',
-                },
-                {
-                  label: 'Manage Staff',
-                  icon: Users,
-                  action: () => navigate('/hr/employees'),
-                  color: '#16A34A',
-                  bg: '#F0FDF4',
-                },
-                {
-                  label: 'Departments',
-                  icon: Building2,
-                  action: () => navigate('/hr/departments'),
-                  color: '#4F46E5',
-                  bg: '#EEF2FF',
-                },
-                {
-                  label: 'Certificates',
-                  icon: Award,
-                  action: () => navigate('/hr/certificates'),
-                  color: '#D97706',
-                  bg: '#FFFBEB',
-                },
-                {
-                  label: 'Export Data',
-                  icon: Download,
-                  action: exportMetrics,
-                  color: '#0F6CBD',
-                  bg: '#F8FAFC',
-                },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={item.action}
-                    style={{
-                      padding: '0.85rem 0.75rem',
-                      borderRadius: '6px',
-                      border: '1px solid #E2E8F0',
-                      background: '#FFFFFF',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      textAlign: 'center',
-                      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
-                      transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#CBD5E1';
-                      e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.08)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = '#E2E8F0';
-                      e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.04)';
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '6px',
-                        background: item.bg,
-                        color: item.color,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '1px solid #E2E8F0',
-                      }}
-                    >
-                      <Icon size={18} />
-                    </div>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#0F172A' }}>
-                      {item.label}
-                    </span>
-                  </button>
-                );
-              })}
+            {/* Categorized action layout */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {launchpadGroups.map((group) => (
+                <div key={group.category}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 750, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.35rem' }}>
+                    {group.category}
+                  </div>
+                  <div className="hr-ops-launchpad-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={item.action}
+                          className="hr-ops-launch-tile"
+                        >
+                          <div
+                            className="hr-ops-launch-icon"
+                            style={{
+                              background: item.bg,
+                              color: item.color,
+                              borderColor: item.border,
+                            }}
+                            aria-hidden="true"
+                          >
+                            <Icon size={16} />
+                          </div>
+                          <div className="hr-ops-launch-text">
+                            <span className="hr-ops-launch-title">{item.label}</span>
+                            <span className="hr-ops-launch-desc">{item.desc}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* System Integration Quick Link */}
-          <div
-            style={{
-              marginTop: '1.25rem',
-              padding: '0.75rem 0.95rem',
-              background: '#F8FAFC',
-              borderRadius: '6px',
-              border: '1px solid #E2E8F0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '0.75rem',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <FolderGit2 size={18} color="#0F6CBD" />
-              <div>
+          {/* System Integration Secondary Group */}
+          <div className="hr-ops-integration-bar">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+              <div
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: '#F0F9FF',
+                  color: '#0284C7',
+                  border: '1px solid #BAE6FD',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+                aria-hidden="true"
+              >
+                <Settings size={16} />
+              </div>
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: '0.82rem', fontWeight: 650, color: '#0F172A' }}>
-                  Zoho WorkDrive Storage
+                  Platform Settings &amp; Policies
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                  Video lesson files stream securely via OAuth
+                <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                  Manage notifications, security rules &amp; integrations
                 </div>
               </div>
             </div>
             <button
               type="button"
               onClick={() => navigate('/hr/settings')}
-              style={{
-                ...actionBtnStyle,
-                padding: '0.35rem 0.75rem',
-                fontSize: '0.78rem',
-              }}
+              className="hr-ops-btn"
+              style={{ padding: '0.38rem 0.75rem', fontSize: '0.76rem' }}
             >
               Configure
             </button>
@@ -743,42 +880,39 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
         </section>
       </div>
 
-      {/* 4. ROW 2: DEPARTMENTAL TRAINING ANALYTICS */}
-      <section style={cardStyle}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '1.25rem',
-            flexWrap: 'wrap',
-            gap: '0.75rem',
-          }}
-        >
+      {/* =========================================================================
+          UPCOMING TRAINING & DEADLINES (COMPACT CALENDAR WIDGET)
+         ========================================================================= */}
+      <UpcomingTrainingWidget />
+
+      {/* =========================================================================
+          E. DEPARTMENT TRAINING ANALYTICS
+         ========================================================================= */}
+      <section className="hr-ops-panel" aria-labelledby="hr-dept-analytics-heading">
+        <div className="hr-ops-panel-header">
           <div>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
-              Departmental Training Analytics
-            </h2>
-            <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '4px 0 0 0' }}>
-              Workforce learning progress by operational division
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+              <h2 id="hr-dept-analytics-heading" className="hr-ops-panel-title">
+                Departmental Training Analytics
+              </h2>
+            </div>
+            <p className="hr-ops-panel-subtitle">
+              Workforce learning progress by operational division — select any division to inspect details
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 500 }}>Sort:</span>
+          <div className="hr-ops-dept-controls">
+            <label
+              htmlFor="hr-dept-sort-select"
+              style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 600 }}
+            >
+              Sort:
+            </label>
             <select
+              id="hr-dept-sort-select"
               value={deptSortBy}
               onChange={(e) => setDeptSortBy(e.target.value)}
-              style={{
-                padding: '0.4rem 0.75rem',
-                borderRadius: '6px',
-                border: '1px solid #CBD5E1',
-                fontSize: '0.8rem',
-                color: '#334155',
-                background: '#FFFFFF',
-                cursor: 'pointer',
-                outline: 'none',
-              }}
+              className="hr-ops-select"
             >
               <option value="highest">Highest Completion</option>
               <option value="lowest">Lowest Completion</option>
@@ -788,128 +922,110 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
             <button
               type="button"
               onClick={loadHrMetrics}
-              style={{ ...actionBtnStyle, padding: '0.4rem 0.75rem' }}
+              className="hr-ops-btn"
+              style={{ padding: '0.42rem 0.75rem', fontSize: '0.79rem' }}
               title="Refresh departmental data"
             >
-              <RefreshCw size={14} /> Refresh
+              <RefreshCw size={14} aria-hidden="true" /> Refresh
             </button>
           </div>
         </div>
 
-        {sortedDepartments.length ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {metricsLoading && sortedDepartments.length === 0 ? (
+          <div className="hr-ops-dept-list">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div
+                key={`dept-skel-${idx}`}
+                className="skeleton-shimmer"
+                style={{ height: '64px', borderRadius: '12px', border: '1px solid #E2E8F0' }}
+              />
+            ))}
+          </div>
+        ) : sortedDepartments.length ? (
+          <div className="hr-ops-dept-list">
             {sortedDepartments.map((dept) => {
               const rate = Math.round(dept.rate);
-              const isHigh = rate >= 90;
-              const isMedium = rate >= 60 && rate < 90;
+              const hasTraining = dept.hasAssignedTraining;
+              const isHigh = hasTraining && rate >= 90;
+              const isMedium = hasTraining && rate >= 50 && rate < 90;
+              const statusClass = !hasTraining
+                ? 'is-neutral'
+                : isHigh
+                ? 'is-met'
+                : isMedium
+                ? 'is-info'
+                : 'is-low';
+              const statusLabel = !hasTraining
+                ? 'No Course Assigned'
+                : isHigh
+                ? 'Target Met'
+                : isMedium
+                ? 'In Progress'
+                : 'Needs Focus';
 
               return (
-                <div
+                <button
                   key={dept.department}
+                  type="button"
                   onClick={() => setSelectedDeptForDrilldown(dept)}
-                  style={{
-                    padding: '0.85rem 1rem',
-                    borderRadius: '6px',
-                    border: '1px solid #E2E8F0',
-                    background: '#FFFFFF',
-                    cursor: 'pointer',
-                    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#CBD5E1';
-                    e.currentTarget.style.background = '#F8FAFC';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#E2E8F0';
-                    e.currentTarget.style.background = '#FFFFFF';
-                  }}
+                  className="hr-ops-dept-row"
+                  aria-label={`${dept.department}: ${dept.completed} of ${dept.total} active employees completed at least one assigned course, ${hasTraining ? rate + '% average course progress' : 'no training assigned'}. Click to open department analytics.`}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '1rem',
-                      flexWrap: 'wrap',
-                      marginBottom: '0.5rem',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                      <div
-                        style={{
-                          width: '32px',
-                          height: '32px',
-                          borderRadius: '6px',
-                          background: '#F0F9FF',
-                          color: '#0F6CBD',
-                          border: '1px solid #BAE6FD',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                        }}
-                      >
-                        <Building2 size={16} />
-                      </div>
-                      <div>
-                        <span
-                          style={{
-                            fontSize: '0.9rem',
-                            fontWeight: 650,
-                            color: '#0F172A',
-                          }}
-                        >
-                          {dept.department}
-                        </span>
-                        <span
-                          style={{
-                            display: 'block',
-                            fontSize: '0.75rem',
-                            color: '#64748B',
-                          }}
-                        >
-                          {dept.completed} of {dept.total} employees trained
-                        </span>
-                      </div>
+                  <div className="hr-ops-dept-identity">
+                    <div className="hr-ops-dept-icon" aria-hidden="true">
+                      <Building2 size={17} />
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <span
-                        style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          padding: '0.15rem 0.55rem',
-                          borderRadius: '4px',
-                          background: isHigh ? '#F0FDF4' : isMedium ? '#F0F9FF' : '#FEF2F2',
-                          color: isHigh ? '#166534' : isMedium ? '#075985' : '#991B1B',
-                          border: `1px solid ${isHigh ? '#BBF7D0' : isMedium ? '#BAE6FD' : '#FECACA'}`,
-                        }}
-                      >
-                        {rate}% Complete
+                    <div style={{ minWidth: 0 }}>
+                      <span className="hr-ops-dept-name">{dept.department}</span>
+                      <span className="hr-ops-dept-count">
+                        {dept.completed} of {dept.total} active employees completed at least one assigned course
                       </span>
-                      <ChevronRight size={16} color="#94A3B8" />
                     </div>
                   </div>
 
-                  <div className="progress-bar-bg" style={{ height: '6px' }}>
-                    <div
-                      className="progress-bar-fill"
-                      style={{
-                        width: `${dept.rate}%`,
-                        background: isHigh ? '#16A34A' : isMedium ? '#0F6CBD' : '#DC2626',
-                      }}
-                    />
+                  <div className="hr-ops-dept-progress-col">
+                    <div className="hr-ops-dept-progress-meta">
+                      <span>Average Course Progress</span>
+                      <span>{hasTraining ? `${rate}%` : '—'}</span>
+                    </div>
+                    <div className="hr-ops-progress-track">
+                      <div
+                        className="hr-ops-progress-fill"
+                        style={{
+                          width: hasTraining ? `${dept.rate}%` : '0%',
+                          background: !hasTraining
+                            ? '#94A3B8'
+                            : isHigh
+                            ? '#16A34A'
+                            : isMedium
+                            ? '#0F6CBD'
+                            : '#DC2626',
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
+
+                  <div className="hr-ops-dept-status-col">
+                    <span className={`hr-ops-status-pill ${statusClass}`}>
+                      {!hasTraining ? (
+                        <HelpCircle size={12} aria-hidden="true" />
+                      ) : isHigh ? (
+                        <CheckCircle2 size={12} aria-hidden="true" />
+                      ) : !isMedium ? (
+                        <AlertTriangle size={12} aria-hidden="true" />
+                      ) : null}
+                      {!hasTraining ? statusLabel : `${rate}% Complete • ${statusLabel}`}
+                    </span>
+                    <ChevronRight size={16} color="#64748B" aria-hidden="true" />
+                  </div>
+                </button>
               );
             })}
           </div>
         ) : (
-          <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#64748B' }}>
-            <Building2 size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
-            <p style={{ fontWeight: 600, margin: 0, color: '#0F172A' }}>No department statistics found.</p>
+          <div style={{ padding: '2.25rem 1rem', textAlign: 'center', color: '#64748B' }}>
+            <Building2 size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.45 }} aria-hidden="true" />
+            <p style={{ fontWeight: 650, margin: 0, color: '#0F172A' }}>No department statistics found.</p>
             <p style={{ fontSize: '0.8rem', margin: '4px 0 0 0' }}>
               Department figures will appear once employee training records are active.
             </p>
@@ -917,112 +1033,99 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
         )}
       </section>
 
-      {/* 5. ROW 3: RECENTLY AWARDED CERTIFICATES PREVIEW */}
-      <section style={cardStyle}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: '1rem',
-            flexWrap: 'wrap',
-            gap: '0.75rem',
-          }}
-        >
+      {/* =========================================================================
+          F. RECENTLY ISSUED CREDENTIALS
+         ========================================================================= */}
+      <section className="hr-ops-panel" aria-labelledby="hr-recent-creds-heading">
+        <div className="hr-ops-panel-header">
           <div>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+            <h2 id="hr-recent-creds-heading" className="hr-ops-panel-title">
               Recently Issued Credentials
             </h2>
-            <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '4px 0 0 0' }}>
+            <p className="hr-ops-panel-subtitle">
               Verified course certifications awarded across all branches
             </p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/hr/certificates')}
-            style={{ ...actionBtnStyle, padding: '0.4rem 0.75rem' }}
+            className="hr-ops-btn"
+            style={{ padding: '0.42rem 0.8rem', fontSize: '0.79rem' }}
           >
-            View All Certificates <ChevronRight size={14} />
+            View All Certificates <ChevronRight size={14} aria-hidden="true" />
           </button>
         </div>
 
         {recentCertificates?.length ? (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '0.75rem',
-            }}
-          >
-            {recentCertificates.slice(0, 4).map((cert, idx) => (
-              <div
-                key={cert.certificateId ?? cert.id ?? idx}
-                onClick={() => openRecentAsVerified(cert)}
-                style={{
-                  padding: '0.75rem 0.95rem',
-                  borderRadius: '6px',
-                  border: '1px solid #E2E8F0',
-                  background: '#FFFFFF',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',
-                  transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#CBD5E1';
-                  e.currentTarget.style.background = '#F8FAFC';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#E2E8F0';
-                  e.currentTarget.style.background = '#FFFFFF';
-                }}
-              >
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '6px',
-                    background: '#F0FDF4',
-                    color: '#16A34A',
-                    border: '1px solid #BBF7D0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
+          <div className="hr-ops-cert-grid">
+            {recentCertificates.slice(0, 4).map((cert, idx) => {
+              const courseTitle = cert.courseTitle || cert.courseName || 'Completed Course';
+              const recipientName = cert.userName || cert.employeeName || 'Employee';
+              const certCode = cert.certificateId || cert.id;
+              return (
+                <button
+                  key={certCode ?? idx}
+                  type="button"
+                  onClick={() => openRecentAsVerified(cert)}
+                  className="hr-ops-cert-card"
+                  aria-label={`Verify certificate ${certCode} for ${recipientName} in ${courseTitle}`}
                 >
-                  <Award size={18} />
-                </div>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: '0.86rem',
-                      fontWeight: 650,
-                      color: '#0F172A',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                    }}
-                  >
-                    {cert.courseTitle || cert.courseName || 'Completed Course'}
+                  <div className="hr-ops-cert-badge" aria-hidden="true">
+                    <Award size={19} />
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: 2 }}>
-                    {cert.userName || cert.employeeName || 'Employee'}
-                    {cert.department ? ` • ${cert.department}` : ''}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        fontSize: '0.86rem',
+                        fontWeight: 650,
+                        color: '#0F172A',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {courseTitle}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#475569', marginTop: 2 }}>
+                      {recipientName}
+                      {cert.department ? ` • ${cert.department}` : ''}
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                        marginTop: 5,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.71rem',
+                          color: '#0F6CBD',
+                          fontWeight: 600,
+                          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                          background: '#F0F9FF',
+                          padding: '0.1rem 0.42rem',
+                          borderRadius: '4px',
+                          border: '1px solid #BAE6FD',
+                        }}
+                      >
+                        {certCode}
+                      </span>
+                      <span style={{ fontSize: '0.71rem', fontWeight: 600, color: '#15803D' }}>
+                        Preview →
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: '#0F6CBD', fontWeight: 500, marginTop: 2, fontFamily: 'monospace' }}>
-                    {cert.certificateId || cert.id}
-                  </div>
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
         ) : (
           <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#64748B' }}>
-            <Award size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
-            <p style={{ fontWeight: 600, margin: 0, color: '#0F172A' }}>No recent credentials to display.</p>
+            <Award size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.45 }} aria-hidden="true" />
+            <p style={{ fontWeight: 650, margin: 0, color: '#0F172A' }}>No recent credentials to display.</p>
             <p style={{ fontSize: '0.8rem', margin: '4px 0 0 0' }}>
               Newly issued employee certificates will appear here automatically.
             </p>
@@ -1030,65 +1133,33 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
         )}
       </section>
 
-      {/* DEPARTMENT DRILLDOWN MODAL */}
-      {selectedDeptForDrilldown && (
+      {/* =========================================================================
+          G1. DEPARTMENT DRILLDOWN MODAL (VIEWPORT PORTAL)
+         ========================================================================= */}
+      {selectedDeptForDrilldown && typeof document !== 'undefined' && createPortal(
         <div
-          className="modal-overlay"
+          id="hr-dept-drilldown-portal"
+          className="hr-dept-drilldown-overlay"
           role="presentation"
           onClick={(event) => {
             if (event.target === event.currentTarget) setSelectedDeptForDrilldown(null);
           }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.45)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '1rem',
-          }}
         >
           <div
-            className="animate-fade-in"
+            className="hr-dept-drilldown-modal animate-fade-in"
             role="dialog"
             aria-modal="true"
             aria-labelledby="dept-drilldown-title"
-            style={{
-              maxWidth: 540,
-              width: '100%',
-              borderRadius: '8px',
-              background: '#FFFFFF',
-              boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.12)',
-              overflow: 'hidden',
-              border: '1px solid #E2E8F0',
-            }}
           >
-            <div
-              style={{
-                background: '#0F172A',
-                padding: '1.25rem 1.5rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                color: '#FFFFFF',
-              }}
-            >
+            {/* Header (pinned glass navy) */}
+            <div className="hr-dept-drilldown-header">
               <div>
-                <div
-                  style={{
-                    fontSize: '0.72rem',
-                    fontWeight: 600,
-                    color: '#38BDF8',
-                    textTransform: 'uppercase',
-                    letterSpacing: 1,
-                  }}
-                >
+                <div className="hr-dept-drilldown-subtitle">
                   Department Analytics
                 </div>
                 <h2
                   id="dept-drilldown-title"
-                  style={{ fontSize: '1.2rem', fontWeight: 700, margin: '4px 0 0 0' }}
+                  className="hr-dept-drilldown-title"
                 >
                   {selectedDeptForDrilldown.department}
                 </h2>
@@ -1097,113 +1168,103 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
                 type="button"
                 aria-label="Close department details"
                 onClick={() => setSelectedDeptForDrilldown(null)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.15)',
-                  border: 0,
-                  padding: '0.4rem',
-                  borderRadius: '6px',
-                  color: '#FFFFFF',
-                  cursor: 'pointer',
-                  display: 'flex',
-                }}
+                className="hr-dept-drilldown-close-btn"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div style={{ padding: '1.5rem' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: '0.75rem',
-                }}
-              >
+            {/* Scrollable Body (icy-white glass) */}
+            <div className="hr-dept-drilldown-body">
+              {/* Metric Cards Row */}
+              <div className="hr-dept-drilldown-kpi-grid">
                 {[
-                  { label: 'Total Employees', value: selectedDeptForDrilldown.total },
-                  { label: 'Completed', value: selectedDeptForDrilldown.completed },
+                  { label: 'Active Employees', value: selectedDeptForDrilldown.total },
+                  { label: 'Completed ≥1 Assigned Course', value: selectedDeptForDrilldown.completed },
                   {
-                    label: 'Completion',
-                    value: `${Math.round(selectedDeptForDrilldown.rate)}%`,
+                    label: 'Average Progress',
+                    value: selectedDeptForDrilldown.hasAssignedTraining
+                      ? `${Math.round(selectedDeptForDrilldown.rate)}%`
+                      : 'No courses assigned',
                   },
                 ].map((item) => (
                   <div
                     key={item.label}
-                    style={{
-                      background: '#F8FAFC',
-                      padding: '0.85rem',
-                      borderRadius: '6px',
-                      border: '1px solid #E2E8F0',
-                      textAlign: 'center',
-                    }}
+                    className="hr-dept-drilldown-kpi-card"
                   >
-                    <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                    <div className="hr-dept-drilldown-kpi-label">
                       {item.label}
                     </div>
-                    <div
-                      style={{
-                        fontSize: '1.25rem',
-                        fontWeight: 700,
-                        color: '#0F172A',
-                        marginTop: 4,
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    >
+                    <div className="hr-dept-drilldown-kpi-value">
                       {item.value}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <p
-                style={{
-                  color: '#64748B',
-                  fontSize: '0.84rem',
-                  lineHeight: 1.5,
-                  marginTop: '1.25rem',
-                }}
-              >
-                Department completion rate is dynamically computed from live employee course attempts.
-                Assigning mandatory training will instantly cascade to all active members of this department.
-              </p>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '0.75rem',
-                  marginTop: '1.5rem',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setSelectedDeptForDrilldown(null)}
-                  style={actionBtnStyle}
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedDeptForDrilldown(null);
-                    navigate('/hr/courses');
-                  }}
-                  style={{
-                    ...actionBtnStyle,
-                    background: '#0F6CBD',
-                    color: '#FFFFFF',
-                    border: '1px solid #0F6CBD',
-                  }}
-                >
-                  Go to Courses
-                </button>
+              {/* Progress Section */}
+              <div className="hr-dept-drilldown-progress-section">
+                <div className="hr-dept-drilldown-progress-header">
+                  <span>Average Course Progress (Assigned Training)</span>
+                  <span className="hr-dept-drilldown-progress-pct">
+                    {selectedDeptForDrilldown.hasAssignedTraining
+                      ? `${Math.round(selectedDeptForDrilldown.rate)}%`
+                      : 'No courses assigned'}
+                  </span>
+                </div>
+                <div className="hr-dept-drilldown-progress-track">
+                  <div
+                    className="hr-dept-drilldown-progress-fill"
+                    style={{
+                      width: selectedDeptForDrilldown.hasAssignedTraining ? `${selectedDeptForDrilldown.rate}%` : '0%',
+                      background:
+                        !selectedDeptForDrilldown.hasAssignedTraining
+                          ? '#94A3B8'
+                          : selectedDeptForDrilldown.rate >= 90
+                          ? 'linear-gradient(90deg, #16A34A 0%, #22C55E 100%)'
+                          : selectedDeptForDrilldown.rate >= 50
+                          ? 'linear-gradient(90deg, #0F6CBD 0%, #0284C7 100%)'
+                          : 'linear-gradient(90deg, #DC2626 0%, #EF4444 100%)',
+                    }}
+                  />
+                </div>
               </div>
+
+              {/* Descriptive context */}
+              <p className="hr-dept-drilldown-desc">
+                Average course progress is calculated across active learners who have eligible assigned courses in this division.
+                Assigning courses will cascade to all eligible members of this department.
+              </p>
+            </div>
+
+            {/* Footer Actions (pinned glass) */}
+            <div className="hr-dept-drilldown-footer">
+              <button
+                type="button"
+                onClick={() => setSelectedDeptForDrilldown(null)}
+                className="hr-dept-drilldown-btn-close"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDeptForDrilldown(null);
+                  navigate('/hr/courses');
+                }}
+                className="hr-dept-drilldown-btn-primary"
+              >
+                Go to Courses
+              </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* QUICK COURSE BUILDER MODAL */}
+      {/* =========================================================================
+          G2. QUICK COURSE BUILDER MODAL
+         ========================================================================= */}
       {showCourseBuilderModal && (
         <CourseBuilderModal
           key="hr-quick-builder"

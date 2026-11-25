@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Pencil,
@@ -9,7 +10,7 @@ import {
 } from 'lucide-react';
 import CourseBuilderModal, { preloadCourseBuilderReferenceData } from './CourseBuilderModal';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = SHARED_API_BASE_URL;
 
 const cardStyle = {
   background: '#FFFFFF',
@@ -56,7 +57,7 @@ export default function HrDraftsPage() {
     setDraftsError('');
     try {
       const token = localStorage.getItem('fairmacs_token') || localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/drafts`, {
+      const response = await authFetch(`${API_BASE_URL}/drafts`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!response.ok) throw new Error(`Could not load drafts (${response.status})`);
@@ -86,7 +87,7 @@ export default function HrDraftsPage() {
     setDraftDeleteError('');
     try {
       const token = localStorage.getItem('fairmacs_token') || localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/drafts/${encodeURIComponent(targetId)}`, {
+      const response = await authFetch(`${API_BASE_URL}/drafts/${encodeURIComponent(targetId)}`, {
         method: 'DELETE',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

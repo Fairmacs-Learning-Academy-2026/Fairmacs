@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -245,9 +246,7 @@ export default function CourseViewer({
     };
   }, [activeLesson?.dbId, activeLesson?.id]);
 
-  const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL ||
-    'http://localhost:8080/api';
+  const API_BASE_URL = SHARED_API_BASE_URL;
 
 
   const [moduleQuizzes, setModuleQuizzes] = useState([]);
@@ -269,7 +268,7 @@ export default function CourseViewer({
         localStorage.getItem('fairmacs_lms_token') ||
         localStorage.getItem('token') ||
         '';
-      const res = await fetch(`/api/certificates/course/${encodeURIComponent(courseDbId)}`, {
+      const res = await authFetch(`${SHARED_API_BASE_URL}/certificates/course/${encodeURIComponent(courseDbId)}`, {
         headers: {
           Accept: 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
@@ -304,7 +303,7 @@ export default function CourseViewer({
     const courseDbId = course?.dbId ?? course?.courseDbId ?? course?.id;
     if (!courseDbId) { setModuleQuizzes([]); setFinalQuiz(null); return; }
     const token = localStorage.getItem('fairmacs_token') || '';
-    fetch(`${API_BASE_URL}/quizzes/course/${encodeURIComponent(courseDbId)}`, {
+    authFetch(`${API_BASE_URL}/quizzes/course/${encodeURIComponent(courseDbId)}`, {
       headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
     }).then(async response => {
       if (!response.ok) throw new Error(`Quiz list request failed (${response.status})`);
@@ -341,7 +340,7 @@ export default function CourseViewer({
         const id = quiz?.dbId ?? quiz?.id ?? quiz?.quizId;
         if (!id) return null;
         try {
-          const response = await fetch(`${API_BASE_URL}/quizzes/${encodeURIComponent(id)}/unlock-status`, {
+          const response = await authFetch(`${API_BASE_URL}/quizzes/${encodeURIComponent(id)}/unlock-status`, {
             headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }
           });
           if (!response.ok) throw new Error(`Unlock status request failed (${response.status})`);
@@ -918,7 +917,7 @@ export default function CourseViewer({
         );
       }
 
-      const response = await fetch(
+      const response = await authFetch(
         `${API_BASE_URL}/lessons/${encodeURIComponent(
           documentLessonId
         )}/document`,

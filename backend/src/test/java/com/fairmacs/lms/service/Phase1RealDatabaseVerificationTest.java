@@ -8,6 +8,7 @@ import com.fairmacs.lms.repository.LessonRepository;
 import com.fairmacs.lms.repository.ModuleRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -19,6 +20,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("live")
 public class Phase1RealDatabaseVerificationTest {
 
     @Test
@@ -28,8 +30,10 @@ public class Phase1RealDatabaseVerificationTest {
         String dbUser = System.getenv("SUPABASE_DB_USERNAME");
         String dbPass = System.getenv("SUPABASE_DB_PASSWORD");
 
-        if (dbUrl == null || dbUser == null || dbPass == null) {
-            System.out.println("Live Supabase credentials not found in env.");
+        if (dbUrl == null || dbUser == null || dbPass == null ||
+                dbUrl.contains("localhost") || dbUrl.contains("127.0.0.1") ||
+                "true".equalsIgnoreCase(System.getenv("CI"))) {
+            System.out.println("Live Supabase credentials not configured in env (CI/local environment). Skipping real database test.");
             return;
         }
 

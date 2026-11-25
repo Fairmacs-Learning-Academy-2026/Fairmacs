@@ -431,7 +431,7 @@ console.log('[PASS] 14. Role-based security isolation verified at backend query 
 // Test 15: Preservation of Approved UI/UX & Standalone Hotfix
 // -----------------------------------------------------------------------------
 assert(!carouselSrc.includes('role="button"'), 'Carousel contains no role="button" wrappers');
-assert(carouselSrc.includes('<article') && carouselSrc.includes('className="assigned-course-hero-card"'), 'Hero card uses semantic article');
+assert(carouselSrc.includes('<article') && carouselSrc.includes('assigned-course-hero-card'), 'Hero card uses semantic article');
 assert(carouselSrc.includes('tabIndex={isActiveSlide ? 0 : -1}'), 'Independent tabIndex on CTA preserved');
 assert(!overviewSrc.includes('h2 className="carousel-section-heading"'), 'No section heading introduced above carousel');
 console.log('[PASS] 15. Approved Phase 1/2 UI and accessibility structure fully preserved.');

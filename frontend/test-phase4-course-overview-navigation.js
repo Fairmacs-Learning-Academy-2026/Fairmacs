@@ -168,7 +168,7 @@ console.log('[PASS] 11. Direct URL, refresh, back/catalog routing, and certifica
 // Test 12: Preservation of Phase 1, 2, and 3 Approved Architecture
 // -----------------------------------------------------------------------------
 assert(!carouselSrc.includes('role="button"'), 'Carousel contains no role="button" wrappers');
-assert(carouselSrc.includes('<article') && carouselSrc.includes('className="assigned-course-hero-card"'), 'Hero card uses semantic article');
+assert(carouselSrc.includes('<article') && carouselSrc.includes('assigned-course-hero-card'), 'Hero card uses semantic article');
 assert(carouselSrc.includes('tabIndex={isActiveSlide ? 0 : -1}'), 'Independent tabIndex on CTA preserved');
 assert(!overviewCompSrc.includes('h2 className="carousel-section-heading"'), 'No section heading introduced above carousel');
 assert(overviewCompSrc.includes("subscribeEnrollmentSync"), 'Overview maintains Phase 3 synchronization bus');

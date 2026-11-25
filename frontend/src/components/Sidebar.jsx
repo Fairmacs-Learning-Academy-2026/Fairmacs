@@ -112,7 +112,7 @@ export default function Sidebar({
           { id: 'overview', label: 'HR Overview', icon: LayoutGrid, path: '/hr/overview', animType: 'grid-pulse' },
           { id: 'employees', label: 'Employees', icon: Users, path: '/hr/employees', animType: 'person-shift' },
           { id: 'departments', label: 'Departments', icon: Building2, path: '/hr/departments', animType: 'building-lift' },
-          { id: 'courses', label: 'Course Catalog', icon: BookOpen, path: '/hr/courses', animType: 'book-open' },
+          { id: 'courses', label: 'Courses', icon: BookOpen, path: '/hr/courses', animType: 'book-open' },
           { id: 'drafts', label: 'Course Drafts', icon: FileText, path: '/hr/drafts', animType: 'doc-write' },
           { id: 'hrPolicies', label: 'Policies & Agreements', icon: FileCheck, path: '/hr/policies', animType: 'doc-write' },
           { id: 'reports', label: 'HR Analytics', icon: BarChart3, path: '/hr/reports', animType: 'chart-grow' },

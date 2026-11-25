@@ -238,7 +238,6 @@ public class EnrollmentService {
     final String finalRequiredLevel = requiredLevel;
     List<User> eligibleUsers = targetUsers.stream()
             .filter(Objects::nonNull)
-            .filter(user -> user.getRole() == Role.EMPLOYEE)
             .filter(user -> user.getStatus() == UserStatus.ACTIVE)
             .filter(user -> finalRequiredLevel == null || finalRequiredLevel.equals(normalizeLevel(user.getLevel())))
             .toList();
@@ -772,10 +771,6 @@ public class EnrollmentService {
             }
 
             if (user.getStatus() != UserStatus.ACTIVE) {
-                continue;
-            }
-
-            if (user.getRole() != Role.EMPLOYEE) {
                 continue;
             }
 

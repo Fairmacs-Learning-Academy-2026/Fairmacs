@@ -20,13 +20,26 @@ CREATE DATABASE fairmacs_lms;
 
 ### 2. Update Application Properties
 
-Edit `src/main/resources/application.properties`:
+Configuration is read from environment variables (see `src/main/resources/application.properties`).
+The database is PostgreSQL (Supabase); the schema is managed by Flyway and validated by Hibernate.
 
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/fairmacs_lms
-spring.datasource.username=root
-spring.datasource.password=your_mysql_password
-jwt.secret=your-secret-key-change-this-in-production-min-256-bits
+Required - the application will NOT start without these:
+
+```bash
+export SUPABASE_DB_URL=jdbc:postgresql://<host>:5432/<database>
+export SUPABASE_DB_USERNAME=<db user>
+export SUPABASE_DB_PASSWORD=<db password>
+# At least 32 bytes. Generate one with: openssl rand -base64 48
+# Keep it identical across deploys, otherwise every user is logged out.
+export JWT_SECRET=<long random secret>
+```
+
+Set these for a real deployment:
+
+```bash
+export CORS_ALLOWED_ORIGINS=https://your-frontend-domain   # comma-separated; default is localhost only
+export FRONTEND_BASE_URL=https://your-frontend-domain      # used in links inside notification emails
+export ZOHO_CLIENT_ID=... ZOHO_CLIENT_SECRET=... ZOHO_TOKEN_ENCRYPTION_KEY=... ZOHO_REDIRECT_URI=...
 ```
 
 ### 3. Build and Run
@@ -149,7 +162,7 @@ Configure in `application.properties`:
 - `spring.datasource.url` - Database connection URL
 - `spring.datasource.username` - Database username
 - `spring.datasource.password` - Database password
-- `jwt.secret` - JWT secret key (min 256 bits for production)
+- `jwt.secret` - JWT secret key (set via `JWT_SECRET`, required, min 256 bits)
 - `jwt.expiration` - JWT token expiration time in milliseconds
 - `cors.allowed-origins` - Comma-separated list of allowed CORS origins
 

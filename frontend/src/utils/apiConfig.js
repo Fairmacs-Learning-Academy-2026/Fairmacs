@@ -79,3 +79,16 @@ export function handleUnauthorized(redirect = true) {
     window.location.href = '/login';
   }
 }
+
+/**
+ * Drop-in replacement for fetch() for calls to the backend API.
+ * If the server answers 401 (expired / invalid token) the stale session is cleared
+ * and the user is sent to the login page, instead of every screen showing "Request failed (401)".
+ */
+export async function authFetch(input, init) {
+  const response = await fetch(input, init);
+  if (response.status === 401) {
+    handleUnauthorized(true);
+  }
+  return response;
+}

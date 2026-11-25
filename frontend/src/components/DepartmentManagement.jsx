@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,7 +20,7 @@ import {
 
 
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+const API_BASE_URL = SHARED_API_BASE_URL;
 
 
 
@@ -61,7 +62,7 @@ export default function DepartmentManagement() {
 
 
 
-      const response = await fetch(`${API_BASE_URL}/departments`, {
+      const response = await authFetch(`${API_BASE_URL}/departments`, {
 
         method: 'GET',
 

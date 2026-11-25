@@ -21,6 +21,7 @@ import CertificatesWidget from './dashboard/CertificatesWidget';
 import PoliciesWidget from './dashboard/PoliciesWidget';
 import AnnouncementsWidget from './dashboard/AnnouncementsWidget';
 import UpcomingDeadlinesWidget from './dashboard/UpcomingDeadlinesWidget';
+import UpcomingTrainingWidget from './dashboard/UpcomingTrainingWidget';
 import RecommendedElectivesWidget from './dashboard/RecommendedElectivesWidget';
 import { formatCourseDuration } from '../utils/courseDuration';
 import { subscribeEnrollmentSync } from '../utils/enrollmentSync';
@@ -425,7 +426,7 @@ export default function Overview({
                   letterSpacing: '-0.02em'
                 }}
               >
-                You're all caught up
+                You're all caught up!
               </h2>
               <p
                 style={{
@@ -528,15 +529,11 @@ export default function Overview({
           </div>
 
           {/* ========================================================
-              PHASE 7: UPCOMING DEADLINES & RECOMMENDED ELECTIVES
+              PHASE 7: UPCOMING TRAINING & DEADLINES (CALENDAR INTEGRATED)
               Balanced Apple Liquid Glass Sections
           ======================================================== */}
-          {/* 9. Upcoming Deadlines Widget */}
-          <UpcomingDeadlinesWidget
-            assignedCourses={assignedCourses}
-            onOpenCourse={handleOpenCourse}
-            loading={false}
-          />
+          {/* 9. Upcoming Training & Deadlines Widget */}
+          <UpcomingTrainingWidget />
 
           {/* 10. Recommended Electives Widget */}
           <RecommendedElectivesWidget

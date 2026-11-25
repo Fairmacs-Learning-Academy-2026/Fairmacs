@@ -1,8 +1,9 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, RefreshCw, Search, Users, CheckCircle2, AlertTriangle } from 'lucide-react';
 import CourseThumbnailImage from './CourseThumbnailImage';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+const API_BASE = SHARED_API_BASE_URL;
 const token = () => localStorage.getItem('fairmacs_token') || localStorage.getItem('token') || '';
 
 function StatCard({ icon: Icon, label, value, tone = 'blue' }) {
@@ -37,7 +38,7 @@ export default function ManagerAllCourses() {
     setError('');
     refresh ? setRefreshing(true) : setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/manager/all-courses`, {
+      const response = await authFetch(`${API_BASE}/manager/all-courses`, {
         headers: { Accept: 'application/json', ...(token() ? { Authorization: `Bearer ${token()}` } : {}) }
       });
       if (!response.ok) throw new Error((await response.text()) || `Request failed (${response.status})`);

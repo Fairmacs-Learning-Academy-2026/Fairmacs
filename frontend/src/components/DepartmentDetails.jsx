@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -18,7 +19,7 @@ import {
   Clock3,
 } from 'lucide-react';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+const API_BASE_URL = SHARED_API_BASE_URL;
 
 function CircularProgress({ percent = 0, size = 50, strokeWidth = 3.5 }) {
   const radius = (size - strokeWidth) / 2;
@@ -81,7 +82,7 @@ export default function DepartmentDetails() {
         localStorage.getItem('fairmacs_lms_token') ||
         '';
 
-      const response = await fetch(
+      const response = await authFetch(
         `${API_BASE_URL}/departments/${departmentId}/details`,
         {
           method: 'GET',

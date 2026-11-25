@@ -7,8 +7,7 @@ import {
   Database,
   CheckCircle2
 } from 'lucide-react';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+import { getZohoConnectUrl } from '../services/zohoService';
 
 const cardStyle = {
   background: '#FFFFFF',
@@ -45,18 +44,8 @@ export default function HrSettingsPage() {
     try {
       setConnectingZoho(true);
       setZohoError('');
-      const token = localStorage.getItem('fairmacs_token') || localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/zoho/auth-url`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.url) {
-          window.location.href = data.url;
-          return;
-        }
-      }
-      throw new Error('Unable to generate Zoho OAuth authorization URL.');
+      const authUrl = await getZohoConnectUrl();
+      window.location.href = authUrl;
     } catch (err) {
       setZohoError(err.message || 'Zoho authorization failed.');
     } finally {

@@ -16,7 +16,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { policyService } from '../../services/policyService';
-import { API_BASE_URL, getAuthToken } from '../../utils/apiConfig';
+import { API_BASE_URL, getAuthToken, authFetch } from '../../utils/apiConfig';
 
 // Subcomponents
 import PolicyOverviewTab from './PolicyOverviewTab';
@@ -74,7 +74,7 @@ export default function PolicyHrManagement() {
 
       // Fetch departments using authenticated fetch
       const token = getAuthToken();
-      fetch(`${API_BASE_URL}/departments`, {
+      authFetch(`${API_BASE_URL}/departments`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
         .then((res) => (res.ok ? res.json() : []))

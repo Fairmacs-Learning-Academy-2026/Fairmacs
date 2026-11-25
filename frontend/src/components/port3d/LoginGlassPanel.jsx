@@ -92,7 +92,7 @@ export default function LoginGlassPanel({
                   type="text"
                   autoComplete="username"
                   placeholder={
-                    idFocused ? 'e.g. EMP1001 or arjun.kumar@fairmacs.com' : ''
+                    idFocused ? 'e.g. EMP001 or abc@fairmacs.com' : ''
                   }
                   value={empId}
                   onFocus={() => setIdFocused(true)}

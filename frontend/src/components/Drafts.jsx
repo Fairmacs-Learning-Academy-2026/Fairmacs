@@ -1,9 +1,9 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Trash2, Edit3, AlertTriangle, CheckCircle2, X, Plus, RefreshCw } from 'lucide-react';
 import { preloadCourseBuilderReferenceData } from './CourseBuilderModal';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = SHARED_API_BASE_URL;
 
 function formatPosition(pos) {
   if (!pos) return '';
@@ -40,7 +40,7 @@ export default function Drafts({ onOpenDraft, onCreateDraft, refreshKey = 0 }) {
         localStorage.getItem('fairmacs_token') ||
         localStorage.getItem('token');
 
-      const response = await fetch(`${API_BASE_URL}/drafts`, {
+      const response = await authFetch(`${API_BASE_URL}/drafts`, {
         headers: token
           ? { Authorization: `Bearer ${token}`, Accept: 'application/json' }
           : { Accept: 'application/json' },
@@ -89,7 +89,7 @@ export default function Drafts({ onOpenDraft, onCreateDraft, refreshKey = 0 }) {
         localStorage.getItem('fairmacs_token') ||
         localStorage.getItem('token');
 
-      const response = await fetch(
+      const response = await authFetch(
         `${API_BASE_URL}/drafts/${encodeURIComponent(courseId)}`,
         {
           method: 'DELETE',

@@ -1,6 +1,7 @@
 package com.fairmacs.lms.database;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
@@ -9,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.*;
 
+@Tag("live")
 public class ProfileCentreLiveDatabaseAuditTest {
 
     @Test
@@ -18,8 +20,10 @@ public class ProfileCentreLiveDatabaseAuditTest {
         String dbUser = System.getenv("SUPABASE_DB_USERNAME");
         String dbPass = System.getenv("SUPABASE_DB_PASSWORD");
 
-        if (dbUrl == null || dbUser == null || dbPass == null) {
-            System.err.println("Live Supabase credentials not found in env.");
+        if (dbUrl == null || dbUser == null || dbPass == null ||
+                dbUrl.contains("localhost") || dbUrl.contains("127.0.0.1") ||
+                "true".equalsIgnoreCase(System.getenv("CI"))) {
+            System.err.println("Live Supabase credentials not configured in env (CI/local environment). Skipping audit.");
             return;
         }
 

@@ -4,6 +4,7 @@ import com.fairmacs.lms.integration.zoho.ZohoOAuthService;
 import com.fairmacs.lms.integration.zoho.ZohoWorkDriveDownloadService;
 import com.fairmacs.lms.integration.zoho.ZohoWorkDriveService;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("live")
 public class LiveZohoWorkDriveAuditTest {
 
     @Test
@@ -26,8 +28,11 @@ public class LiveZohoWorkDriveAuditTest {
         String clientId = System.getenv("ZOHO_CLIENT_ID");
         String clientSecret = System.getenv("ZOHO_CLIENT_SECRET");
 
-        if (dbUrl == null || dbUser == null || dbPass == null || encKey == null) {
-            System.err.println("Database or Zoho encryption key not found in environment. Skipping live test.");
+        if (dbUrl == null || dbUser == null || dbPass == null || encKey == null ||
+                "ci_dummy_client_id".equals(clientId) ||
+                dbUrl.contains("localhost") || dbUrl.contains("127.0.0.1") ||
+                "true".equalsIgnoreCase(System.getenv("CI"))) {
+            System.err.println("Live Zoho WorkDrive credentials not configured. Skipping live test.");
             return;
         }
 

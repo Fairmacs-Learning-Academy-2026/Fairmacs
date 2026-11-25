@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Compass,
@@ -11,8 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = SHARED_API_BASE_URL;
 
 function getAuthToken() {
   return (
@@ -78,7 +78,7 @@ export default function LearningPaths() {
 
     try {
       const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/learning-paths`, {
+      const response = await authFetch(`${API_BASE_URL}/learning-paths`, {
         method: 'GET',
         headers: {
           Accept: 'application/json',

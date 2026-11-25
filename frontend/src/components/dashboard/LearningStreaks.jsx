@@ -332,16 +332,6 @@ export default function LearningStreaks() {
             >
               Learning Consistency
             </h2>
-            <p
-              style={{
-                fontSize: '0.8rem',
-                color: '#718198',
-                margin: 0,
-                fontWeight: 500
-              }}
-            >
-              Dual Activity Rings & Weekly Milestone Habit
-            </p>
           </div>
         </div>
 

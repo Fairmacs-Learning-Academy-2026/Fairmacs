@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, {
   useCallback,
   useEffect,
@@ -100,8 +101,7 @@ export default function QuizModal({
     localStorage.getItem('token') ||
     '';
 
-  const getApiBaseUrl = () =>
-    (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+  const getApiBaseUrl = () => SHARED_API_BASE_URL;
 
   const loadCooldownStatus = useCallback(async () => {
     if (!quizId || previewMode) return null;
@@ -109,7 +109,7 @@ export default function QuizModal({
     if (!token) return null;
 
     try {
-      const response = await fetch(
+      const response = await authFetch(
         `${getApiBaseUrl()}/quizzes/${encodeURIComponent(quizId)}/unlock-status`,
         {
           method: 'GET',
@@ -195,11 +195,9 @@ export default function QuizModal({
         throw new Error('Your session has expired. Please sign in again.');
       }
 
-      const apiBaseUrl =
-        import.meta.env.VITE_API_BASE_URL ||
-        'http://localhost:8080/api';
+      const apiBaseUrl = SHARED_API_BASE_URL;
 
-      const response = await fetch(
+      const response = await authFetch(
         `${apiBaseUrl}/quizzes/${encodeURIComponent(quizId)}/preview`,
         {
           method: 'GET',

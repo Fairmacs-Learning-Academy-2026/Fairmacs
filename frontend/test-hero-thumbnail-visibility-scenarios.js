@@ -21,7 +21,7 @@ const courseThumbnailImg = fs.readFileSync(courseThumbnailImgPath, 'utf8');
 
 // 1. Verify Split Layout Architecture
 assert.ok(
-  overviewPage.includes('className="course-overview-hero"'),
+  overviewPage.includes('course-overview-hero'),
   'CourseOverviewPage must use .course-overview-hero container'
 );
 assert.ok(
@@ -29,11 +29,11 @@ assert.ok(
   'CourseOverviewPage must implement two-column .course-overview-hero-split'
 );
 assert.ok(
-  overviewPage.includes('className="course-overview-hero-thumb-card"'),
+  overviewPage.includes('course-overview-hero-thumb-card'),
   'CourseOverviewPage must render dedicated .course-overview-hero-thumb-card'
 );
 assert.ok(
-  overviewPage.includes('className="course-overview-hero-info"'),
+  overviewPage.includes('course-overview-hero-info'),
   'CourseOverviewPage must render .course-overview-hero-info on right column'
 );
 console.log('[PASS] 1. Split Layout Architecture verified');

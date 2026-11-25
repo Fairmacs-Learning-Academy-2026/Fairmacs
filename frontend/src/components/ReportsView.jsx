@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useEffect, useMemo, useState } from 'react';
 
 
@@ -44,11 +45,7 @@ import { useAuth } from '../context/AuthContext';
 
 
 
-const API_BASE_URL =
-
-  import.meta.env.VITE_API_BASE_URL ||
-
-  'http://localhost:8080/api';
+const API_BASE_URL = SHARED_API_BASE_URL;
 
 
 
@@ -161,7 +158,7 @@ const ReportsView = ({ currentRole, embedded = false }) => {
 
       try {
 
-        const response = await fetch(
+        const response = await authFetch(
 
           `${API_BASE_URL}/manager/reports/${user.id}`,
 
@@ -268,7 +265,7 @@ const ReportsView = ({ currentRole, embedded = false }) => {
         : `${API_BASE_URL}/trainer/reports`;
 
       try {
-        const response = await fetch(
+        const response = await authFetch(
           endpoint,
           {
             method: 'GET',
@@ -467,7 +464,7 @@ const getOverdueCourseRecords = async () => {
   const results = await Promise.all(teamMembers.map(async (member) => {
     const employeeUserId = member?.userId ?? member?.id;
     if (!employeeUserId) return [];
-    const response = await fetch(`${API_BASE_URL}/manager/reports/employee/${employeeUserId}`, {
+    const response = await authFetch(`${API_BASE_URL}/manager/reports/employee/${employeeUserId}`, {
       method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' }
     });
     if (!response.ok) {
@@ -788,7 +785,7 @@ const exportEmployeeReportToExcel = async (employee) => {
   }
 
   try {
-    const response = await fetch(
+    const response = await authFetch(
       `${API_BASE_URL}/manager/reports/employee/${employeeUserId}`,
       {
         method: 'GET',
@@ -1004,7 +1001,7 @@ const exportEmployeeReportToExcel = async (employee) => {
 
     try {
 
-      const response = await fetch(
+      const response = await authFetch(
 
         `${API_BASE_URL}/manager/reports/employee/${employeeUserId}`,
 

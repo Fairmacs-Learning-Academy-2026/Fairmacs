@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useState, useRef } from 'react';
 import {
   X, Upload, Download, AlertCircle, CheckCircle2,
@@ -24,7 +25,7 @@ export default function BulkQuizImportModal({
 
   if (!isOpen) return null;
 
-  const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+  const API_BASE_URL = SHARED_API_BASE_URL;
 
   const getAuthToken = () =>
     localStorage.getItem('fairmacs_token') ||
@@ -182,7 +183,7 @@ export default function BulkQuizImportModal({
         try {
           const formData = new FormData();
           formData.append('file', file);
-          const response = await fetch(`${API_BASE_URL}/quizzes/bulk-import/parse`, {
+          const response = await authFetch(`${API_BASE_URL}/quizzes/bulk-import/parse`, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${token}`
@@ -666,7 +667,7 @@ export default function BulkQuizImportModal({
       const token = getAuthToken();
       if (token && pastedText.trim()) {
         try {
-          const response = await fetch(`${API_BASE_URL}/quizzes/bulk-import/parse-text`, {
+          const response = await authFetch(`${API_BASE_URL}/quizzes/bulk-import/parse-text`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

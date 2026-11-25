@@ -285,7 +285,7 @@ export default function AssignedLearningCarousel({
   return (
     <section
       ref={containerRef}
-      className="assigned-learning-section cinematic-carousel-shell animate-fade-in"
+      className={`assigned-learning-section cinematic-carousel-shell ${totalCourses <= 1 ? 'single-course-shell' : ''} animate-fade-in`}
       data-autoplay-state={JSON.stringify({ isHovered, isFocused, isInteracting, isTabVisible, prefersReducedMotion, currentIndex })}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

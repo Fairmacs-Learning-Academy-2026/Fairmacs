@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search,
@@ -122,7 +123,7 @@ export default function CourseCatalog({
 
         const [coursesData, deptsData] = await Promise.allSettled([
           courseService.getAllCourses(),
-          fetch('/api/departments', {
+          authFetch(`${SHARED_API_BASE_URL}/departments`, {
             headers: {
               ...(localStorage.getItem('fairmacs_token') ? { Authorization: `Bearer ${localStorage.getItem('fairmacs_token')}` } : {})
             }
@@ -370,7 +371,7 @@ export default function CourseCatalog({
     try {
       const courseDbId = course.dbId ?? course.id;
       const token = localStorage.getItem('fairmacs_token') || localStorage.getItem('token') || '';
-      const res = await fetch(`/api/certificates/course/${courseDbId}`, {
+      const res = await authFetch(`${SHARED_API_BASE_URL}/certificates/course/${courseDbId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       if (res.ok) {

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/integrations/zoho")
+@RequestMapping({"/api/integrations/zoho", "/api/zoho"})
 public class ZohoOAuthController {
 
     private final ZohoOAuthService zohoOAuthService;
@@ -19,14 +19,17 @@ public class ZohoOAuthController {
         this.zohoOAuthService = zohoOAuthService;
     }
 
-    @GetMapping("/connect-url")
+    @GetMapping({"/connect-url", "/auth-url"})
     @PreAuthorize("hasRole('HR_ADMIN')")
     public ResponseEntity<Map<String, String>> connectUrl() {
         String authorizationUrl =
                 zohoOAuthService.createAuthorizationUrl();
 
         return ResponseEntity.ok(
-                Map.of("authorizationUrl", authorizationUrl)
+                Map.of(
+                        "authorizationUrl", authorizationUrl,
+                        "url", authorizationUrl
+                )
         );
     }
 

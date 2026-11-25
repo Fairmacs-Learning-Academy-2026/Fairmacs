@@ -1,3 +1,4 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useState } from 'react';
 import { X, Printer, Award, ShieldCheck, Download, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -39,7 +40,7 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
         localStorage.getItem('token') ||
         sessionStorage.getItem('token') ||
         '';
-      const response = await fetch(`/api/certificates/${certId}/pdf`, {
+      const response = await authFetch(`${SHARED_API_BASE_URL}/certificates/${certId}/pdf`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
 

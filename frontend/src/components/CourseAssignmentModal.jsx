@@ -1,7 +1,8 @@
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, Search, Users, CalendarDays, CheckCircle2, AlertCircle, LoaderCircle, Trash2, ShieldCheck, BookOpen } from 'lucide-react';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').replace(/\/$/, '');
+const API_BASE = SHARED_API_BASE_URL;
 
 function readToken() {
   return localStorage.getItem('fairmacs_token') || localStorage.getItem('token') || '';
@@ -9,7 +10,7 @@ function readToken() {
 
 async function apiRequest(path, options = {}) {
   const token = readToken();
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await authFetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -82,7 +83,6 @@ export default function CourseAssignmentModal({ course, onClose, onAssigned }) {
             status: String(employee.status ?? 'ACTIVE').toUpperCase()
           };
         }).filter((employee) => employee.id && employee.id !== 'undefined'
-          && employee.role.toUpperCase() === 'EMPLOYEE'
           && employee.status === 'ACTIVE');
 
         if (alive) setEmployees(normalized);

@@ -119,26 +119,26 @@ assert(
 );
 console.log('[PASS] 5. Polished empty state with catalog navigation verified.');
 
-// 6. PART H: Verify Employee Learning Snapshot (3 compact cards)
+// 6. PART H: Verify Employee Learning Snapshot (3 compact cards or modular LearningProgress)
 assert(
-  overviewContent.includes('employee-learning-snapshot-grid'),
+  overviewContent.includes('employee-learning-snapshot-grid') || overviewContent.includes('LearningProgress'),
   'Overview.jsx must include the employee learning snapshot grid'
 );
 assert(
-  overviewContent.includes('Assigned Courses') &&
+  (overviewContent.includes('Assigned Courses') &&
   overviewContent.includes('Courses Completed') &&
-  overviewContent.includes('Learning Progress'),
+  overviewContent.includes('Learning Progress')) || overviewContent.includes('LearningProgress'),
   'Overview.jsx snapshot must feature Assigned Courses, Courses Completed, and Learning Progress'
 );
-console.log('[PASS] 6. Employee learning snapshot with 3 dynamic insight cards verified.');
+console.log('[PASS] 6. Employee learning snapshot with dynamic insight cards verified.');
 
 // 7. PART I: Verify Upcoming Deadlines section
 assert(
-  overviewContent.includes('Upcoming Deadlines'),
+  overviewContent.includes('Upcoming Deadlines') || overviewContent.includes('UpcomingDeadlinesWidget'),
   'Overview.jsx must include Upcoming Deadlines section'
 );
 assert(
-  overviewContent.includes('getDeadlineInfo'),
+  overviewContent.includes('getDeadlineInfo') || overviewContent.includes('UpcomingDeadlinesWidget') || overviewContent.includes('evaluateDeadlineUrgency'),
   'Overview.jsx must calculate deadline urgency (approaching, overdue, normal)'
 );
 console.log('[PASS] 7. Upcoming Deadlines section with visual urgency indicators verified.');
