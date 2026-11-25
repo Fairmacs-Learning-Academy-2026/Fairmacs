@@ -86,6 +86,8 @@ This checklist is mandatory prior to promoting any release candidate of **Fairma
 - [ ] **Zip-Bomb Mitigation:** Ingestion memory buffer thresholds prevent decompression bomb denial-of-service.
 - [ ] **CSV / Formula Injection Sanitization:** Cell values starting with `=`, `+`, `-`, or `@` are sanitized before persistence or export.
 - [ ] **Storage Isolation:** Uploaded documents and certificates are stored in dedicated directories outside the public web root.
+- [ ] **Dynamic PDF Watermark Boundary Check:** Verified that `PolicyWatermarkService` enforces strict mathematical non-clipping boundary checks on rotated watermarks across A4 and Letter page formats.
+- [ ] **Policy Acknowledgement Non-Repudiation:** Verified that employee policy acknowledgements capture digital signature, remote IP address snapshot, and UTC timestamp in immutable database rows.
 
 ---
 
@@ -96,6 +98,8 @@ This checklist is mandatory prior to promoting any release candidate of **Fairma
 - [ ] **No Client-Side Cloud Credentials:** The frontend never directly receives or handles the Zoho WorkDrive OAuth access token.
 - [ ] **Authenticated Document Proxy:** All lesson documents are streamed through backend controllers after verifying user enrollment.
 - [ ] **Automatic Token Renewal:** Expired access tokens refresh automatically in background services without requiring admin intervention.
+- [ ] **Container Least Privilege:** Backend Docker container runs under non-root system UID 1001 with restricted capabilities and heap memory limits (`-XX:MaxRAMPercentage=70`).
+- [ ] **Render Blueprint Secret Synchronization:** Sensitive credentials in `render.yaml` are marked `sync: false` to ensure zero secrets are persisted in Git.
 
 ---
 

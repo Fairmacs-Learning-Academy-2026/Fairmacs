@@ -26,6 +26,7 @@
      - Assessment Passed / Failed / Retake Unlocked (`ASSESSMENT_RESULT`, `ASSESSMENT_FAILED`, `RETAKE_AVAILABLE`)
      - Manager Team Compliance Updates & Weekly Digest (`TEAM_COMPLIANCE`)
      - HR/Admin Operational Alerts & Weekly Digest (`HR_ADMIN_ALERT`, `SYSTEM_ALERT`)
+     - Corporate Policy Assignment & Acknowledgement Reminder (`POLICY_ASSIGNED`, `POLICY_REMINDER`, `POLICY_ESCALATION`)
      - Organization Announcements (`GENERAL_ANNOUNCEMENT`)
 3. **Delivery Tracking on `notifications` Table**
    - `email_status`: `DISABLED` (when email is off), `PENDING`, `SENT`, `FAILED`, `SKIPPED`

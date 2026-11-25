@@ -150,10 +150,12 @@ flowchart TD
 |---|---|---|:---:|:---:|
 | `T-STRIDE-R1` | **Disputing Mandatory Training Compliance:** Employee claims they completed a mandatory training before a deadline despite records showing overdue. | `EnrollmentService` | Medium | **Medium** |
 | `T-STRIDE-R2` | **Disputing Quiz Attempts:** Learner claims the system submitted answers prematurely. | `QuizService` | Low | **Low** |
+| `T-STRIDE-R3` | **Repudiating Corporate Policy Agreement:** Employee claims they never signed or acknowledged a critical corporate compliance policy or SOP. | `PolicyService` | Medium | **High** |
 
 **Mitigations:**
 - `T-STRIDE-R1`: Database stores immutable timestamps for `enrolled_at`, `completed_at`, and `last_activity_at`.
 - `T-STRIDE-R2`: Every quiz attempt logs `started_at`, `submitted_at`, duration in seconds, IP context, and detailed answer mappings in `quiz_attempts`.
+- `T-STRIDE-R3`: Policy acknowledgements record digital signature, client IP address, UTC timestamp, and policy version snapshot in immutable database records.
 
 ---
 
@@ -165,12 +167,14 @@ flowchart TD
 | `T-STRIDE-I2` | **Leaking Quiz Question Answer Keys:** Question fetching endpoint includes `isCorrect: true` in the JSON response payload. | `QuizController` | High | **High** |
 | `T-STRIDE-I3` | **Unfiltered Stack Traces:** Server 500 error outputs database credentials or SQL query fragments. | Global Exception Handler | Medium | **Medium** |
 | `T-STRIDE-I4` | **Accidental Secret Commit to Git:** Developer commits `application.properties` with database passwords or API keys. | Git Repository | Medium | **Critical** |
+| `T-STRIDE-I5` | **Confidential Document Exfiltration:** Employee downloads or screenshots proprietary course/policy PDFs and leaks them. | Document Streaming & Viewer | Medium | **High** |
 
 **Mitigations:**
 - `T-STRIDE-I1`: All Zoho refresh tokens are encrypted at rest using AES-256-GCM (`ZohoOAuthService`).
 - `T-STRIDE-I2`: DTO mapper explicitly strips `isCorrect` fields when serving questions to learners.
 - `T-STRIDE-I3`: Sanitize all error responses into RFC 7807 problem payloads without exposing internal exception classes.
 - `T-STRIDE-I4`: Exclude `.env`, `*local.properties`, `backups/`, and `backend/uploads/` via `.gitignore`; use pure environment variables.
+- `T-STRIDE-I5`: `PolicyWatermarkService` stamps an unalterable rotated diagonal watermark across every page with employee name, employee ID, and UTC timestamp, with strict mathematical non-clipping boundaries.
 
 ---
 
@@ -196,11 +200,13 @@ flowchart TD
 | `T-STRIDE-E1` | **Insecure Direct Object Reference (IDOR):** An employee calls `GET /api/reports/manager/employee/1/transcript` to view another employee's performance. | `ManagerReportController` | High | **High** |
 | `T-STRIDE-E2` | **Horizontal Role Tampering:** User modifies client token payload in browser LocalStorage to set `role: "HR_ADMIN"`. | Frontend Client | High | **Zero** |
 | `T-STRIDE-E3` | **Mass Assignment in Employee Creation:** User submits `"role": "HR_ADMIN"` during self-registration or profile update. | `HrAdminController` | Medium | **High** |
+| `T-STRIDE-E4` | **Container Breakout & Privilege Escalation:** Attacker exploits application flaw to escape JVM and gain host root privileges. | Docker Container | Low | **Critical** |
 
 **Mitigations:**
 - `T-STRIDE-E1`: Enforce manager-to-employee relationship validation in `ManagerReportService` using `SecurityContextUtil.getCurrentUserId()`.
 - `T-STRIDE-E2`: Frontend state is purely representational; all API requests are cryptographically validated by the Spring Security filter on the server.
 - `T-STRIDE-E3`: Self-registration is disabled; user creation endpoints require `@PreAuthorize("hasRole('HR_ADMIN')")`.
+- `T-STRIDE-E4`: Container runs strictly as unprivileged system user `app:app` (UID 1001) without root capabilities, bounded by `-XX:MaxRAMPercentage=70`.
 
 ---
 
@@ -233,6 +239,9 @@ Scoring Criteria: **D**amage, **R**eproducibility, **E**xploitability, **A**ffec
 | `T-STRIDE-E1` | Method-level RBAC (`@PreAuthorize`) and direct-report ownership checks | [`SecurityConfig.java`](backend/src/main/java/com/fairmacs/lms/security/SecurityConfig.java) | **Verified** |
 | `T-STRIDE-D2` | Multipart upload cap set to 10MB | [`application.properties`](backend/src/main/resources/application.properties) | **Verified** |
 | `T-STRIDE-T3` | Parameterized SQL queries via Spring Data JPA repositories | Repositories Layer | **Verified** |
+| `T-STRIDE-I5` | Dynamic rotated non-clipping watermark embedding employee ID & timestamp on PDF streams | [`PolicyWatermarkService.java`](backend/src/main/java/com/fairmacs/lms/service/PolicyWatermarkService.java) | **Verified** |
+| `T-STRIDE-R3` | Immutable policy acknowledgement tracking capturing digital signature, IP address, and UTC timestamp | [`PolicyService.java`](backend/src/main/java/com/fairmacs/lms/service/PolicyService.java) | **Verified** |
+| `T-STRIDE-E4` | Non-root container UID 1001 execution, restricted capabilities, and memory limits | [`Dockerfile`](backend/Dockerfile) | **Verified** |
 
 ---
 

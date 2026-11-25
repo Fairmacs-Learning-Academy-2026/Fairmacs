@@ -1,8 +1,8 @@
 # Fairmacs KMS — Design System & UI Specification
 
-**Version:** 1.0.0  
+**Version:** 2.1.0  
 **Target Platform:** Web (Desktop First, Tablet & Mobile Responsive)  
-**Core Technologies:** React 19, Tailwind CSS v4, Lucide React, Canvas Confetti  
+**Core Technologies:** React 19, Tailwind CSS, Lucide React, Canvas Confetti, OpenPDF, PDF.js  
 **Typography:** Inter (Google Fonts)
 
 ---
@@ -11,67 +11,65 @@
 1. [Design Philosophy & Core Pillars](#1-design-philosophy--core-pillars)
 2. [Color Palette & Semantic Tokens](#2-color-palette--semantic-tokens)
 3. [Typography Scale & Hierarchies](#3-typography-scale--hierarchies)
-4. [Spacing, Grid & Layout System](#4-spacing-grid--layout-system)
-5. [Elevation, Borders & Depth](#5-elevation-borders--depth)
-6. [Motion & Micro-Interactions](#6-motion--micro-interactions)
-7. [Core UI Component Library](#7-core-ui-component-library)
-8. [Role-Based Dashboard Patterns](#8-role-based-dashboard-patterns)
-9. [Accessibility (a11y) & Contrast Standards](#9-accessibility-a11y--contrast-standards)
+4. [Elevation, Surfaces & Glassmorphism](#4-elevation-surfaces--glassmorphism)
+5. [Proximity-Hover Intelligent Liquid Glass Sidebar](#5-proximity-hover-intelligent-liquid-glass-sidebar)
+6. [Editorial Learning Operations Dashboard Direction](#6-editorial-learning-operations-dashboard-direction)
+7. [Universal Assigned Learning Carousel](#7-universal-assigned-learning-carousel)
+8. [Learning & Compliance Calendar Specification](#8-learning--compliance-calendar-specification)
+9. [Dynamic PDF Watermark Visual Standards](#9-dynamic-pdf-watermark-visual-standards)
+10. [Core UI Component Library](#10-core-ui-component-library)
+11. [Accessibility (a11y) & Contrast Standards](#11-accessibility-a11y--contrast-standards)
 
 ---
 
 ## 1. Design Philosophy & Core Pillars
 
-The Fairmacs KMS design system is tailored for an enterprise freight forwarding and global logistics corporation. The interface emphasizes:
+The Fairmacs KMS design system is tailored for an enterprise freight forwarding, shipping, and supply-chain corporation. The interface emphasizes:
 
-- **Clarity & Efficiency:** High-density data tables, clear progress meters, and minimal cognitive friction for employees completing required compliance modules.
-- **Enterprise Authority:** Anchored in a deep maritime navy (`#0f172a`, `#0b1f38`) paired with bright cyan and blue accents (`#0284c7`, `#06b6d4`), conveying security and precision.
-- **Role-Centric Adaptability:** Visual layouts dynamically adjust depending on whether the user is an **Employee** (focused on task completion and certificates), a **Trainer** (curriculum building and grading), a **Manager** (team oversight and compliance tracking), or an **HR Admin** (enterprise configuration, imports, and system audit).
-- **Responsive Resilience:** Flexbox and CSS grid layouts guarantee non-breaking views across ultrawide monitors down to mobile tablet viewports.
+- **Calm, Editorial Enterprise Tone:** Replaces generic "AI-dashboard" templates with calm, high-density workspaces. Avoids oversized gradients, decorative blobs, bouncing counters, and fake trend arrows.
+- **Precision Data Hierarchy:** Uses white surfaces with subtle 1px slate borders (`#E2E8F0`), soft shadows, and deep navy text (`#0F172A`) over a pale blue-gray canvas (`#F8FAFC`).
+- **Targeted Glassmorphism:** Glassmorphism is used purposefully for modals, tooltips, and floating navigation overlays—never as a blurry default for standard data tables or metric cards.
+- **Responsive & Touch-Resilient:** Seamlessly adapts from 4K and ultrawide displays down to compact mobile viewports, providing touch-friendly tap targets ($\ge 44\text{px}$) and hidden scrollbars where appropriate.
 
 ---
 
 ## 2. Color Palette & Semantic Tokens
 
-All primary tokens are registered as CSS custom properties in [`index.css`](frontend/src/index.css) and mirrored in Tailwind utility classes:
-
 ### 2.1 Brand & Neutral Tokens
 
-| Token Name | Hex Code | HSL Equivalent | Role & Context |
-|---|---|---|---|
-| `--primary-navy` | `#0f172a` | `hsl(222, 47%, 11%)` | Primary text, modal headers, dark backgrounds |
-| `--secondary-navy` | `#1e293b` | `hsl(217, 33%, 17%)` | Sidebar hover backgrounds, secondary borders |
-| `--sidebar-dark` | `#0b1f38` | `hsl(214, 67%, 13%)` | Fixed navigation sidebar background |
-| `--bg-slate` | `#f8fafc` | `hsl(210, 40%, 98%)` | Global application background |
-| `--card-bg` | `#ffffff` | `hsl(0, 0%, 100%)` | Content card, dropdown, and modal backgrounds |
-| `--border-slate` | `#e2e8f0` | `hsl(214, 32%, 91%)` | Standard card borders, table dividers |
-| `--text-main` | `#0f172a` | `hsl(222, 47%, 11%)` | Default body copy, high-contrast headings |
-| `--text-muted` | `#64748b` | `hsl(215, 16%, 47%)` | Subtitles, meta-tags, helper texts, table headers |
+| Token Name | Hex Code | Purpose & Context |
+|:---|:---|:---|
+| `--primary-navy` | `#0F172A` | Primary typography, high-contrast headings, active icons |
+| `--secondary-navy` | `#1E293B` | Secondary headers, active sub-tabs, hover states |
+| `--sidebar-dark` | `#0B1F38` | Deep maritime navy base for navigation |
+| `--bg-canvas` | `#F8FAFC` | Global application backdrop (slate 50) |
+| `--card-surface` | `#FFFFFF` | Crisp white cards, data tables, and form containers |
+| `--border-subtle` | `#E2E8F0` | Card borders, dividers, table cell lines |
+| `--text-muted` | `#64748B` | Helper text, metadata, timestamps, table column headers |
 
-### 2.2 Accent & Interactive Gradients
+### 2.2 Accent & Interactive Tokens
 
 | Token Name | Hex Code | Purpose & Usage |
-|---|---|---|
-| `--accent-blue` | `#0284c7` | Primary action buttons, active navigation markers |
-| `--accent-blue-hover` | `#0369a1` | Hover state for primary buttons |
-| `--accent-cyan` | `#06b6d4` | Gradient partner for badges, active states, progress fills |
-| `Primary Gradient` | `linear-gradient(135deg, #0284c7, #06b6d4)` | Brand badges, active sidebar tabs, primary highlights |
+|:---|:---|:---|
+| `--accent-blue` | `#0284C7` | Primary action buttons, active navigation markers |
+| `--accent-blue-hover` | `#0369A1` | Hover state for primary buttons |
+| `--accent-cyan` | `#06B6D4` | Accent highlight, progress track end-caps, badges |
+| `Brand Gradient` | `linear-gradient(135deg, #0284C7, #06B6D4)` | High-impact badges, primary submit buttons |
 
-### 2.3 Semantic Status Colors
+### 2.3 Semantic Status Palette
 
-| State | Background | Border | Text | Badge Example |
-|---|---|---|---|---|
-| **Success / Completed** | `#ecfdf5` | `#a7f3d0` | `#047857` | Course Completed, Passing Quiz (>=80%) |
-| **In Progress / Info** | `#eff6ff` | `#bfdbfe` | `#1d4ed8` | Active Enrollment, Ongoing Training Session |
-| **Warning / Pending** | `#fffbeb` | `#fde68a` | `#b45309` | Quiz In Progress, Approaching Deadline |
-| **Danger / Overdue** | `#fff1f2` | `#fecdd3` | `#e11d48` | Overdue Assignment, Terminated Status, Failed Quiz |
-| **Neutral / Inactive** | `#f1f5f9` | `#cbd5e1` | `#475569` | Draft Course, Inactive / On Leave Employee |
+| State | Background | Border | Text | Example Usage |
+|:---|:---|:---|:---|:---|
+| **Target Met / Completed** | `#F0FDF4` | `#BBF7D0` | `#16A34A` | Completed course, Passing quiz ($\ge 80\%$), Compliance $\ge 90\%$ |
+| **In Progress / Info** | `#EFF6FF` | `#BFDBFE` | `#0F6CBD` | Active learning, Ongoing live session, Progress $50\text{--}89\%$ |
+| **Needs Focus / Warning** | `#FEF2F2` | `#FECACA` | `#DC2626` | Progress $<50\%$, Approaching due date, Action required |
+| **Neutral / Unassigned** | `#F1F5F9` | `#CBD5E1` | `#64748B` | No courses assigned, Open-ended policy without due date |
 
 ---
 
 ## 3. Typography Scale & Hierarchies
 
-The font family across all components is **Inter**, loaded with weights `300, 400, 500, 600, 700, 800`.
+The font family across all components is **Inter**, configured with weights `300, 400, 500, 600, 700, 800`.
 
 ```css
 font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -80,138 +78,111 @@ font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 ### Type Scale Specification
 
 | Level | Size | Weight | Line Height | Usage |
-|---|---|---|---|---|
-| **Display Header** | `2.00rem` (32px) | 800 (ExtraBold) | 1.2 | Main page titles (e.g., *HR Administration Dashboard*) |
-| **Section Header** | `1.50rem` (24px) | 700 (Bold) | 1.3 | Module headers, drilldown titles, modal headers |
-| **Card Header** | `1.25rem` (20px) | 600 (SemiBold) | 1.4 | Course card titles, department widget headings |
-| **Subtitle / Subhead** | `1.05rem` (16.8px) | 500 (Medium) | 1.5 | Section summaries, step descriptors |
-| **Body (Default)** | `0.95rem` (15.2px) | 400 (Regular) | 1.5 | General paragraph text, table body cells |
-| **Body Small** | `0.85rem` (13.6px) | 500 (Medium) | 1.4 | Meta tags, author info, timestamps, input helper text |
-| **Caption / Label** | `0.75rem` (12px) | 700 (Bold) | 1.3 | Form input labels (uppercase), table column headers |
-| **Micro-Badge** | `0.65rem` (10.4px) | 800 (ExtraBold) | 1.0 | Status pills, role tags (`EMPLOYEE`, `TRAINER`) |
+|:---|:---|:---|:---|:---|
+| **Display Header** | `1.75rem` (28px) | 800 (ExtraBold) | 1.2 | Workspace titles (*HR Overview*, *Team Training*) |
+| **Section Header** | `1.25rem` (20px) | 700 (Bold) | 1.3 | Panel titles (*Departmental Training Analytics*) |
+| **Card Header** | `1.05rem` (16.8px) | 600 (SemiBold) | 1.4 | Metric card headers, course card titles |
+| **Body (Default)** | `0.90rem` (14.4px) | 400 (Regular) | 1.5 | Paragraphs, descriptions, table body text |
+| **Body Small** | `0.80rem` (12.8px) | 500 (Medium) | 1.4 | Metadata, instructor names, durations |
+| **Caption / Label** | `0.72rem` (11.5px) | 700 (Bold) | 1.3 | Uppercase form labels, table column headers |
+| **Micro-Badge** | `0.65rem` (10.4px) | 700 (Bold) | 1.0 | Status pills (*Target Met*, *In Progress*) |
 
 ---
 
-## 4. Spacing, Grid & Layout System
+## 4. Elevation, Surfaces & Glassmorphism
 
-### 4.1 Base Unit: 8px Scale
-All spacing, padding, margins, and layout gaps adhere strictly to the 4px / 8px scale:
+### 4.1 Surface Shadows
+- `--shadow-card`: `0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)` — Clean data surface.
+- `--shadow-hover`: `0 4px 14px rgba(15, 23, 42, 0.08)` — Interactive card elevation.
+- `--shadow-modal`: `0 20px 40px -15px rgba(15, 23, 42, 0.25)` — Floating dialogs and drilldowns.
 
-- `4px` (`0.25rem`): Micro gaps, badge inner padding.
-- `8px` (`0.50rem`): Component element gaps, tight card spacing.
-- `12px` (`0.75rem`): Input field vertical padding, small margins.
-- `16px` (`1.00rem`): Standard layout padding, button horizontal padding.
-- `24px` (`1.50rem`): Section gaps, card padding, modal body padding.
-- `32px` (`2.00rem`): Page container padding, primary section dividers.
-- `48px` (`3.00rem`): Hero header spacing, dashboard widget separation.
-
-### 4.2 Top-Level Layout Anatomy
-```
-+------------------------------------------------------------------------+
-|  HEADER (Height: 70px, Sticky top, z-index: 100, Border bottom)         |
-|  [Brand Logo] [Role Switcher]               [Notifications] [User Menu] |
-+------------------+-----------------------------------------------------+
-| SIDEBAR          | MAIN CONTENT AREA                                   |
-| (Width: 250px,   | (Flex: 1, Max-Width: 1400px, Margin: 0 Auto,        |
-|  Fixed Left,     |  Padding: 2rem, Background: #f8fafc)                |
-|  Dark #0b1f38)   |                                                     |
-|                  | [Page Title & Action Toolbar]                       |
-| [Navigation]     | [Metric Stat Cards Grid - 4 Columns]                |
-|                  | [Primary Interactive View / Tabbed Workspace]       |
-+------------------+-----------------------------------------------------+
+### 4.2 Liquid Glass Specification (Modals & Overlays)
+```css
+background: rgba(255, 255, 255, 0.88);
+backdrop-filter: blur(20px) saturate(180%);
+border: 1px solid rgba(255, 255, 255, 0.65);
+box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
 ```
 
-### 4.3 Responsive Breakpoints
-- **Mobile (< 640px):** Sidebar collapses into mobile slide-out drawer; metric cards wrap to single column.
-- **Tablet (640px – 1024px):** 2-column metric cards; tables enable horizontal scroll wrappers.
-- **Desktop (1024px – 1440px):** Full 4-column metric cards; multi-pane course builder modal.
-- **Ultrawide (> 1440px):** Centered workspace capped at `1400px` max-width to avoid line-length eye fatigue.
+---
+
+## 5. Proximity-Hover Intelligent Liquid Glass Sidebar
+
+The navigation sidebar redefines spatial efficiency on web desktops:
+
+1. **Auto-Hiding Rail:** In default state, the sidebar collapses into a slim 16px ambient edge indicator.
+2. **Proximity Trigger:** Detects cursor proximity within an 8–16px threshold from the left viewport edge to smoothly expand the dock.
+3. **Body-Mounted Portal Tooltips:** Floating hover labels mount to `document.body` via `createPortal`, completely eliminating clipping from parent overflows.
+4. **Semantic Hover Motion:** Each navigation icon triggers a role-appropriate micro-interaction (e.g. slight bounce for notifications, smooth rotation for settings).
+5. **Direct Navigation Architecture:** Replaces monolithic tab states with 9 dedicated clean URLs for HR operations (`/hr/overview`, `/hr/courses`, `/hr/employees`, etc.).
 
 ---
 
-## 5. Elevation, Borders & Depth
+## 6. Editorial Learning Operations Dashboard Direction
 
-### 5.1 Shadows
-- `--shadow-sm`: `0 1px 3px rgba(0, 0, 0, 0.05)` — Table rows, subtle input focus.
-- `--shadow-md`: `0 4px 12px rgba(15, 23, 42, 0.08)` — Standard course cards, stat cards.
-- `--shadow-lg`: `0 10px 25px rgba(15, 23, 42, 0.12)` — Floating dropdowns, action modals.
-- `--shadow-glow`: `0 4px 14px rgba(2, 132, 199, 0.35)` — Active navigation tab, primary action button.
-
-### 5.2 Borders & Radii
-- `--radius-sm`: `4px` — Checkboxes, micro status badges.
-- `--radius-md`: `8px` — Standard inputs, buttons, navigation items.
-- `--radius-lg`: `12px` — Dashboard cards, interactive panels.
-- `--radius-full`: `9999px` / `20px` — Avatar circles, pill badges.
-- Standard Border: `1px solid var(--border-slate)` (`#e2e8f0`).
+### 6.1 Layout Anatomy
+- **Header Strip:** Time-based greeting, contextual operational subtitle, and primary action buttons.
+- **KPI Summary Strip:** Compact, carefully aligned metric cards with purposeful labels and micro status tags.
+- **Primary Working Area:** High-density, actionable tables (e.g. Manager Team Report, HR Department Analytics) rather than a wall of decorative graphs.
+- **Drilldown Portals:** Glassmorphic detail drawers that lock body scroll and dismiss on `Escape`.
 
 ---
 
-## 6. Motion & Micro-Interactions
+## 7. Universal Assigned Learning Carousel
 
-1. **Standard Transitions:** All buttons, nav items, and interactive links use `transition: all 0.2s ease;`.
-2. **Page Entrance Animation:**
-   ```css
-   @keyframes fadeIn {
-     from { opacity: 0; transform: translateY(8px); }
-     to   { opacity: 1; transform: translateY(0); }
-   }
-   .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-   ```
-3. **Hover Elevation:** Cards elevate smoothly with `transform: translateY(-2px)` and shadow transition on hover.
-4. **Completion Celebration:** Course completion triggers a particle burst using `canvas-confetti` configured with corporate palette colors (`#0284c7`, `#06b6d4`, `#10b981`).
+### 7.1 Visual & Responsive Rules
+- **Course Card Layout:** Modern 16:9 banner preview with fallback brand asset, course ID badge, title, duration pill, and progress meter.
+- **Empty State:** Restrained ice-blue glass panel with clear guidance when zero courses are assigned.
+- **Single Card Centering:** Centers single-item carousels without stretching or blank gaps.
+- **Reduced Motion:** Fully honors `@media (prefers-reduced-motion: reduce)` by disabling sliding transitions and switching to instant step pagination.
 
 ---
 
-## 7. Core UI Component Library
+## 8. Learning & Compliance Calendar Specification
 
-### 7.1 Buttons
-- **Primary Action:**
-  - Background: `var(--accent-blue)` (`#0284c7`), hover: `#0369a1`.
-  - Text: `#ffffff`, font-weight `600`, radius `8px`, padding `0.65rem 1.25rem`.
-- **Secondary / Ghost:**
-  - Background: `#f1f5f9`, hover: `#e2e8f0`, text: `#334155`.
-- **Danger Button:**
-  - Background: `#fff1f2`, border: `1px solid #fecdd3`, text: `#e11d48`, hover: `#f43f5e` (inverted white text).
-- **Outline Action:**
-  - Background: `transparent`, border: `1px solid #cbd5e1`, text: `#0f172a`, hover: `#f8fafc`.
+### 8.1 Multi-View Architecture
+- **Month View:** 7-column calendar grid displaying up to 3 events per day with overflow badges (`+N more`).
+- **Week View:** Hourly or daytime time-column view for live training workshops.
+- **Agenda View:** Compact chronologically sorted list view optimized for mobile and quick skimming.
 
-### 7.2 Form Inputs & Controls
-- **Text Inputs & Selects:**
-  - Height: `40px`, padding: `0.5rem 0.85rem`, border: `1px solid #cbd5e1`, radius: `8px`.
-  - Focus State: Border color `#0284c7`, box-shadow `0 0 0 3px rgba(2, 132, 199, 0.15)`.
-- **Labels:**
-  - `font-size: 0.75rem`, `font-weight: 700`, `text-transform: uppercase`, `letter-spacing: 0.05em`, color `#475569`.
-
-### 7.3 Data Tables
-- Header: Background `#f8fafc`, text color `#64748b`, uppercase `0.72rem`, letter spacing `0.05em`, padding `0.85rem 1rem`.
-- Rows: Background `#ffffff`, hover background `#f8fafc`, bottom border `1px solid #f1f5f9`.
-- Responsive Overflow: Enclosed within an `overflow-x: auto` wrapper with customized 6px scrollbars.
-
-### 7.4 Modals & Slide-out Drawers
-- Backdrop: `rgba(15, 23, 42, 0.65)` with `backdrop-filter: blur(4px)`.
-- Modal Window: Centered flexbox, background `#ffffff`, radius `14px`, max-height `90vh`, box-shadow `--shadow-lg`.
-- Header: Sticky header with title, subtitle, and close `X` button.
-- Footer: Sticky footer with Cancel and Primary Submit buttons.
+### 8.2 Event Category Tagging
+- **Live Sessions:** Fairmacs Blue (`#0F6CBD` on `#EFF6FF`).
+- **Course Deadlines:** Indigo / Purple (`#4F46E5` on `#EEF2FF`).
+- **Policy Acknowledgements:** Amber (`#D97706` on `#FFFBEB`).
+- **Assessments / Quizzes:** Emerald (`#16A34A` on `#F0FDF4`).
 
 ---
 
-## 8. Role-Based Dashboard Patterns
+## 9. Dynamic PDF Watermark Visual Standards
 
-| Portal / View | Visual Theme & Focus | Key Dominant Components |
-|---|---|---|
-| **Employee Portal** (`/dashboard`, `/learning`) | Progress-centric, motivating, clean | Radial progress rings, course cards with continue buttons, quiz trigger modal, verifiable certificate viewer. |
-| **Trainer Portal** (`/trainer`) | Authoring workspace, curriculum tree | Multi-step Course Builder modal, Module & Lesson list with drag/order, Zoho document upload dropzone, draft management panel. |
-| **Manager Portal** (`/manager`) | Team oversight, compliance risk | Direct reports table, overdue warning indicators, training transcript drawer, team export buttons (Excel/PDF). |
-| **HR Admin Portal** (`/admin`) | High-density controls, auditing | Department matrix grid, bulk employee Excel import modal, lifecycle status toggles, organization-wide analytics charts. |
+To guarantee intellectual property security without degrading document readability:
+
+- **Watermark Text Template:**  
+  `PROPERTY OF FAIRMACS SHIPPING & LOGISTICS — CONFIDENTIAL — <EMPLOYEE_NAME> — <TIMESTAMP>`
+- **Rotation Angle:** Exactly `-35.0` degrees across the page diagonal.
+- **Font & Sizing:** Clean sans-serif (Helvetica / Inter), scaled between `10pt` and `14pt` based on page dimensions.
+- **Opacity:** Restrained `12%` opacity (`rgba(15, 23, 42, 0.12)`) ensuring underlying text and tables remain 100% legible.
+- **Non-Clipping Geometry:** Boundary math calculates diagonal extent against page width/height, guaranteeing zero character clipping on Letter, A4, portrait, or landscape orientations.
 
 ---
 
-## 9. Accessibility (a11y) & Contrast Standards
+## 10. Core UI Component Library
 
-1. **Contrast Ratio Compliance:**
-   - Primary text (`#0f172a`) against white (`#ffffff`): **16.1:1** (Exceeds WCAG AAA).
-   - Secondary text (`#64748b`) against white (`#ffffff`): **4.6:1** (Complies with WCAG AA).
-   - Accent button text (White on `#0284c7`): **4.8:1** (Complies with WCAG AA).
-2. **Keyboard Navigation:** All interactive elements (`button`, `a`, `input`, `select`) provide visible outline focus rings (`:focus-visible`).
-3. **Screen Reader Optimization:** Form fields pair `<label htmlFor="...">` with matching IDs; status icons include `aria-label` or `aria-hidden="true"` with accompanying descriptive text.
-4. **Accessible Iconography:** Icons from `lucide-react` are consistently rendered with a standard 18px or 20px bounding box and paired with legible text labels.
+### 10.1 Action Buttons
+- **Primary:** Background `#0284C7`, text `#FFFFFF`, radius `8px`, weight `650`, box-shadow `0 2px 4px rgba(2, 132, 199, 0.25)`.
+- **Secondary:** Background `#F1F5F9`, border `1px solid #E2E8F0`, text `#334155`.
+- **Destructive:** Background `#FEF2F2`, border `1px solid #FECACA`, text `#DC2626`.
+
+### 10.2 Progress Tracks
+- Height: `6px` or `8px`, border-radius `9999px`.
+- Track background: `#E2E8F0` (light gray).
+- Fill gradient: Matches status threshold (`#16A34A` for $\ge 90\%$, `#0F6CBD` for $50\text{--}89\%$, `#DC2626` for $<50\%$).
+
+---
+
+## 11. Accessibility (a11y) & Contrast Standards
+
+1. **WCAG AAA Contrast:** Navy body text (`#0F172A`) against canvas (`#FFFFFF`) exceeds **16:1**.
+2. **Visible Focus Rings:** All buttons, interactive rows, and form controls exhibit a `2px` focus outline with a `2px` offset.
+3. **Screen Reader Semantic Roles:** Modals enforce `role="dialog"`, `aria-modal="true"`, and label references via `aria-labelledby`.
+4. **Keyboard Trap Prevention:** Modal dialogs intercept `Tab` navigation to circulate focus within the active overlay until dismissed.

@@ -1,6 +1,7 @@
 # Fairmacs KMS — REST API Reference & Developer Guide
 
-**Base URL:** `http://localhost:8080/api` (Local Dev) / `https://lms.fairmacs.com/api` (Production)  
+**Base URL (Local Dev):** `http://localhost:8080/api`  
+**Base URL (Production on Render):** `https://fairmacs-lms-api.onrender.com/api`  
 **Protocol:** HTTPS / JSON over REST  
 **Authentication:** Bearer Token (JSON Web Token - RFC 7519)
 
@@ -16,12 +17,15 @@
 7. [Enrollments & Learning Progress Endpoints](#7-enrollments--learning-progress-endpoints)
 8. [Quizzes & Assessment Engine Endpoints](#8-quizzes--assessment-engine-endpoints)
 9. [Certificates & Verification Endpoints](#9-certificates--verification-endpoints)
-10. [Department Management & Course Matrix Endpoints](#10-department-management--course-matrix-endpoints)
-11. [HR Administration & Employee Onboarding Endpoints](#11-hr-administration--employee-onboarding-endpoints)
-12. [Reports & Manager Analytics Endpoints](#12-reports--manager-analytics-endpoints)
-13. [Corporate Training Calendar Endpoints](#13-corporate-training-calendar-endpoints)
-14. [Zoho WorkDrive Integration Endpoints](#14-zoho-workdrive-integration-endpoints)
-15. [Notification Center Endpoints](#15-notification-center-endpoints)
+10. [Corporate Policies & SOP Agreements Endpoints](#10-corporate-policies--sop-agreements-endpoints)
+11. [Department Management & Course Matrix Endpoints](#11-department-management--course-matrix-endpoints)
+12. [HR Administration & Employee Management Endpoints](#12-hr-administration--employee-management-endpoints)
+13. [Manager Team Supervision & Reports Endpoints](#13-manager-team-supervision--reports-endpoints)
+14. [Learning & Compliance Calendar Endpoints](#14-learning--compliance-calendar-endpoints)
+15. [Dynamic Rotated Watermark Streaming Endpoints](#15-dynamic-rotated-watermark-streaming-endpoints)
+16. [Zoho WorkDrive Cloud Integration Endpoints](#16-zoho-workdrive-cloud-integration-endpoints)
+17. [Notification Center Endpoints](#17-notification-center-endpoints)
+18. [Reporting & Styled Excel Export Endpoints](#18-reporting--styled-excel-export-endpoints)
 
 ---
 
@@ -39,7 +43,7 @@ Accept: application/json
 
 ## 2. Standard Response & Error Formats
 
-### 2.1 Success Response Example
+### 2.1 Success Response Envelope
 ```json
 {
   "success": true,
@@ -48,28 +52,16 @@ Accept: application/json
 }
 ```
 
-### 2.2 Error Response Format
-When a request fails, the server returns an HTTP status code accompanied by a standard Spring Boot RFC 7807 problem detail payload:
-
+### 2.2 Error Response Format (RFC 7807 Problem Details)
 ```json
 {
-  "timestamp": "2026-10-27T04:45:00.120Z",
+  "timestamp": "2026-11-25T07:15:00.120Z",
   "status": 400,
   "error": "Bad Request",
   "message": "Invalid employee email format.",
-  "path": "/api/hr-admin/employees"
+  "path": "/api/hr/employees"
 }
 ```
-
-### HTTP Status Code Conventions
-- `200 OK`: Request succeeded.
-- `201 Created`: Resource successfully created.
-- `400 Bad Request`: Validation failure, missing required fields.
-- `401 Unauthorized`: Missing, expired, or invalid JWT token.
-- `403 Forbidden`: Authenticated user lacks required role or permission.
-- `404 Not Found`: Target entity ID does not exist.
-- `409 Conflict`: Duplicate entry (e.g., employee email already registered).
-- `502 Bad Gateway`: External integration failure (e.g., Zoho WorkDrive API error).
 
 ---
 
@@ -91,13 +83,12 @@ When a request fails, the server returns an HTTP status code accompanied by a st
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "user": {
       "id": 104,
-      "employeeId": "EMP-9021",
+      "employeeId": "DEV-EMP01",
       "name": "Jane Doe",
       "email": "employee@fairmacs.com",
       "role": "EMPLOYEE",
       "department": "Operations",
-      "designation": "Freight Coordinator",
-      "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=Jane"
+      "designation": "Operations Coordinator"
     }
   }
   ```
@@ -105,21 +96,7 @@ When a request fails, the server returns an HTTP status code accompanied by a st
 ### 3.2 Get Current User Profile
 - **Route:** `GET /api/auth/me`
 - **Access:** Authenticated
-- **Response `200 OK`:**
-  ```json
-  {
-    "id": 104,
-    "employeeId": "EMP-9021",
-    "name": "Jane Doe",
-    "email": "employee@fairmacs.com",
-    "role": "EMPLOYEE",
-    "department": "Operations",
-    "level": "L2",
-    "branch": "Chennai",
-    "joiningDate": "2024-03-15",
-    "status": "ACTIVE"
-  }
-  ```
+- **Response `200 OK`:** Profile entity with role, department, level, and active status.
 
 ### 3.3 Change Password
 - **Route:** `POST /api/auth/change-password`
@@ -131,74 +108,28 @@ When a request fails, the server returns an HTTP status code accompanied by a st
     "newPassword": "NewSecurePassword@2026"
   }
   ```
-- **Response `200 OK`:**
-  ```json
-  {
-    "success": true,
-    "message": "Password changed successfully."
-  }
-  ```
 
 ---
 
 ## 4. Course Catalog & Curriculum Endpoints
 
-### 4.1 List All Active Courses
+### 4.1 List Active Published Courses
 - **Route:** `GET /api/courses`
 - **Access:** Authenticated
-- **Query Params (Optional):** `category`, `level`, `search`
-- **Response `200 OK`:**
-  ```json
-  [
-    {
-      "id": 1,
-      "courseId": "IMP-FND-001",
-      "title": "Import Logistics Fundamentals",
-      "description": "Comprehensive fundamentals of sea and air freight import processes.",
-      "category": "Operations",
-      "level": "L1",
-      "duration": "4h 30m",
-      "totalLessons": 8,
-      "thumbnail": "https://images.unsplash.com/photo-1578575437130-527eed3abbec",
-      "published": true
-    }
-  ]
-  ```
+- **Query Params:** `category`, `level`, `search`
 
-### 4.2 Get Course Details with Modules & Lessons
-- **Route:** `GET /api/courses/{id}`
+### 4.2 Get Course Details by ID
+- **Route:** `GET /api/courses/{courseId}`
 - **Access:** Authenticated
-- **Response `200 OK`:**
+- **Response `200 OK`:** Complete course syllabus, ordered modules, lessons, and assessment metadata.
+
+### 4.3 Update Course Status (Publish / Archive)
+- **Route:** `PATCH /api/courses/{courseId}/status`
+- **Access:** `HR_ADMIN`, `TRAINER`
+- **Request Body:**
   ```json
   {
-    "id": 1,
-    "courseId": "IMP-FND-001",
-    "title": "Import Logistics Fundamentals",
-    "modules": [
-      {
-        "id": 10,
-        "title": "Module 1: Maritime Freight Overview",
-        "orderIndex": 1,
-        "lessons": [
-          {
-            "id": 101,
-            "lessonId": "IMP-FND-M01-L01",
-            "title": "Bill of Lading Overview",
-            "type": "VIDEO",
-            "videoUrl": "https://www.youtube.com/watch?v=example",
-            "duration": "10:15",
-            "workdriveFileId": null
-          },
-          {
-            "id": 102,
-            "lessonId": "IMP-FND-M01-L02",
-            "title": "Customs Documentation Standard SOP",
-            "type": "PDF",
-            "workdriveFileId": "uqi2q368e8c06e5bc44de87954550476aa546"
-          }
-        ]
-      }
-    ]
+    "active": true
   }
   ```
 
@@ -206,79 +137,66 @@ When a request fails, the server returns an HTTP status code accompanied by a st
 
 ## 5. Course Authoring & Drafts Endpoints
 
-### 5.1 Create & Publish Course
-- **Route:** `POST /api/courses/authoring/create`
-- **Access:** `TRAINER`, `HR_ADMIN`
-- **Request Body:**
-  ```json
-  {
-    "courseId": "EXP-AIR-002",
-    "title": "Export Air Cargo Compliance",
-    "description": "Aviation regulatory compliance for export consignments.",
-    "category": "Documentation",
-    "level": "L2",
-    "duration": "2h 15m",
-    "modules": [
-      {
-        "title": "IATA Cargo Guidelines",
-        "orderIndex": 1,
-        "lessons": [
-          {
-            "title": "Hazardous Goods Declarations",
-            "type": "PDF",
-            "workdriveFileId": "file_id_zoho_12345"
-          }
-        ]
-      }
-    ]
-  }
-  ```
+### 5.1 Create / Update Course Draft
+- **Route:** `POST /api/drafts`
+- **Access:** `HR_ADMIN`, `TRAINER`
+- **Request Body:** Serialized 5-step curriculum JSON wizard payload including modules, lessons, quiz schema, and target departments.
 
-### 5.2 Save / Update Course Draft
-- **Route:** `POST /api/courses/drafts`
-- **Access:** `TRAINER`, `HR_ADMIN`
-- **Request Body:** JSON snapshot of curriculum in progress.
+### 5.2 Retrieve In-Progress Drafts
+- **Route:** `GET /api/drafts`
+- **Access:** `HR_ADMIN`, `TRAINER`
 
-### 5.3 List Saved Drafts
-- **Route:** `GET /api/courses/drafts`
-- **Access:** `TRAINER`, `HR_ADMIN`
+### 5.3 Publish Draft Course
+- **Route:** `POST /api/drafts/{id}/publish`
+- **Access:** `HR_ADMIN`, `TRAINER`
+- **Response `200 OK`:** Published Course DTO with resolved unique course code and department cascade.
 
 ---
 
 ## 6. Course Assignment Engine Endpoints
 
-### 6.1 Assign Course to an Entire Department
-- **Route:** `POST /api/course-assignments/department`
-- **Access:** `HR_ADMIN`
+### 6.1 Assign Course to Specific Employees
+- **Route:** `POST /api/course-assignments`
+- **Access:** `HR_ADMIN`, `TRAINER`
 - **Request Body:**
   ```json
   {
-    "courseId": 1,
-    "department": "Documentation",
-    "mandatory": true,
-    "dueDate": "2026-11-30"
+    "courseId": 12,
+    "courseCode": "OP005",
+    "employeeIds": [101, 104, 108],
+    "dueDate": "2026-12-15",
+    "assignmentType": "MANDATORY"
   }
   ```
 - **Response `200 OK`:**
   ```json
   {
     "success": true,
-    "assignedCount": 24,
-    "department": "Documentation",
-    "message": "Course successfully assigned to 24 employees."
+    "assignedCount": 3,
+    "message": "3 employee(s) assigned or restored successfully."
   }
   ```
 
-### 6.2 Assign Course to Specific Employees
-- **Route:** `POST /api/course-assignments/employees`
-- **Access:** `HR_ADMIN`
+### 6.2 Get Currently Assigned Employees for Course
+- **Route:** `GET /api/course-assignments/{courseId}`
+- **Access:** `HR_ADMIN`, `TRAINER`
+- **Response `200 OK`:** Array of enrolled active learners with progress percentages and assignment type.
+
+### 6.3 Soft-Revoke Employee Course Access
+- **Route:** `DELETE /api/course-assignments/{courseId}/employees/{userId}`
+- **Access:** `HR_ADMIN`, `TRAINER`
+- **Response `200 OK`:** Confirms access revocation while strictly preserving all historical lesson completions and scores.
+
+### 6.4 Assign Course to Department
+- **Route:** `POST /api/enrollments/assign-department`
+- **Access:** `HR_ADMIN`, `TRAINER`
 - **Request Body:**
   ```json
   {
-    "courseId": 1,
-    "employeeIds": [101, 102, 105],
-    "mandatory": true,
-    "dueDate": "2026-12-15"
+    "courseId": 12,
+    "departmentId": 4,
+    "assignmentType": "MANDATORY",
+    "dueDate": "2026-12-31"
   }
   ```
 
@@ -286,312 +204,206 @@ When a request fails, the server returns an HTTP status code accompanied by a st
 
 ## 7. Enrollments & Learning Progress Endpoints
 
-### 7.1 Self-Enroll in Course
-- **Route:** `POST /api/enrollments/enroll/{courseId}`
+### 7.1 Get User Learning Dashboard
+- **Route:** `GET /api/enrollments/dashboard`
 - **Access:** Authenticated
-- **Response `200 OK`:**
-  ```json
-  {
-    "enrollmentId": 302,
-    "courseId": 1,
-    "status": "IN_PROGRESS",
-    "progressPercentage": 0.0,
-    "enrolledAt": "2026-10-27T04:50:00Z"
-  }
-  ```
+- **Response `200 OK`:** Contains active enrollments, completed courses, progress percentages, and due dates.
 
-### 7.2 Get Enrolled Courses ("My Learning")
-- **Route:** `GET /api/enrollments/my-learning`
+### 7.2 Toggle Lesson Completion
+- **Route:** `POST /api/enrollments/{enrollmentId}/lessons/{lessonId}/complete`
 - **Access:** Authenticated
-- **Response `200 OK`:**
-  ```json
-  [
-    {
-      "enrollmentId": 302,
-      "courseId": 1,
-      "courseTitle": "Import Logistics Fundamentals",
-      "status": "IN_PROGRESS",
-      "progressPercentage": 62.5,
-      "completedLessons": 5,
-      "totalLessons": 8,
-      "mandatory": true,
-      "dueDate": "2026-11-30"
-    }
-  ]
-  ```
-
-### 7.3 Toggle Lesson Completion
-- **Route:** `POST /api/lesson-progress/toggle`
-- **Access:** Authenticated
-- **Request Body:**
-  ```json
-  {
-    "courseId": 1,
-    "lessonId": 101,
-    "completed": true
-  }
-  ```
+- **Response `200 OK`:** Updated enrollment progress percentage and course completion state.
 
 ---
 
 ## 8. Quizzes & Assessment Engine Endpoints
 
-### 8.1 Get Quiz Questions for a Course
+### 8.1 Get Quiz for Course
 - **Route:** `GET /api/quizzes/course/{courseId}`
-- **Access:** Authenticated
-- **Response `200 OK`:** *(Answers are intentionally stripped for exam integrity)*
-  ```json
-  {
-    "quizId": 5,
-    "title": "Import Regulations Assessment",
-    "passingScore": 80,
-    "timeLimitMinutes": 15,
-    "questions": [
-      {
-        "id": 501,
-        "questionText": "Which document is mandatory for customs clearance of sea imports?",
-        "options": [
-          { "key": "A", "text": "Bill of Lading" },
-          { "key": "B", "text": "Packing List" },
-          { "key": "C", "text": "Commercial Invoice" },
-          { "key": "D", "text": "All of the above" }
-        ]
-      }
-    ]
-  }
-  ```
+- **Access:** Authenticated (Answer keys strictly stripped)
+- **Response `200 OK`:** Time limit, passing threshold (default 80%), and questions.
 
-### 8.2 Start Timed Quiz Attempt
-- **Route:** `POST /api/quizzes/{quizId}/start`
-- **Access:** Authenticated
-- **Response `200 OK`:**
-  ```json
-  {
-    "attemptId": 801,
-    "quizId": 5,
-    "startedAt": "2026-10-27T05:00:00Z",
-    "timeLimitMinutes": 15
-  }
-  ```
-
-### 8.3 Submit Quiz Answers
-- **Route:** `POST /api/quizzes/submit`
+### 8.2 Submit Quiz Attempt
+- **Route:** `POST /api/quizzes/{quizId}/submit`
 - **Access:** Authenticated
 - **Request Body:**
   ```json
   {
-    "attemptId": 801,
-    "timeTakenSeconds": 480,
     "answers": {
-      "501": "D",
-      "502": "B"
+      "q1": "B",
+      "q2": "A"
     }
   }
   ```
-- **Response `200 OK`:**
-  ```json
-  {
-    "attemptId": 801,
-    "score": 100.0,
-    "passed": true,
-    "correctCount": 10,
-    "totalCount": 10,
-    "certificateGenerated": true,
-    "certificateId": "FM-CERT-2026-9516"
-  }
-  ```
+- **Response `200 OK`:** Calculated score, pass/fail status, and generated certificate ID if passed.
 
 ---
 
 ## 9. Certificates & Verification Endpoints
 
-### 9.1 Download Official Certificate PDF
-- **Route:** `GET /api/certificates/{id}/download`
-- **Access:** Authenticated
-- **Response Header:** `Content-Type: application/pdf`, `Content-Disposition: attachment; filename="Certificate-FM-CERT-2026-9516.pdf"`
-
-### 9.2 Public Verification of Certificate
+### 9.1 Verify Certificate (Public Registry)
 - **Route:** `GET /api/certificates/verify/{certificateNumber}`
-- **Access:** Public (Used by auditors, employers, and clients)
+- **Access:** Public
 - **Response `200 OK`:**
   ```json
   {
-    "valid": true,
-    "certificateNumber": "FM-CERT-2026-9516",
-    "recipientName": "Jane Doe",
-    "courseTitle": "Import Logistics Fundamentals",
-    "issueDate": "2026-10-27",
-    "issuingOrganization": "Fairmacs Learning & Development"
+    "authentic": true,
+    "certificateNumber": "CERT-OP-2026-0042",
+    "courseTitle": "Maritime Hazardous Cargo Handling",
+    "employeeName": "Jane Doe",
+    "issuedAt": "2026-11-20T10:30:00Z"
   }
   ```
 
----
-
-## 10. Department Management & Course Matrix Endpoints
-
-### 10.1 List Departments with Aggregated Metrics
-- **Route:** `GET /api/departments`
+### 9.2 Download Official PDF Certificate
+- **Route:** `GET /api/certificates/{certificateId}/download`
 - **Access:** Authenticated
-- **Response `200 OK`:**
-  ```json
-  [
-    {
-      "id": 1,
-      "name": "Operations",
-      "description": "Freight forwarding, logistics and terminal operations.",
-      "employeeCount": 42,
-      "activeCoursesCount": 8,
-      "completionRate": 78.4
-    }
-  ]
-  ```
-
-### 10.2 Department Course Employee Matrix
-- **Route:** `GET /api/departments/{id}/courses/{courseId}/employees`
-- **Access:** `HR_ADMIN`, `MANAGER`
-- **Response `200 OK`:** Returns individual completion status for all employees in that department enrolled in that course.
+- **Response:** PDF binary stream generated with OpenPDF, corporate digital seal, and tamper-resistant certificate ID.
 
 ---
 
-## 11. HR Administration & Employee Onboarding Endpoints
+## 10. Corporate Policies & SOP Agreements Endpoints
 
-### 11.1 Search & Filter Employees
-- **Route:** `GET /api/hr-admin/employees`
-- **Access:** `HR_ADMIN`
-- **Query Params:** `query`, `department`, `role`, `status`
-- **Response `200 OK`:** List of user profiles with status and department.
+### 10.1 Get Authenticated User's Assigned Policies
+- **Route:** `GET /api/policies/my-assignments`
+- **Access:** Authenticated
+- **Response `200 OK`:** Assigned policies, version numbers, compliance status (`PENDING` or `ACKNOWLEDGED`), and due dates.
 
-### 11.2 Update Employee Lifecycle Status
-- **Route:** `PATCH /api/hr-admin/employees/{id}/status`
-- **Access:** `HR_ADMIN`
+### 10.2 Submit Explicit Employee Acknowledgement
+- **Route:** `POST /api/policies/assignments/{assignmentId}/acknowledge`
+- **Access:** Authenticated
 - **Request Body:**
   ```json
   {
-    "status": "ON_LEAVE"
+    "digitalSignature": "Jane Doe",
+    "confirmed": true
   }
   ```
-- Allowed Values: `ACTIVE`, `INACTIVE`, `ON_LEAVE`, `TERMINATED`.
+- **Response `200 OK`:** Records signature, snapshot timestamp, and IP address.
 
-### 11.3 Bulk Import Employees via Excel (`.xlsx`)
-- **Route:** `POST /api/hr-admin/employees/import`
-- **Access:** `HR_ADMIN`
-- **Content-Type:** `multipart/form-data`
-- **Form Data:** `file: <spreadsheet.xlsx>`
-- **Response `200 OK`:**
-  ```json
-  {
-    "success": true,
-    "importedCount": 45,
-    "skippedCount": 2,
-    "errors": [
-      "Row 14: EMP-092 already exists in system.",
-      "Row 22: Invalid email format 'john@invalid'."
-    ]
-  }
-  ```
+### 10.3 Manager Department Policy Overview
+- **Route:** `GET /api/manager/policies/overview`
+- **Access:** `MANAGER`
+- **Response `200 OK`:** Scoped metrics for manager's department (total assigned, pending acknowledgements, overdue counts).
+
+### 10.4 Send Manager Escalation Reminder
+- **Route:** `POST /api/manager/policies/assignments/{assignmentId}/remind`
+- **Access:** `MANAGER`
+- **Response `200 OK`:** Triggers notification to employee regarding approaching policy deadline.
+
+### 10.5 HR Policy Lifecycle Management
+- **Routes:**
+  - `POST /api/hr/policies` (Create policy draft)
+  - `POST /api/hr/policies/{id}/publish` (Publish version and trigger audience assignment cascade)
+  - `GET /api/hr/policies/assignments` (Organization-wide compliance audit table)
 
 ---
 
-## 12. Reports & Manager Analytics Endpoints
+## 11. Department Management & Course Matrix Endpoints
 
-### 12.1 HR Executive Summary
-- **Route:** `GET /api/reports/hr/summary`
+### 11.1 List All Departments
+- **Route:** `GET /api/departments`
+- **Access:** Authenticated
+
+### 11.2 Get Department Details & Analytics
+- **Route:** `GET /api/departments/{departmentId}/details`
+- **Access:** Authenticated
+- **Response `200 OK`:** Head count, active courses, completion percentage, and active learners.
+
+---
+
+## 12. HR Administration & Employee Management Endpoints
+
+### 12.1 Organization Dashboard Metrics
+- **Route:** `GET /api/hr/dashboard/metrics`
+- **Access:** `HR_ADMIN`, `SUPER_ADMIN`
+- **Response `200 OK`:**
+  - `totalEmployees`, `activeEmployees`, `activeLearners`
+  - `overallCompletionRate`, `avgTrainingHours` (Estimated Curriculum Duration)
+  - `certificatesIssued`, `mandatoryComplianceRate` (90% target)
+  - `departmentStats`: Array of divisional metrics.
+
+### 12.2 Employee Workforce List
+- **Route:** `GET /api/hr/employees`
 - **Access:** `HR_ADMIN`
-- **Response `200 OK`:** Overall compliance rates, total learners, active enrollments, and pending certifications.
 
-### 12.2 Manager Direct Reports Overview
-- **Route:** `GET /api/reports/manager/team`
+### 12.3 Excel Employee Batch Import
+- **Route:** `POST /api/hr/employees/import`
+- **Access:** `HR_ADMIN`
+- **Content-Type:** `multipart/form-data` (file: `.xlsx`)
+
+---
+
+## 13. Manager Team Supervision & Reports Endpoints
+
+### 13.1 Team Learning Summary
+- **Route:** `GET /api/reports/manager/team-summary`
 - **Access:** `MANAGER`, `HR_ADMIN`
-- **Response `200 OK`:** List of direct reports, enrolled courses, completion percentages, and overdue status.
+- **Response `200 OK`:** Team members, assigned courses, average progress, and overdue compliance flags.
 
-### 12.3 Individual Employee Training Transcript
+### 13.2 Employee Historical Transcript
 - **Route:** `GET /api/reports/manager/employee/{userId}/transcript`
 - **Access:** `MANAGER`, `HR_ADMIN`
-- **Response `200 OK`:** Complete historical record of all assigned and completed courses, quiz attempt histories, and certificates.
 
 ---
 
-## 13. Corporate Training Calendar Endpoints
+## 14. Learning & Compliance Calendar Endpoints
 
-### 13.1 List Scheduled Sessions
+### 14.1 Get Training Sessions & Events
 - **Route:** `GET /api/training-sessions`
 - **Access:** Authenticated
-- **Response `200 OK`:**
-  ```json
-  [
-    {
-      "id": 12,
-      "title": "Air Cargo Dangerous Goods Regulation Workshop",
-      "type": "Workshop",
-      "date": "2026-11-15",
-      "time": "14:00 - 16:30",
-      "targetType": "DEPARTMENT",
-      "department": "Operations",
-      "instructor": "Captain V. Sharma"
-    }
-  ]
-  ```
+- **Response `200 OK`:** Scheduled live workshops, webinars, and operational drills.
 
-### 13.2 Create Training Event
-- **Route:** `POST /api/training-sessions`
-- **Access:** `TRAINER`, `MANAGER`, `HR_ADMIN`
-- **Request Body:** Target audience parameters (`ALL`, `DEPARTMENT`, or list of `targetUserIds`).
+### 14.2 Get Training Assignments Calendar Feed
+- **Route:** `GET /api/training/assignments`
+- **Access:** Authenticated
+- **Client Aggregator:** Combined with course deadlines and policy due dates via `calendarService.js`.
 
 ---
 
-## 14. Zoho WorkDrive Integration Endpoints
+## 15. Dynamic Rotated Watermark Streaming Endpoints
 
-### 14.1 Generate OAuth Connect URL
+### 15.1 Stream Watermarked Policy PDF
+- **Route:** `GET /api/policies/{policyId}/stream`
+- **Access:** Authenticated
+- **Response:** PDF binary stream stamped on-the-fly with:
+  `PROPERTY OF FAIRMACS SHIPPING & LOGISTICS — CONFIDENTIAL — <EMPLOYEE_NAME> — <TIMESTAMP>`
+  Guaranteed zero text clipping across page boundaries via `PolicyWatermarkService`.
+
+---
+
+## 16. Zoho WorkDrive Cloud Integration Endpoints
+
+### 16.1 Generate OAuth Connect URL
 - **Route:** `GET /api/integrations/zoho/connect-url`
 - **Access:** `HR_ADMIN`
-- **Response `200 OK`:**
-  ```json
-  {
-    "authorizationUrl": "https://accounts.zoho.com/oauth/v2/auth?response_type=code&client_id=...&scope=WorkDrive.workspace.ALL..."
-  }
-  ```
 
-### 14.2 Upload Document to Zoho WorkDrive
-- **Route:** `POST /api/integrations/zoho/documents/upload`
-- **Access:** `TRAINER`, `HR_ADMIN`
-- **Content-Type:** `multipart/form-data`
-- **Response `200 OK`:**
-  ```json
-  {
-    "success": true,
-    "fileId": "uqi2q368e8c06e5bc44de87954550476aa546",
-    "fileName": "Bill_of_Lading_Guide.pdf",
-    "fileType": "pdf",
-    "sizeBytes": 1048576
-  }
-  ```
-
-### 14.3 Securely Stream Document
-- **Route:** `GET /api/lessons/{lessonId}/document/stream`
-- **Access:** Authenticated
-- **Response:** Binary stream of the file with appropriate `Content-Type` header (`application/pdf` or `application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
+### 16.2 OAuth Callback Listener
+- **Route:** `GET /api/integrations/zoho/callback`
+- **Access:** Public (Redirect target from Zoho OAuth)
 
 ---
 
-## 15. Notification Center Endpoints
+## 17. Notification Center Endpoints
 
-### 15.1 Get User Notifications
+### 17.1 List User Notifications
 - **Route:** `GET /api/notifications`
 - **Access:** Authenticated
-- **Response `200 OK`:**
-  ```json
-  [
-    {
-      "id": 901,
-      "title": "New Mandatory Course Assigned",
-      "message": "You have been enrolled in 'Customs Compliance 2026'. Due date: Nov 30.",
-      "type": "COURSE_ASSIGNED",
-      "read": false,
-      "createdAt": "2026-10-27T03:00:00Z"
-    }
-  ]
-  ```
 
-### 15.2 Mark Notification as Read
+### 17.2 Mark Notification as Read
 - **Route:** `PATCH /api/notifications/{id}/read`
 - **Access:** Authenticated
+
+---
+
+## 18. Reporting & Styled Excel Export Endpoints
+
+### 18.1 Export Policy Assignments Report (HR Organization-Wide)
+- **Route:** `GET /api/hr/policies/assignments/export`
+- **Access:** `HR_ADMIN`
+- **Response:** Styled `.xlsx` file generated via Apache POI with headers, color-coded statuses, and compliance summary.
+
+### 18.2 Export Department Policy Compliance (Manager)
+- **Route:** `GET /api/manager/policies/reports/departments/export`
+- **Access:** `MANAGER`
+- **Response:** Scoped `.xlsx` export for manager's authorized team hierarchy.

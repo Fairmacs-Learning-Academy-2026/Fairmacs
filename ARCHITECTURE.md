@@ -1,420 +1,223 @@
-# Fairmacs KMS - Technical Architecture
+# Fairmacs KMS — Technical Architecture Blueprint
 
-## Overview
-The Fairmacs KMS has been enhanced with a robust frontend architecture ready for backend integration with Spring Boot and MySQL.
-
----
-
-## 1. State Management (Zustand)
-
-### Store Structure
-Located in `src/stores/`
-
-#### authStore.js
-- **State**: user, isAuthenticated, isLoading
-- **Actions**: login, logout, initializeAuth, updateUser
-- **Purpose**: Centralized authentication state management
-
-#### courseStore.js
-- **State**: courses, selectedCourse, courseProgress, searchQuery, categoryFilter, levelFilter
-- **Actions**: setCourses, setSelectedCourse, updateCourseProgress, setSearchQuery, setCategoryFilter, setLevelFilter
-- **Computed**: getFilteredCourses, getCourseById, getCoursesByDepartment
-- **Purpose**: Course catalog and progress management
-
-#### notificationStore.js
-- **State**: notifications, unreadCount
-- **Actions**: setNotifications, addNotification, markAsRead, markAllAsRead, deleteNotification, clearAll
-- **Computed**: getUnreadNotifications, getNotificationsByType
-- **Purpose**: Real-time notification management
-
-#### enrollmentStore.js
-- **State**: enrollments, certificates
-- **Actions**: enrollInCourse, updateProgress, completeLesson, completeCourse
-- **Computed**: getUserProgress, getCourseProgress, getUserCertificates, getCompletionRate
-- **Purpose**: Enrollment tracking and certificate management
+**Application:** Fairmacs Knowledge Management System (KMS)  
+**Classification:** Enterprise System Architecture Specification  
+**Architecture Style:** Layered Single-Page Application (SPA) + Spring Boot Cloud REST API  
+**Core Stack:** React 19, Vite 8, Spring Boot 3.2.0, PostgreSQL (Supabase Cloud), Docker, Render Cloud
 
 ---
 
-## 2. Routing Architecture (React Router)
-
-### Route Structure
-Located in `src/routes/`
-
-#### Protected Routes
-- **ProtectedRoute**: Requires authentication, redirects to /login if not authenticated
-- **RoleRoute**: Requires specific role, redirects to /unauthorized if unauthorized
-
-#### Role-Based Routes
-- **EmployeeRoute**: EMPLOYEE role only
-- **TrainerRoute**: TRAINER role only
-- **ManagerRoute**: MANAGER role only
-- **HrAdminRoute**: HR_ADMIN role only
-
-### Route Configuration (App.jsx)
-```
-/login → Login component
-/unauthorized → Unauthorized component
-/* → MainApp (protected)
-```
-
-### URL Structure (Future)
-```
-/employee/*      → Employee dashboard and learning
-/trainer/*       → Trainer course management
-/manager/*       → Manager team oversight
-/admin/*         → HR administration
-```
+## 📑 Table of Contents
+1. [Architectural Overview & System Context](#1-architectural-overview--system-context)
+2. [End-to-End System Architecture (Mermaid)](#2-end-to-end-system-architecture-mermaid)
+3. [Frontend Architecture (React 19 & Vite 8)](#3-frontend-architecture-react-19--vite-8)
+   - [3.1 Proximity-Hover Intelligent Liquid Glass Sidebar](#31-proximity-hover-intelligent-liquid-glass-sidebar)
+   - [3.2 Universal Assigned Learning Carousel](#32-universal-assigned-learning-carousel)
+   - [3.3 Learning & Compliance Calendar Architecture](#33-learning--compliance-calendar-architecture)
+   - [3.4 Course Builder 5-Step Curriculum Wizard](#34-course-builder-5-step-curriculum-wizard)
+   - [3.5 Secure Watermarked In-Browser PDF Viewer](#35-secure-watermarked-in-browser-pdf-viewer)
+4. [Backend Service Layer (Spring Boot 3.2.0)](#4-backend-service-layer-spring-boot-320)
+   - [4.1 Security Filter Chain & RBAC Subsystem](#41-security-filter-chain--rbac-subsystem)
+   - [4.2 Corporate Policies & SOP Agreements Subsystem](#42-corporate-policies--sop-agreements-subsystem)
+   - [4.3 Dynamic Rotated Non-Clipping Watermarking](#43-dynamic-rotated-non-clipping-watermarking)
+   - [4.4 Assessment & Credential Engine](#44-assessment--credential-engine)
+   - [4.5 Transactional Notifications (Zoho ZeptoMail)](#45-transactional-notifications-zoho-zeptomail)
+5. [Data Architecture & Persistence (PostgreSQL / Flyway)](#5-data-architecture--persistence-postgresql--flyway)
+6. [Containerization & Render Cloud Deployment](#6-containerization--render-cloud-deployment)
+7. [Automated Verification & Test Harness](#7-automated-verification--test-harness)
 
 ---
 
-## 3. API Service Layer
+## 1. Architectural Overview & System Context
 
-### Service Structure
-Located in `src/services/`
+Fairmacs KMS is designed for an international shipping, logistics, and freight forwarding enterprise with 500+ employees. The platform balances high operational security with an intuitive, calm, editorial user interface.
 
-#### authService.js
-- login(email, password)
-- logout()
-- getCurrentUser()
-- isAuthenticated()
-- getToken()
-- refreshToken()
-- changePassword(currentPassword, newPassword)
-
-#### courseService.js
-- getAllCourses()
-- getCourseById(courseId)
-- getCoursesByCategory(category)
-- searchCourses(query)
-- createCourse(courseData)
-- updateCourse(courseId, courseData)
-- deleteCourse(courseId)
-
-#### enrollmentService.js
-- enrollInCourse(courseId)
-- getUserEnrollments(userId)
-- updateLessonProgress(enrollmentId, lessonId, completed)
-- getCourseProgress(userId, courseId)
-- unenrollFromCourse(enrollmentId)
-
-#### employeeService.js
-- getAllEmployees()
-- getEmployeeById(employeeId)
-- getEmployeesByDepartment(department)
-- createEmployee(employeeData)
-- updateEmployee(employeeId, employeeData)
-- deleteEmployee(employeeId)
-
-#### assessmentService.js
-- getAssessmentByCourse(courseId)
-- submitAssessment(assessmentId, answers)
-- getUserAttempts(userId, assessmentId)
-- createAssessment(assessmentData)
-- updateAssessment(assessmentId, assessmentData)
-
-#### trainingService.js
-- assignTraining(assignmentData)
-- getUserAssignments(userId)
-- getAllAssignments()
-- createCalendarEvent(eventData)
-- getCalendarEvents(month, year)
-- deleteAssignment(assignmentId)
-
-#### reportService.js
-- getHRMetrics()
-- getDepartmentAnalytics(department)
-- getAuditLogs(limit, offset)
-- getCompletionReport(filters)
-- exportReport(reportType, format)
-- getOverdueReport()
+### Key Architectural Tenets:
+- **Zero-Credential-in-Code:** All credentials, database connection strings, JWT secrets, and API tokens are dynamically provided through environment variables.
+- **Defense in Depth:** Multi-layered authorization: edge TLS termination, CORS origin validation, JWT authentication filters, Spring Security method-level annotations (`@PreAuthorize`), and database-level relational constraints.
+- **Role-Based Workspace Scoping:** UI and API contracts strictly segregate 5 roles: `EMPLOYEE`, `TRAINER`, `MANAGER`, `HR_ADMIN`, and `SUPER_ADMIN`.
+- **Fault-Tolerant Integrations:** Third-party cloud systems (Zoho WorkDrive, Zoho ZeptoMail) are decoupled via async workers and feature toggles, ensuring zero downtime if external cloud providers experience outages.
 
 ---
 
-## 4. Environment Configuration
+## 2. End-to-End System Architecture (Mermaid)
 
-### Environment Variables
-Located in `.env.example`
+```mermaid
+flowchart TD
+    subgraph Client["Client Browser (React 19 SPA)"]
+        Sidebar["Proximity-Hover Liquid Glass Sidebar\n(Auto-hiding, Body-mounted Tooltips)"]
+        Router["React Router\n(RoleRoute, ProtectedRoute)"]
+        Dashboards["Role Dashboards\n(Employee, Trainer, Manager, HR/Admin)"]
+        Carousel["AssignedLearningCarousel\n(Universal 0, 1, N Course Motion)"]
+        CalendarWidget["Learning & Compliance Calendar\n(calendarService.js, Month/Week/Agenda)"]
+        SecureViewer["Secure PDF Viewer\n(SVG Dynamic Rotated Watermark)"]
+        Services["API Client Layer\n(apiConfig.js, authFetch)"]
+        
+        Sidebar --> Router
+        Router --> Dashboards
+        Dashboards --> Carousel
+        Dashboards --> CalendarWidget
+        Dashboards --> SecureViewer
+        Dashboards --> Services
+    end
 
-```env
-VITE_API_BASE_URL=http://localhost:8080/api
-```
+    subgraph Gateway["Edge & Ingress (Render Cloud)"]
+        TLS["HTTPS / TLS 1.3 Termination"]
+        CORS["CORS Policy Validation\n(CORS_ALLOWED_ORIGINS)"]
+        StaticSite["fairmacs-lms-web\n(SPA Rewrite: /* -> index.html)"]
+        
+        Client -->|HTTPS| TLS
+        TLS --> CORS
+        TLS --> StaticSite
+    end
 
-### Usage
-```javascript
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+    subgraph BackendApp["Backend Application (fairmacs-lms-api Docker)"]
+        SecFilterChain["Spring Security 6 Filter Chain\n(JwtAuthenticationFilter)"]
+        Controllers["REST Controllers\n(@PreAuthorize Method Security)"]
+        
+        subgraph DomainServices["Core Domain Services"]
+            AuthSvc["AuthService & SecurityContextUtil"]
+            CourseSvc["CourseService & CourseAuthoringService"]
+            EnrollmentSvc["EnrollmentService (Learning Engine)"]
+            PolicySvc["PolicyService & PolicyWatermarkService"]
+            QuizSvc["QuizService & Assessment Engine"]
+            CertSvc["CertificateService (OpenPDF Engine)"]
+            ReportSvc["ManagerReports & HrAdminService"]
+            NotifySvc["NotificationService & ZeptoMail Channel"]
+        end
+
+        CORS --> SecFilterChain
+        SecFilterChain --> Controllers
+        Controllers --> DomainServices
+    end
+
+    subgraph DataStore["Persistence & Cloud Integrations"]
+        DB[(PostgreSQL / Supabase\nFlyway Migrations & HikariCP)]
+        ZohoWorkDrive[(Zoho WorkDrive\nOAuth 2.0 Document Cloud)]
+        ZeptoMail[(Zoho ZeptoMail\nTransactional HTTPS API)]
+        
+        DomainServices -->|JDBC SSL| DB
+        DomainServices -->|OAuth 2.0 / REST| ZohoWorkDrive
+        DomainServices -->|HTTPS REST| ZeptoMail
+    end
 ```
 
 ---
 
-## 5. Component Architecture
+## 3. Frontend Architecture (React 19 & Vite 8)
 
-### Current Components
-- **Header**: Navigation, notifications, user menu
-- **Sidebar**: Role-based navigation
-- **Login**: Authentication with demo accounts
-- **Unauthorized**: Access denied page
-- **Dashboards**: Employee, Trainer, Manager, HR Admin
-- **Learning**: MyLearning, CourseCatalog, CourseViewer
-- **Management**: EmployeeManagement, DepartmentManagement
-- **Training**: TrainingCalendar, TrainingAssignmentModal
-- **Analytics**: HrAdminDashboard with drilldowns
-- **Assessment**: QuizModal, CertificateViewer
+The frontend is built on **React 19** with **Vite 8**, prioritizing responsive data presentation, fluid transitions, and accessibility.
 
-### Component Hierarchy
-```
-App (Router)
-├── Login
-├── Unauthorized
-└── MainApp (Protected)
-    ├── Header
-    ├── Sidebar
-    └── Main Content
-        ├── Overview
-        ├── MyLearning
-        ├── CourseCatalog
-        ├── LearningPaths
-        ├── TrainingCalendar
-        ├── Role Dashboards
-        └── Modals
-```
+### 3.1 Proximity-Hover Intelligent Liquid Glass Sidebar (`Sidebar.jsx`)
+- **Proximity Edge Activation:** Detects pointer proximity within 8–16px of the left screen boundary to smoothly expand from a slim visual rail into the navigation dock.
+- **Liquid Glass Aesthetic:** Uses backdrop blur (`28px`), semi-transparent ice-white surfaces (`rgba(255, 255, 255, 0.45)`), and specular reflections.
+- **Body-Mounted Floating Tooltip Portal:** Mounts tooltips directly to `document.body` via `createPortal`, guaranteeing zero visual clipping from parent container overflow or stacking contexts.
+- **9 Dedicated HR Navigation Routes:** Eliminates monolithic tab switching in favor of clean URLs (`/hr/overview`, `/hr/courses`, `/hr/employees`, `/hr/departments`, `/hr/policies`, `/hr/announcements`, `/hr/credentials`, `/hr/drafts`, `/hr/settings`).
+- **Profile & Logout Actions:** Bottom docked actions with direct routing to `/profile` and explicit session termination.
 
----
+### 3.2 Universal Assigned Learning Carousel (`AssignedLearningCarousel.jsx`)
+- Shared component across **Employee**, **Manager**, and **HR/Admin** dashboards.
+- Populated exclusively with courses assigned to the authenticated user.
+- Responsive pagination handling 0 (empty glass card), 1 (single card centered), and N cards without awkward whitespace or broken sliding.
+- Supports keyboard navigation (`ArrowLeft` / `ArrowRight`) and respects `prefers-reduced-motion`.
 
-## 6. Data Flow Architecture
+### 3.3 Learning & Compliance Calendar Architecture (`calendarService.js`, `UpcomingTrainingWidget.jsx`)
+- **Unified Aggregation:** Consolidates live training sessions, course due dates, policy deadlines, and quizzes into normalized calendar events.
+- **Strict Policy Due Date Rule:** Policies without an explicit due date (`dueDate === null`) are never stamped as overdue tasks.
+- **Compact Widget Integration:** Embedded directly into Employee, Manager, and HR/Admin dashboards for instant deadline awareness.
 
-### Current Flow (Mock Data)
-```
-Component → Mock Data → UI
-```
+### 3.4 Course Builder 5-Step Curriculum Wizard (`CourseBuilderModal.jsx`)
+- Structured authoring wizard:
+  1. *Course Details* (Code, title, category, level, estimated duration).
+  2. *Syllabus & Modules* (Hierarchical module and lesson creation).
+  3. *Assessments* (Integrated quiz questions, passing thresholds).
+  4. *Target Departments* (Divisional assignment configuration).
+  5. *Review & Publish* (Validation check and instant publication).
 
-### Future Flow (Backend Integration)
-```
-Component → Service → REST API → Spring Boot → MySQL
-```
-
-### Example: Course Enrollment
-```
-1. User clicks "Enroll" button
-2. Component calls enrollmentService.enrollInCourse(courseId)
-3. Service makes POST request to /api/enrollments
-4. Spring Boot validates and creates enrollment record
-5. MySQL stores enrollment data
-6. Response updates Zustand enrollmentStore
-7. Component re-renders with new state
-```
+### 3.5 Secure Watermarked In-Browser PDF Viewer (`PolicyPdfViewerModal.jsx`, `CourseViewer.jsx`)
+- Uses `pdfjs-dist` to render PDF streams on HTML canvas.
+- Stamps an SVG overlay across the viewport containing:
+  `PROPERTY OF FAIRMACS SHIPPING & LOGISTICS — CONFIDENTIAL — <EMPLOYEE_NAME> — <TIMESTAMP>`
+- Non-clipping rotation and pointer-events pass-through preserve native scrolling and inspection while protecting intellectual property.
 
 ---
 
-## 7. Backend Integration Roadmap
+## 4. Backend Service Layer (Spring Boot 3.2.0)
 
-### Phase 1: Authentication
-- [ ] Implement Spring Security with JWT
-- [ ] Create User, Role, Permission entities
-- [ ] Build login/logout endpoints
-- [ ] Integrate with React authStore
+### 4.1 Security Filter Chain & RBAC Subsystem
+- Stateless architecture: Every request passes through `JwtAuthenticationFilter`, extracting the Bearer token and populating the Spring `SecurityContext`.
+- Role verification using standard Spring authorities: `ROLE_EMPLOYEE`, `ROLE_TRAINER`, `ROLE_MANAGER`, `ROLE_HR_ADMIN`, `ROLE_SUPER_ADMIN`.
+- Account status guard: Inactive or terminated users are blocked at the filter level regardless of token expiration.
 
-### Phase 2: Core Entities
-- [ ] Department entity
-- [ ] Employee entity
-- [ ] Course entity
-- [ ] Module entity
-- [ ] Lesson entity
+### 4.2 Corporate Policies & SOP Agreements Subsystem (`PolicyService.java`)
+- **Targeting Engine:** Matches policies to employees via company-wide, department hierarchy, or individual assignment rules.
+- **Audit Trails:** Acknowledgements produce immutable records storing signature strings, timestamps, and IP addresses.
+- **Manager Oversight:** Scopes compliance monitoring strictly to the manager's authorized department hierarchy.
 
-### Phase 3: Enrollment System
-- [ ] Enrollment entity
-- [ ] Progress tracking entity
-- [ ] Certificate entity
-- [ ] Build enrollment APIs
+### 4.3 Dynamic Rotated Non-Clipping Watermarking (`PolicyWatermarkService.java`)
+- Stamped on PDF streams dynamically generated via OpenPDF.
+- Calculates document dimensions (Letter/A4, portrait/landscape) to ensure watermark lines remain strictly inside printable margins.
 
-### Phase 4: Assessment Engine
-- [ ] Assessment entity
-- [ ] Question entity
-- [ ] Answer entity
-- [ ] Attempt entity
-- [ ] Build scoring logic
+### 4.4 Assessment & Credential Engine (`QuizService.java`, `CertificateService.java`)
+- Automated grading against an 80% passing standard.
+- Verified certificate generation assigning formatted IDs (`CERT-OP-2026-XXXX`).
+- Public verification endpoint (`/api/certificates/verify/{certNumber}`) allows external audits of employee qualifications.
 
-### Phase 5: Training Management
-- [ ] TrainingAssignment entity
-- [ ] CalendarEvent entity
-- [ ] Notification entity
-- [ ] Build assignment APIs
-
-### Phase 6: Analytics
-- [ ] Build HR metrics endpoints
-- [ ] Implement department analytics
-- [ ] Create audit logging
-- [ ] Build report generation
-
-### Phase 7: File Storage
-- [ ] Configure file upload endpoints
-- [ ] Integrate with AWS S3 or local storage
-- [ ] Build certificate PDF generation
+### 4.5 Transactional Notifications (Zoho ZeptoMail)
+- Decoupled `NotificationChannel` interface.
+- When enabled via `NOTIFICATION_EMAIL_ENABLED=true`, sends transactional emails via ZeptoMail REST API (`https://api.zeptomail.in/v1.1/email`).
+- Fallback in-app notifications are persisted in PostgreSQL and delivered immediately.
 
 ---
 
-## 8. Database Schema (Proposed)
+## 5. Data Architecture & Persistence (PostgreSQL / Flyway)
 
-### Core Tables
-```sql
--- Users & Authentication
-users (id, email, password, name, role, department_id, designation, status)
-roles (id, name, permissions)
-permissions (id, name, description)
-
--- Organization
-departments (id, name, head_id, description)
-employees (id, user_id, department_id, branch, joining_date)
-
--- Learning Content
-courses (id, title, description, category, level, duration, banner_url)
-modules (id, course_id, title, order_index)
-lessons (id, module_id, title, type, content_url, duration, order_index)
-
--- Enrollments & Progress
-enrollments (id, user_id, course_id, status, enrolled_date, completed_date)
-lesson_progress (id, enrollment_id, lesson_id, completed, completed_at)
-
--- Assessments
-assessments (id, course_id, title, time_limit, passing_score)
-questions (id, assessment_id, type, question_text, options, correct_index)
-assessment_attempts (id, assessment_id, user_id, score, completed_at, passed)
-
--- Certificates
-certificates (id, user_id, course_id, certificate_id, issued_date, score, pdf_url)
-
--- Training Management
-training_assignments (id, course_id, target_type, target_value, due_date, requirement_type)
-calendar_events (id, title, date, time, trainer, department, location, type)
-
--- Notifications
-notifications (id, user_id, title, message, type, read, created_at)
-
--- Analytics & Audit
-audit_logs (id, user_id, action, entity_type, entity_id, timestamp, ip_address)
-department_analytics (id, department_id, headcount, completion_rate, active_courses, overdue_count)
-```
+- **PostgreSQL (Supabase Cloud):** Multi-region relational database with connection pooling and SSL encryption in transit (`sslmode=require`).
+- **Flyway Database Migrations:** Versioned SQL migrations (`src/main/resources/db/migration/`) maintain schema parity across local development, staging, and production.
+- **Key Tables:**
+  - `users`: Core workforce identity and role metadata.
+  - `departments`: Operational divisions and hierarchy.
+  - `courses`, `modules`, `lessons`: Curriculum structure.
+  - `enrollments`, `lesson_progress`: Learner progress tracking.
+  - `quizzes`, `quiz_questions`, `quiz_progress`: Assessment engine.
+  - `certificates`: Issued qualifications and digital seals.
+  - `policy_documents`, `policy_versions`, `policy_assignments`: Compliance governance.
+  - `notifications`: In-app notification center records.
 
 ---
 
-## 9. Security Considerations
+## 6. Containerization & Render Cloud Deployment
 
-### Frontend
-- JWT token storage in localStorage (consider httpOnly cookies for production)
-- Role-based route protection
-- Input validation in forms
-- XSS prevention via React's built-in escaping
+Fairmacs KMS deploys via Render Blueprint (`render.yaml`) combining two services:
 
-### Backend (Future)
-- Spring Security with JWT
-- Password hashing (BCrypt)
-- Role-based access control (RBAC)
-- CORS configuration
-- Rate limiting
-- SQL injection prevention (JPA/Hibernate)
-- CSRF protection
+### 6.1 Backend Web Service (`fairmacs-lms-api`)
+- Built from `backend/Dockerfile`.
+- Runtime environment: Docker on Linux.
+- Memory profile: Optimized for 512 MB instances (`-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k`).
+- Dynamic port resolution: Spring Boot listens on `${PORT:8080}` as assigned by the host.
+- Secrets managed safely in the Render dashboard (`sync: false`).
 
----
-
-## 10. Performance Optimization
-
-### Current
-- Code splitting with Vite
-- Lazy loading for large components
-- Optimized bundle size (477 KB gzipped)
-
-### Future
-- API response caching
-- Image optimization
-- Service Worker for offline support
-- Database query optimization
-- Redis caching for frequently accessed data
+### 6.2 Frontend Static Site (`fairmacs-lms-web`)
+- Runtime environment: Static web service running Node 22.
+- Build command: `npm ci && npm run build`.
+- Publish directory: `frontend/dist`.
+- Route rewrite rule: `/*` -> `/index.html` (supporting React Router `BrowserRouter`).
 
 ---
 
-## 11. Testing Strategy
+## 7. Automated Verification & Test Harness
 
-### Frontend Testing
-- Component testing with React Testing Library
-- Form validation tests
-- Route protection tests
-- Integration tests for service layer
+The system is validated by an automated test harness covering both frontend and backend:
 
-### Backend Testing (Future)
-- Unit tests with JUnit
-- Service layer tests with Mockito
-- Controller tests with MockMvc
-- Repository tests with TestContainers
-- End-to-end tests with Selenium/Playwright
-
----
-
-## 12. Deployment Architecture
-
-### Development
-```
-React (Vite Dev Server) → Mock Data
-```
-
-### Production
-```
-React (Nginx) → Spring Boot (Tomcat) → MySQL
-```
-
-### Cloud Deployment (Future)
-```
-React (Vercel/Netlify) → Spring Boot (AWS EC2/Heroku) → MySQL (AWS RDS)
-File Storage (AWS S3)
-```
-
----
-
-## 13. Next Steps
-
-### Immediate
-1. Gradually migrate components to use Zustand stores
-2. Replace mock data with API service calls
-3. Implement proper error handling and loading states
-
-### Short-term
-1. Set up Spring Boot project structure
-2. Configure database connection
-3. Implement authentication endpoints
-4. Build core entity repositories
-
-### Long-term
-1. Complete all API endpoints
-2. Implement file storage integration
-3. Build certificate generation system
-4. Add email notifications
-5. Implement real-time features (WebSocket)
-
----
-
-## 14. Key Benefits
-
-### Scalability
-- Modular architecture allows easy feature additions
-- Service layer enables backend swapping
-- State management prevents prop drilling
-
-### Maintainability
-- Clear separation of concerns
-- Reusable service functions
-- Centralized state management
-
-### Developer Experience
-- Type-safe API contracts (future TypeScript migration)
-- Predictable data flow
-- Easy debugging with DevTools
-
-### Enterprise Readiness
-- Role-based access control
-- Audit logging infrastructure
-- Analytics and reporting capabilities
-- Security best practices
-
----
-
-## Conclusion
-
-The Fairmacs KMS now has a production-ready frontend architecture that can seamlessly integrate with a Spring Boot backend. The modular design, proper routing, service layer, and state management provide a solid foundation for building a scalable, maintainable, and enterprise-grade knowledge management system.
+- **Frontend Suites:** 23 Node.js verification suites checking UI components, portals, responsive behaviors, accessibility, and routing.
+  ```bash
+  npm --prefix frontend test
+  ```
+- **Frontend Production Build:** Vite 8 production bundling with Rolldown tree-shaking and gzip compression checks.
+  ```bash
+  npm --prefix frontend run build
+  ```
+- **Backend Test Suites:** Spring Boot unit, slice, and integration tests verifying security filters, database rollups, and policy compliance.
+  ```bash
+  mvn -f backend/pom.xml test
+  ```

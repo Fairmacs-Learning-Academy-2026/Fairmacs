@@ -290,3 +290,31 @@ The bulk employee onboarding service (`EmployeeExcelImportService.java`) parses 
   - Credentials: `allowCredentials=true`.
 - **Preflight Handling:** Explicit preflight matching for `HttpMethod.OPTIONS, "/**"` permitted without authentication to ensure smooth browser handshakes.
 - **Database Connection Security:** Supabase connection strings require SSL mode (`sslmode=require`) to prevent eavesdropping across cloud networks.
+
+---
+
+## 10. Corporate Policy Governance & Legal Non-Repudiation
+
+1. **Digital Signature & Acknowledgement Proof:**
+   - When an employee acknowledges a mandatory policy (`POST /api/policies/assignments/{id}/acknowledge`), the service captures:
+     - Digital signature string entered by user.
+     - Authenticated user ID snapshot.
+     - Remote client IP address (`HttpServletRequest.getRemoteAddr()`).
+     - UTC ISO-8601 timestamp.
+     - Policy document version ID and snapshot hash.
+2. **Manager Scoping Perimeter:**
+   - Managers can only supervise policies assigned to employees within their designated operational hierarchy. Unauthorized cross-department queries produce HTTP `403 Forbidden`.
+
+---
+
+## 11. Dynamic Watermarking & Container Sandboxing
+
+1. **Anti-Leak Rotated PDF Watermarking:**
+   - All confidential course and policy PDFs streamed to client browsers pass through `PolicyWatermarkService`.
+   - Incorporates mathematical non-clipping geometry calculation guaranteeing watermark lines do not cross printable margins on A4 and Letter orientations.
+   - Text template stamps authenticated user identity:
+     `PROPERTY OF FAIRMACS SHIPPING & LOGISTICS — CONFIDENTIAL — <EMPLOYEE_NAME> — <TIMESTAMP>`
+2. **Container Security & Least Privilege:**
+   - Production Docker container runs unprivileged under non-root system user `app:app` (UID 1001).
+   - Strict container JVM options (`-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k`) defend against memory exhaustion and OOM kills in resource-constrained environments.
+   - Render Blueprint marks all secrets as `sync: false`, ensuring zero plaintext credentials exist in source repositories.

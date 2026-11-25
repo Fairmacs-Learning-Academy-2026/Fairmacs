@@ -354,7 +354,7 @@ Configure the following environment variables on your system, or supply them in 
 | `ZOHO_REDIRECT_URI` | Zoho OAuth 2.0 Redirect URI | Optional | `http://localhost:8080/api/integrations/zoho/callback` |
 | `ZOHO_TOKEN_ENCRYPTION_KEY` | 32-byte Base64 AES key for OAuth tokens | Optional | `k8yW5f8f9Q3b4+6fX+7t8Y8Z...` |
 | `ZOHO_COURSE_DOCUMENTS_FOLDER_ID` | Target folder ID in Zoho WorkDrive | Optional | `uqi2q368e8c06e5bc44de87954550476aa546` |
-| `server.port` | Spring Boot HTTP port | No | `8080` (default) |
+| `server.port` / `PORT` | Spring Boot HTTP port (Render injects `$PORT`) | No | `8080` (default) |
 
 > A ready-to-use template is available at [`backend/src/main/resources/application.properties.example`](backend/src/main/resources/application.properties.example).
 
@@ -430,6 +430,34 @@ VITE_API_BASE_URL=http://localhost:8080/api
    ```
    http://localhost:5173
    ```
+
+---
+
+### 3. Docker & Cloud Deployment (Render Blueprint)
+
+Fairmacs KMS includes an infrastructure-as-code deployment blueprint via [`render.yaml`](render.yaml) and a hardened multi-stage [`backend/Dockerfile`](backend/Dockerfile):
+
+#### Run via Docker Locally:
+```bash
+# Build the backend image
+docker build -t fairmacs-lms-backend backend/
+
+# Run container with dynamic port and memory constraints
+docker run -p 8080:8080 \
+  -e SUPABASE_DB_URL="jdbc:postgresql://<host>:5432/<database>?sslmode=require" \
+  -e SUPABASE_DB_USERNAME="postgres" \
+  -e SUPABASE_DB_PASSWORD="<password>" \
+  -e JWT_SECRET="<secret>" \
+  -e PORT=8080 \
+  fairmacs-lms-backend
+```
+
+#### Deploy to Render:
+1. Connect the GitHub repository to **Render**.
+2. Render detects [`render.yaml`](render.yaml) automatically and provisions:
+   - `fairmacs-lms-api`: Docker web service with Java 17, non-root execution (`UID 1001`), and memory constraints (`-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k`).
+   - `fairmacs-lms-web`: Static web service running Node 22 (`npm ci && npm run build`), publishing `dist`, with SPA rewrite rule (`/* -> /index.html`).
+3. Set your private environment variables in the Render dashboard (`SUPABASE_DB_URL`, `SUPABASE_DB_PASSWORD`, `CORS_ALLOWED_ORIGINS`). `JWT_SECRET` is generated automatically.
 
 ---
 

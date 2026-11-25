@@ -6,6 +6,7 @@ services:
     runtime: docker
     rootDir: backend
     dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free            # use "starter" or higher so scheduled jobs keep running (free sleeps after ~15 min idle)
     envVars:
       - key: SUPABASE_DB_URL

@@ -56,6 +56,9 @@ Fairmacs KMS adheres to a strict **Zero-Credential-in-Code** standard across all
 - **Password Security**: Passwords are salted and hashed using **BCrypt** with strong work factors. Plaintext passwords are never logged, stored, or transmitted back to clients.
 - **Role-Based Access Control (RBAC)**: All sensitive administrative endpoints enforce Spring Security method-level authorization (`@PreAuthorize("hasRole(...)")`).
 - **Cloud OAuth Token Encryption**: Third-party OAuth tokens (e.g., Zoho WorkDrive refresh tokens) are encrypted at rest using **AES-256-GCM** before database persistence.
+- **Dynamic Rotated Watermarking**: Proprietary and confidential PDFs streamed to clients are stamped dynamically with employee name, employee ID, and UTC timestamp with non-clipping boundary guarantees to deter intellectual property leaks.
+- **Policy Non-Repudiation**: Employee acknowledgements of corporate policies capture digital signatures, client IP address, and UTC timestamp in immutable database records.
+- **Container Isolation & Least Privilege**: The production backend container runs as an unprivileged non-root user (`app`, UID 1001) with serial garbage collection and strict memory caps (`-XX:MaxRAMPercentage=70`) to prevent container breakout and resource exhaustion.
 - **Secure File Ingestion**: Uploaded documents (PDF, DOCX) and spreadsheets (`.xlsx`) undergo MIME validation, payload size restrictions (10MB default limit), and strict type verification.
 - **CORS & CSRF**: Controlled CORS whitelist restricting requests to verified client domains, with stateless Bearer authentication mitigating CSRF risks.
 

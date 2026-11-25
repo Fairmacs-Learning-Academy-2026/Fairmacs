@@ -61,6 +61,8 @@ Each requirement is tagged with a unique identifier and categorized according to
 | `SR-INTEG` | Zoho WorkDrive Cloud OAuth, Token Protection | 4 |
 | `SR-AUDIT` | Immutable Trails, Certificate Non-Repudiation | 4 |
 | `SR-PRIV` | PII Governance, Account Separation | 3 |
+| `SR-POLICY` | Policy Acknowledgements & Anti-Leak Watermarking | 4 |
+| `SR-DEPLOY` | Container Isolation & Cloud Secret Protection | 3 |
 
 ---
 
@@ -146,7 +148,24 @@ Each requirement is tagged with a unique identifier and categorized according to
 
 ---
 
-## 12. Verification & Acceptance Criteria
+## 12. Corporate Policies & Anti-Leak Protection (SR-POLICY)
+
+- **SR-POLICY-01 (Explicit Legal Declarations):** Employee policy acknowledgements **MUST** require explicit digital signature confirmation and capture remote IP address snapshot, user ID, and UTC timestamp in immutable database records.
+- **SR-POLICY-02 (Dynamic Non-Clipping Watermarking):** All confidential course and policy PDFs streamed to browsers **MUST** be stamped on-the-fly with an unalterable rotated diagonal watermark embedding employee name, employee ID, and UTC timestamp, with mathematical bounds preventing text clipping across page boundaries.
+- **SR-POLICY-03 (Departmental Scoping):** Managers **MUST ONLY** access policy compliance tracking and send reminder notifications to employees within their designated operational hierarchy.
+- **SR-POLICY-04 (Document Versioning & Immutability):** Publishing a new policy version **MUST** archive previous versions and snapshot the specific version acknowledged by each employee.
+
+---
+
+## 13. Container Isolation & Cloud Deployment (SR-DEPLOY)
+
+- **SR-DEPLOY-01 (Non-Root Execution):** Production Docker container **MUST** run under an unprivileged non-root system user (`app`, UID 1001) with restricted operating system privileges.
+- **SR-DEPLOY-02 (Memory & Resource Protection):** Container JVM options **MUST** restrict heap memory usage (`-XX:MaxRAMPercentage=70 -XX:+UseSerialGC -Xss512k`) to prevent host resource exhaustion.
+- **SR-DEPLOY-03 (Cloud Secret Synchronization):** Render Blueprint configurations (`render.yaml`) **MUST** declare sensitive production credentials as `sync: false` to ensure zero secrets are committed to version control.
+
+---
+
+## 14. Verification & Acceptance Criteria
 
 | Requirement ID | Verification Test Method | Acceptance Pass Criteria |
 |---|---|---|
