@@ -1,0 +1,5 @@
+target/
+uploads/
+.git/
+*.md
+src/main/resources/application-local.properties

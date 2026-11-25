@@ -54,3 +54,17 @@ uploads/
 .vite/
 desktop.ini
 scratch/
+
+# dependencies / build output
+node_modules/
+frontend/dist/
+backend/target/
+
+# runtime files
+backend/uploads/
+
+# local-only configuration and secrets
+backend/src/main/resources/application-local.properties
+.env
+.env.*
+*.log
