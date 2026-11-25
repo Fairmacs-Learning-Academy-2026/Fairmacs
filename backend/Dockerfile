@@ -1,9 +1,14 @@
 # ---- build stage ----
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /build
-COPY pom.xml .
-RUN mvn -B -q dependency:go-offline
-COPY src ./src
+COPY . /tmp/ctx
+RUN if [ -f /tmp/ctx/pom.xml ]; then \
+      cp /tmp/ctx/pom.xml ./pom.xml && cp -R /tmp/ctx/src ./src; \
+    elif [ -f /tmp/ctx/backend/pom.xml ]; then \
+      cp /tmp/ctx/backend/pom.xml ./pom.xml && cp -R /tmp/ctx/backend/src ./src; \
+    else \
+      echo "ERROR: pom.xml not found in build context" && exit 1; \
+    fi && rm -rf /tmp/ctx
 RUN mvn -B -q -DskipTests package
 
 # ---- run stage ----

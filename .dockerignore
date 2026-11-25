@@ -1,0 +1,15 @@
+.git/
+.github/
+.vite/
+.vscode/
+frontend/
+scratch/
+backend/target/
+backend/uploads/
+target/
+uploads/
+*.md
+*.zip
+*.json
+src/main/resources/application-local.properties
+backend/src/main/resources/application-local.properties
