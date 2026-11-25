@@ -69,82 +69,6 @@ export default function Sidebar({
   const backdropRef = useRef(null);
   const drawerDragRef = useRef({ active: false, startX: 0, startY: 0, currentX: 0, startTime: 0, lockedAxis: null });
 
-  // 1:1 Direct-Manipulation Swipe-to-Close Gesture for Mobile Drawer (/gestures skill)
-  const handleDrawerTouchStart = useCallback((e) => {
-    if (!mobileOpen || typeof window === 'undefined' || window.innerWidth > 768) return;
-    const touch = e.targetTouches?.[0];
-    if (!touch) return;
-    drawerDragRef.current = {
-      active: true,
-      startX: touch.clientX,
-      startY: touch.clientY,
-      currentX: touch.clientX,
-      startTime: performance.now(),
-      lockedAxis: null
-    };
-    if (sidebarRef.current) {
-      sidebarRef.current.style.transition = 'none';
-    }
-  }, [mobileOpen]);
-
-  const handleDrawerTouchMove = useCallback((e) => {
-    const drag = drawerDragRef.current;
-    if (!drag.active || !sidebarRef.current) return;
-    const touch = e.targetTouches?.[0];
-    if (!touch) return;
-
-    const dx = touch.clientX - drag.startX;
-    const dy = touch.clientY - drag.startY;
-
-    if (!drag.lockedAxis) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
-      drag.lockedAxis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
-    }
-
-    if (drag.lockedAxis !== 'x') return;
-
-    drag.currentX = touch.clientX;
-    // 1:1 tracking to the left; rubber-band resistance (0.15) when pulling right
-    const offset = dx <= 0 ? dx : dx * 0.15;
-    sidebarRef.current.style.transform = `translate3d(${offset}px, 0, 0)`;
-    if (backdropRef.current) {
-      const width = sidebarRef.current.offsetWidth || 280;
-      const progress = Math.min(1, Math.max(0, 1 + offset / width));
-      backdropRef.current.style.opacity = String(progress);
-    }
-  }, []);
-
-  const handleDrawerTouchEnd = useCallback(() => {
-    const drag = drawerDragRef.current;
-    if (!drag.active) return;
-    drag.active = false;
-
-    const el = sidebarRef.current;
-    if (backdropRef.current) {
-      backdropRef.current.style.opacity = '';
-    }
-    if (!el) return;
-
-    el.style.transition = '';
-    if (drag.lockedAxis !== 'x') {
-      el.style.transform = '';
-      return;
-    }
-
-    const dx = drag.currentX - drag.startX;
-    const elapsed = Math.max(1, performance.now() - drag.startTime);
-    const velocity = dx / elapsed; // px per ms (negative = left flick)
-
-    // Dismiss on distance (< -72px) OR fast left flick (velocity < -0.42 px/ms)
-    if (dx < -72 || (dx < -24 && velocity < -0.42)) {
-      el.style.transform = '';
-      scheduleRetract(0);
-      if (onCloseMobile) onCloseMobile();
-    } else {
-      el.style.transform = '';
-    }
-  }, [onCloseMobile, scheduleRetract]);
-
   // Intentional movement & browser visibility lifecycle refs
   const isEmergedRef = useRef(false);
   const ignoreEventsUntilRef = useRef(Date.now() + 400); // 400ms guard on mount
@@ -300,6 +224,82 @@ export default function Sidebar({
       setIsEmerged(true);
     }
   }, []);
+
+  // 1:1 Direct-Manipulation Swipe-to-Close Gesture for Mobile Drawer (/gestures skill)
+  const handleDrawerTouchStart = useCallback((e) => {
+    if (!mobileOpen || typeof window === 'undefined' || window.innerWidth > 768) return;
+    const touch = e.targetTouches?.[0];
+    if (!touch) return;
+    drawerDragRef.current = {
+      active: true,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      currentX: touch.clientX,
+      startTime: performance.now(),
+      lockedAxis: null
+    };
+    if (sidebarRef.current) {
+      sidebarRef.current.style.transition = 'none';
+    }
+  }, [mobileOpen]);
+
+  const handleDrawerTouchMove = useCallback((e) => {
+    const drag = drawerDragRef.current;
+    if (!drag.active || !sidebarRef.current) return;
+    const touch = e.targetTouches?.[0];
+    if (!touch) return;
+
+    const dx = touch.clientX - drag.startX;
+    const dy = touch.clientY - drag.startY;
+
+    if (!drag.lockedAxis) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      drag.lockedAxis = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+    }
+
+    if (drag.lockedAxis !== 'x') return;
+
+    drag.currentX = touch.clientX;
+    // 1:1 tracking to the left; rubber-band resistance (0.15) when pulling right
+    const offset = dx <= 0 ? dx : dx * 0.15;
+    sidebarRef.current.style.transform = `translate3d(${offset}px, 0, 0)`;
+    if (backdropRef.current) {
+      const width = sidebarRef.current.offsetWidth || 280;
+      const progress = Math.min(1, Math.max(0, 1 + offset / width));
+      backdropRef.current.style.opacity = String(progress);
+    }
+  }, []);
+
+  const handleDrawerTouchEnd = useCallback(() => {
+    const drag = drawerDragRef.current;
+    if (!drag.active) return;
+    drag.active = false;
+
+    const el = sidebarRef.current;
+    if (backdropRef.current) {
+      backdropRef.current.style.opacity = '';
+    }
+    if (!el) return;
+
+    el.style.transition = '';
+    if (drag.lockedAxis !== 'x') {
+      el.style.transform = '';
+      return;
+    }
+
+    const dx = drag.currentX - drag.startX;
+    const elapsed = Math.max(1, performance.now() - drag.startTime);
+    const velocity = dx / elapsed; // px per ms (negative = left flick)
+
+    // Dismiss on distance (< -72px) OR fast left flick (velocity < -0.42 px/ms)
+    if (dx < -72 || (dx < -24 && velocity < -0.42)) {
+      el.style.transform = '';
+      scheduleRetract(0);
+      if (onCloseMobile) onCloseMobile();
+    } else {
+      el.style.transform = '';
+    }
+  }, [onCloseMobile, scheduleRetract]);
 
   // Left-Edge Hotzone Handler with Intentional Motion Validation
   const handleEdgeZoneInteraction = useCallback(
