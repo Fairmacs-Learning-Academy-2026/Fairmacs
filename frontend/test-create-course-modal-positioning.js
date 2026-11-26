@@ -154,4 +154,17 @@ assert.ok(
 );
 console.log('[PASS] 7. Responsive tablet, mobile, and reduced-motion rules verified');
 
+// 8. Verify BulkQuizImportModal portals to document.body above .course-modal-container (z-index: 100001)
+const bulkQuizModalPath = path.join(__dirname, 'src', 'components', 'BulkQuizImportModal.jsx');
+const bulkQuizModalCode = fs.readFileSync(bulkQuizModalPath, 'utf8');
+assert.ok(
+  bulkQuizModalCode.includes('createPortal(') && bulkQuizModalCode.includes('document.body'),
+  'BulkQuizImportModal must portal to document.body so it is never trapped inside CourseBuilderModal stacking context'
+);
+assert.ok(
+  bulkQuizModalCode.includes('zIndex: 120000'),
+  'BulkQuizImportModal must specify zIndex: 120000 (> .course-modal-container z-index 100001)'
+);
+console.log('[PASS] 8. BulkQuizImportModal portal and stacking z-index (120000 > 100001) verified');
+
 console.log('--- ALL CREATE COURSE MODAL POSITIONING CHECKS PASSED ---');

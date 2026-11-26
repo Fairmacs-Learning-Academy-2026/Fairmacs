@@ -61,7 +61,7 @@ export default function RecommendedElectivesWidget({
       <div className="phase7-electives-card skeleton-shimmer" style={{ minHeight: '260px' }}>
         <div style={{ padding: '1.5rem' }}>
           <div style={{ height: '24px', width: '220px', background: '#E2E8F0', borderRadius: '6px', marginBottom: '1.25rem' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px, 100%), 1fr))', gap: '1rem' }}>
             <div style={{ height: '180px', background: '#F1F5F9', borderRadius: '16px' }} />
             <div style={{ height: '180px', background: '#F1F5F9', borderRadius: '16px' }} />
           </div>

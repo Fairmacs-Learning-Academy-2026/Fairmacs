@@ -408,7 +408,7 @@ export default function LearningStreaks() {
         className="learning-streaks-grid"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(270px, 320px) 1fr',
+          gridTemplateColumns: 'minmax(270px, 320px) minmax(0, 1fr)',
           gap: '1.5rem',
           position: 'relative',
           zIndex: 1

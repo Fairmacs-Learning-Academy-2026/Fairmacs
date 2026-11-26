@@ -138,7 +138,16 @@ for (const jsxFile of jsxFiles) {
     !/\d+vh\b/.test(src),
     `Found bare vh unit in ${rel} — use dvh (app/modals) or svh (heroes) instead`
   );
+  assert(
+    !/minmax\(\s*(2[6-9]\d|3\d\d)px\s*,\s*1fr\s*\)/.test(src),
+    `Found unclamped grid minmax(>260px, 1fr) in ${rel} — wrap with min(NNNpx, 100%) for <375px screens`
+  );
 }
+const cvSrc = fs.readFileSync(path.join(srcDir, 'components', 'CourseViewer.jsx'), 'utf8');
+assert(
+  cvSrc.includes('mn-course-viewer-grid') && cvSrc.includes('mn-course-top-bar'),
+  'CourseViewer.jsx must use responsive mn-course-viewer-grid and mn-course-top-bar'
+);
 console.log(`[PASS] 4. Zero bare vh or h-screen layout height bugs across all ${jsxFiles.length} JSX components.`);
 
 // 5. Carousels Declare Horizontal Gesture Axis Ownership (touch-action: pan-y)

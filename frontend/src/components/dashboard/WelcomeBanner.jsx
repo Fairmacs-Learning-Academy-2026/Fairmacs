@@ -93,8 +93,8 @@ export default function WelcomeBanner({ onOpenNotifications }) {
           <div className="welcome-banner-left">
             <div className="welcome-banner-text-stack" style={{ gap: '0.45rem', width: '100%', maxWidth: '440px' }}>
               <div className="skeleton-shimmer" style={{ width: '180px', height: '18px', borderRadius: '999px' }} />
-              <div className="skeleton-shimmer" style={{ width: '260px', height: '28px', borderRadius: '8px' }} />
-              <div className="skeleton-shimmer" style={{ width: '380px', height: '14px', borderRadius: '6px' }} />
+              <div className="skeleton-shimmer" style={{ width: 'min(260px, 100%)', height: '28px', borderRadius: '8px' }} />
+              <div className="skeleton-shimmer" style={{ width: 'min(380px, 100%)', height: '14px', borderRadius: '6px' }} />
             </div>
           </div>
           <div className="welcome-banner-right">

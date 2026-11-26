@@ -266,13 +266,13 @@ public class BulkQuestionParserService {
         boolean hasHeader = firstRow.stream().anyMatch(h -> h.contains("question") || h.contains("option") || h.contains("correct") || h.contains("answer"));
 
         int startRow = hasHeader ? 1 : 0;
-        int qTextCol = hasHeader ? findColumnIndex(firstRow, List.of("question", "text", "qtext")) : 0;
-        int qTypeCol = hasHeader ? findColumnIndex(firstRow, List.of("type", "qtype")) : -1;
-        int optACol = hasHeader ? findColumnIndex(firstRow, List.of("option a", "opt a", "option_a", "opta", "a")) : 1;
-        int optBCol = hasHeader ? findColumnIndex(firstRow, List.of("option b", "opt b", "option_b", "optb", "b")) : 2;
-        int optCCol = hasHeader ? findColumnIndex(firstRow, List.of("option c", "opt c", "option_c", "optc", "c")) : 3;
-        int optDCol = hasHeader ? findColumnIndex(firstRow, List.of("option d", "opt d", "option_d", "optd", "d")) : 4;
-        int ansCol = hasHeader ? findColumnIndex(firstRow, List.of("correct", "answer", "ans", "correct answer", "key")) : 5;
+        int qTextCol = hasHeader ? findColumnIndex(firstRow, List.of("question text", "question", "text", "qtext")) : 0;
+        int qTypeCol = hasHeader ? findColumnIndex(firstRow, List.of("question type", "qtype", "type")) : -1;
+        int optACol = hasHeader ? findColumnIndex(firstRow, List.of("option a", "opt a", "option_a", "opta", "choice a", "a")) : 1;
+        int optBCol = hasHeader ? findColumnIndex(firstRow, List.of("option b", "opt b", "option_b", "optb", "choice b", "b")) : 2;
+        int optCCol = hasHeader ? findColumnIndex(firstRow, List.of("option c", "opt c", "option_c", "optc", "choice c", "c")) : 3;
+        int optDCol = hasHeader ? findColumnIndex(firstRow, List.of("option d", "opt d", "option_d", "optd", "choice d", "d")) : 4;
+        int ansCol = hasHeader ? findColumnIndex(firstRow, List.of("correct answer", "correct", "answer", "ans", "key")) : 5;
         int expCol = hasHeader ? findColumnIndex(firstRow, List.of("explanation", "explain", "rationale", "note")) : 6;
         int marksCol = hasHeader ? findColumnIndex(firstRow, List.of("marks", "mark", "points", "score")) : -1;
 
@@ -804,11 +804,22 @@ public class BulkQuestionParserService {
     }
 
     private int findColumnIndex(List<String> headers, List<String> searchTerms) {
-        for (int i = 0; i < headers.size(); i++) {
-            String h = headers.get(i);
-            if (h == null) continue;
-            for (String term : searchTerms) {
-                if (h.equalsIgnoreCase(term) || h.contains(term)) {
+        // Pass 1: exact match in priority order of searchTerms
+        for (String term : searchTerms) {
+            for (int i = 0; i < headers.size(); i++) {
+                String h = headers.get(i);
+                if (h != null && h.trim().equalsIgnoreCase(term)) {
+                    return i;
+                }
+            }
+        }
+        // Pass 2: substring match only for multi-character searchTerms (never single-letter 'a'/'b'/'c'/'d')
+        for (String term : searchTerms) {
+            if (term.length() <= 1) continue;
+            String lowerTerm = term.toLowerCase(Locale.ROOT);
+            for (int i = 0; i < headers.size(); i++) {
+                String h = headers.get(i);
+                if (h != null && h.trim().toLowerCase(Locale.ROOT).contains(lowerTerm)) {
                     return i;
                 }
             }

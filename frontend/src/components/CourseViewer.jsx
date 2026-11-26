@@ -2190,12 +2190,7 @@ export default function CourseViewer({
    */
   return (
     <div
-      className="animate-fade-in"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1.25rem'
-      }}
+      className="animate-fade-in mn-course-viewer-shell"
     >
 
       {/* =====================================================
@@ -2203,29 +2198,17 @@ export default function CourseViewer({
       ====================================================== */}
 
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          background: 'white',
-          padding: '1rem 1.5rem',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          boxShadow: 'var(--shadow-sm)'
-        }}
+        className="mn-course-top-bar"
       >
         <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}
+          className="mn-course-top-left"
         >
           <button
             className="btn-secondary"
             onClick={onBack}
             style={{
-              padding: '0.4rem 0.8rem'
+              padding: '0.45rem 0.8rem',
+              flexShrink: 0
             }}
           >
             <ArrowLeft
@@ -2238,12 +2221,15 @@ export default function CourseViewer({
             Back
           </button>
 
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div
               style={{
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                color: '#0284c7'
+                color: '#0284c7',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}
             >
               {course.id} • {course.department || (course.departments && course.departments[0]) || course.category || 'General Logistics'}
@@ -2251,9 +2237,11 @@ export default function CourseViewer({
 
             <h1
               style={{
-                fontSize: '1.2rem',
+                fontSize: 'clamp(1rem, 3.6vw, 1.2rem)',
                 fontWeight: 800,
-                color: '#0f172a'
+                color: '#0f172a',
+                lineHeight: 1.25,
+                wordBreak: 'break-word'
               }}
             >
               {course.title}
@@ -2262,11 +2250,7 @@ export default function CourseViewer({
         </div>
 
         <div
-          style={{
-            display: 'flex',
-            gap: '0.75rem',
-            alignItems: 'center'
-          }}
+          className="mn-course-top-actions"
         >
           <button
             className="btn-secondary"

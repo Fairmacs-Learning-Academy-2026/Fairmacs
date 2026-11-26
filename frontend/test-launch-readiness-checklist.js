@@ -69,7 +69,7 @@ const appJsx = fs.readFileSync(path.join(__dirname, 'src', 'App.jsx'), 'utf8');
 assert(appJsx.includes('path="/privacy-policy"') && appJsx.includes('path="/terms"'), 'Privacy & Terms routes must exist in App.jsx');
 assert(appJsx.includes('path="/thank-you"') && appJsx.includes('<NotFoundPage />'), 'Thank-You and custom 404 NotFoundPage routes must exist in App.jsx');
 const footerNav = fs.readFileSync(path.join(__dirname, 'src', 'components', 'footer', 'FooterNavigation.jsx'), 'utf8');
-assert(footerNav.includes('Moore Street') && footerNav.includes('Chennai'), 'Real Fairmacs corporate address must appear in footer');
+assert(footerNav.includes('Kattupakkam') && footerNav.includes('600077'), 'Real Fairmacs corporate address must appear in footer');
 const publicHome = fs.readFileSync(path.join(__dirname, 'src', 'components', 'PublicHome.jsx'), 'utf8');
 assert(!publicHome.includes('hidden sm:flex items-center gap-2 rounded-xl'), 'Mobile sticky Login CTA must be directly visible in navbar on small screens');
 console.log('[PASS] #10-#20: Custom 404, real Chennai address, Privacy, Terms, sticky mobile CTA, and Thank-You page verified.');

@@ -550,7 +550,7 @@ export default function EmployeeManagement() {
     setEditingEmployee(null);
     setFormData({
       ...DEFAULT_FORM,
-      temporaryPassword: generateClientTemporaryPassword(),
+      temporaryPassword: "",
     });
     setFormError("");
     setShowModal(true);
@@ -651,7 +651,10 @@ export default function EmployeeManagement() {
         await createEmployee(payload);
         setNotice({
           type: "success",
-          message: "Employee account created with mandatory first-login password change.",
+          message:
+            formData.temporaryPassword && formData.temporaryPassword.trim()
+              ? "Employee account created with the password you entered. They must change it at first login."
+              : "Employee account created with the shared initial password. They must change it at first login.",
         });
       }
       setShowModal(false);
@@ -673,10 +676,14 @@ export default function EmployeeManagement() {
     try {
       const result = await importEmployees(file);
       if (result?.success === false) {
+        const rowErrors = Array.isArray(result.errors) ? result.errors : [];
+        const shown = rowErrors.slice(0, 8).join(" | ");
+        const more = rowErrors.length > 8 ? ` ... and ${rowErrors.length - 8} more` : "";
         throw new Error(
-          result.message ||
+          (result.message ||
             result.error ||
-            "Excel import failed. Check the required columns and try again."
+            "Excel import failed. Check the required columns and try again.") +
+            (shown ? ` ${shown}${more}` : "")
         );
       }
 
@@ -692,7 +699,9 @@ export default function EmployeeManagement() {
 
       setNotice({
         type: "success",
-        message: result?.message || "Employee Excel import completed successfully.",
+        message:
+          (result?.message || "Employee Excel import completed successfully.") +
+          " New employees sign in with the shared initial password (System Settings) and must change it at first login.",
       });
     } catch (error) {
       setNotice({
@@ -1930,7 +1939,7 @@ export default function EmployeeManagement() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-extrabold text-[#0B5CAB] mb-1.5">
-                          One-Time Initial Temporary Password
+                          Initial Password
                         </div>
                         <div className="flex flex-wrap sm:flex-nowrap gap-2 items-center">
                           <input
@@ -1938,21 +1947,14 @@ export default function EmployeeManagement() {
                             value={formData.temporaryPassword || ""}
                             onChange={(e) => setField("temporaryPassword", e.target.value)}
                             className="emp-modal-input font-mono font-bold"
-                            placeholder="Min 8 chars, upper, lower, number, symbol"
+                            placeholder="Leave blank to use the shared initial password"
+                            autoComplete="off"
+                            autoCapitalize="none"
+                            autoCorrect="off"
                           />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setField("temporaryPassword", generateClientTemporaryPassword())
-                            }
-                            className="emp-btn-glass"
-                          >
-                            <RefreshCw size={13} />
-                            <span>Regenerate</span>
-                          </button>
                         </div>
                         <p className="mt-1.5 text-[11px] text-[#4A5058] leading-relaxed">
-                          Copy and share this temporary password securely with the employee. They will be forced to change it immediately upon their first sign-in.
+                          Leave this blank and the employee gets the shared initial password set in System Settings (the same one used for bulk upload). Type a password only to give this one employee a different one (min 8 chars, upper, lower, number, symbol). Either way they must change it at first sign-in.
                         </p>
                       </div>
                     </div>

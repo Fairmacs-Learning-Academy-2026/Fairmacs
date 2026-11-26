@@ -47,6 +47,9 @@ import com.fairmacs.lms.security.SecurityContextUtil;
 @Service
 public class EmployeeExcelImportService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SystemSettingsService systemSettingsService;
+
     public static final long MAX_FILE_SIZE_BYTES = 5L * 1024L * 1024L; // 5 MB
     public static final int MAX_IMPORT_ROWS = 500;
     public static final int MAX_FIELD_LENGTH = 255;
@@ -336,6 +339,16 @@ public class EmployeeExcelImportService {
             List<Map<String, Object>> importedEmployees = new ArrayList<>();
             LocalDateTime now = LocalDateTime.now();
 
+            // Everyone in this upload starts with the shared initial password HR set in System Settings.
+            String sharedInitialPasswordHash = systemSettingsService != null
+                    ? systemSettingsService.getInitialPasswordHash().orElse(null)
+                    : null;
+            if (systemSettingsService != null && sharedInitialPasswordHash == null) {
+                throw new IllegalArgumentException(
+                        "Set the shared initial password in System Settings (Employee onboarding) "
+                                + "before importing employees, so new employees know how to log in.");
+            }
+
             for (EmployeeRow row : rows) {
                 User user = new User();
 
@@ -348,8 +361,12 @@ public class EmployeeExcelImportService {
                  * Only the BCrypt hash is stored in the database, and the user is
                  * required to change their password on first login.
                  */
-                String generatedTempPassword = PasswordSecurityUtil.generateSecureTemporaryPassword();
-                user.setPassword(passwordEncoder.encode(generatedTempPassword));
+                if (sharedInitialPasswordHash != null) {
+                    user.setPassword(sharedInitialPasswordHash);
+                } else {
+                    String generatedTempPassword = PasswordSecurityUtil.generateSecureTemporaryPassword();
+                    user.setPassword(passwordEncoder.encode(generatedTempPassword));
+                }
                 user.setMustChangePassword(true);
                 user.setPasswordChangedAt(now);
 

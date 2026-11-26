@@ -42,6 +42,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 import { useAuth } from '../context/AuthContext';
+import { buildTrainingReportWorkbook } from '../utils/hrReportExport';
 
 
 
@@ -103,6 +104,25 @@ const ReportsView = ({ currentRole, embedded = false }) => {
   const [hrReport, setHrReport] = useState(null);
   const [hrLoading, setHrLoading] = useState(false);
   const [hrError, setHrError] = useState('');
+  const [hrFilters, setHrFilters] = useState({
+    department: 'ALL',
+    courseId: '',
+    employeeStatus: 'CURRENT',
+    enrollmentType: 'ALL',
+    from: '',
+    to: ''
+  });
+  const updateHrFilter = (key, value) =>
+    setHrFilters((current) => ({ ...current, [key]: value }));
+  const resetHrFilters = () =>
+    setHrFilters({
+      department: 'ALL',
+      courseId: '',
+      employeeStatus: 'CURRENT',
+      enrollmentType: 'ALL',
+      from: '',
+      to: ''
+    });
 
   const [courseSearch, setCourseSearch] = useState('');
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('ALL');
@@ -260,8 +280,19 @@ const ReportsView = ({ currentRole, embedded = false }) => {
       setHrLoading(true);
       setHrError('');
 
+      const params = new URLSearchParams();
+      if (isHR) {
+        if (hrFilters.department && hrFilters.department !== 'ALL') params.set('department', hrFilters.department);
+        if (hrFilters.courseId) params.set('courseId', hrFilters.courseId);
+        if (hrFilters.employeeStatus === 'ALL') params.set('employeeStatus', 'ALL');
+        if (hrFilters.enrollmentType && hrFilters.enrollmentType !== 'ALL') params.set('enrollmentType', hrFilters.enrollmentType);
+        if (hrFilters.from) params.set('from', hrFilters.from);
+        if (hrFilters.to) params.set('to', hrFilters.to);
+      }
+      const query = params.toString();
+
       const endpoint = isHR
-        ? `${API_BASE_URL}/hr/reports/training`
+        ? `${API_BASE_URL}/hr/reports/training${query ? `?${query}` : ''}`
         : `${API_BASE_URL}/trainer/reports`;
 
       try {
@@ -277,8 +308,14 @@ const ReportsView = ({ currentRole, embedded = false }) => {
         );
 
         if (!response.ok) {
+          let serverMessage = '';
+          try {
+            serverMessage = (await response.json())?.message || '';
+          } catch {
+            serverMessage = '';
+          }
           throw new Error(
-            `Failed to load training reports (${response.status})`
+            serverMessage || `Failed to load training reports (${response.status})`
           );
         }
 
@@ -294,7 +331,7 @@ const ReportsView = ({ currentRole, embedded = false }) => {
     };
 
     loadAnalyticsReport();
-  }, [isAnalyticsRole, isHR, token]);
+  }, [isAnalyticsRole, isHR, token, hrFilters]);
 
 
 
@@ -335,7 +372,7 @@ const createPdfDocument = (title, subtitle = '') => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   doc.setFontSize(18);
   doc.setTextColor(23, 32, 51);
-  doc.text('FAIRMACS LEARNING ACADEMY', 14, 15);
+  doc.text('FAIRMACS KMS', 14, 15);
   doc.setFontSize(13);
   doc.text(title, 14, 23);
   if (subtitle) {
@@ -367,7 +404,7 @@ const exportManagerTeamReportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Team Report');
     sheet.addRows([
-      ['FAIRMACS LEARNING ACADEMY - TEAM TRAINING REPORT'], [],
+      ['FAIRMACS KMS - TEAM TRAINING REPORT'], [],
       ['Generated On', new Date().toLocaleString('en-IN')],
       ['Team Members', report.teamMembers ?? 0],
       ['Training Completion', `${report.overallCompletion ?? 0}%`],
@@ -417,7 +454,7 @@ const exportManagerComplianceToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Compliance Summary');
     sheet.addRows([
-      ['FAIRMACS LEARNING ACADEMY - TEAM COMPLIANCE SUMMARY'], [],
+      ['FAIRMACS KMS - TEAM COMPLIANCE SUMMARY'], [],
       ['Generated On', new Date().toLocaleString('en-IN')],
       ['Overall Completion', `${report.overallCompletion ?? 0}%`],
       ['Mandatory Compliance', `${report.mandatoryCompliance ?? 0}%`],
@@ -500,7 +537,7 @@ const exportOverdueTrainingReportToExcel = async () => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Overdue Training');
     sheet.addRows([
-      ['FAIRMACS LEARNING ACADEMY - OVERDUE TRAINING REPORT'], [],
+      ['FAIRMACS KMS - OVERDUE TRAINING REPORT'], [],
       ['Generated On', new Date().toLocaleString('en-IN')], ['Overdue Records', records.length], [],
       ['Employee ID', 'Employee Name', 'Department', 'Course ID', 'Course Title', 'Status', 'Progress', 'Due Date', 'Days Overdue']
     ]);
@@ -560,144 +597,24 @@ const exportEmployeeReportToPdf = (data, employee) => {
 
 const exportHrReportToExcel = async () => {
   if (!hrReport) {
-    alert('HR report data is not available.');
+    alert('Report data is not available.');
     return;
   }
 
   try {
-    const workbook = new ExcelJS.Workbook();
-
-    // =========================
-    // SUMMARY SHEET
-    // =========================
-    const summarySheet = workbook.addWorksheet('Summary');
-
-    summarySheet.addRows([
-      ['FAIRMACS LEARNING ACADEMY - HR TRAINING REPORT'],
-      [],
-      ['Generated On', new Date().toLocaleString('en-IN')],
-      [],
-      ['TRAINING OVERVIEW'],
-      ['Total Employees', hrReport.totalEmployees ?? 0],
-      ['Active Employees', hrReport.activeEmployees ?? 0],
-      ['Total Assignments', hrReport.totalAssignments ?? 0],
-      ['Completed Assignments', hrReport.completedAssignments ?? 0],
-      ['In Progress Assignments', hrReport.inProgressAssignments ?? 0],
-      ['Not Started Assignments', hrReport.notStartedAssignments ?? 0],
-      ['Overdue Assignments', hrReport.overdueAssignments ?? 0],
-      ['Mandatory Assignments', hrReport.mandatoryAssignments ?? 0],
-      ['Mandatory Completed', hrReport.mandatoryCompleted ?? 0],
-      ['Mandatory Compliance Rate', `${hrReport.mandatoryComplianceRate ?? 0}%`],
-      ['Average Progress', `${hrReport.averageProgress ?? 0}%`],
-      ['Average Score', `${hrReport.averageScore ?? 0}%`],
-      ['Certificates Issued', hrReport.certificatesIssued ?? 0]
-    ]);
-
-    summarySheet.getColumn(1).width = 32;
-    summarySheet.getColumn(2).width = 35;
-
-    // =========================
-    // DEPARTMENT SHEET
-    // =========================
-    const departmentSheet = workbook.addWorksheet('Departments');
-
-    departmentSheet.addRow([
-      'Department',
-      'Employees',
-      'Assignments',
-      'Completed',
-      'Completion Rate',
-      'Overdue',
-      'Mandatory Assignments',
-      'Mandatory Completed',
-      'Mandatory Compliance'
-    ]);
-
-    (hrReport.departmentReports || []).forEach((department) => {
-      departmentSheet.addRow([
-        department.department || '—',
-        department.employeeCount ?? 0,
-        department.totalAssignments ?? 0,
-        department.completedAssignments ?? 0,
-        `${department.completionRate ?? 0}%`,
-        department.overdueAssignments ?? 0,
-        department.mandatoryAssignments ?? 0,
-        department.mandatoryCompleted ?? 0,
-        `${department.mandatoryComplianceRate ?? 0}%`
-      ]);
+    const workbook = buildTrainingReportWorkbook(hrReport, {
+      title: isTrainer ? 'TRAINER TRAINING REPORT' : 'HR TRAINING REPORT'
     });
 
-    departmentSheet.columns.forEach((column) => {
-      column.width = 22;
-    });
-
-    departmentSheet.getColumn(1).width = 38;
-
-    // =========================
-    // EMPLOYEE SHEET
-    // =========================
-    const employeeSheet = workbook.addWorksheet('Employees');
-
-    employeeSheet.addRow([
-      'Employee ID',
-      'Employee Name',
-      'Email',
-      'Designation',
-      'Department',
-      'Status',
-      'Assigned Courses',
-      'Completed Courses',
-      'In Progress',
-      'Not Started',
-      'Overdue',
-      'Average Progress',
-      'Average Score',
-      'Mandatory Courses',
-      'Mandatory Completed'
-    ]);
-
-    (hrReport.employeeReports || []).forEach((employee) => {
-      employeeSheet.addRow([
-        employee.employeeId || '—',
-        employee.name || '—',
-        employee.email || '—',
-        employee.designation || '—',
-        employee.department || '—',
-        employee.status || '—',
-        employee.assignedCourses ?? 0,
-        employee.completedCourses ?? 0,
-        employee.inProgressCourses ?? 0,
-        employee.notStartedCourses ?? 0,
-        employee.overdueCourses ?? 0,
-        `${employee.averageProgress ?? 0}%`,
-        `${employee.averageScore ?? 0}%`,
-        employee.mandatoryCourses ?? 0,
-        employee.mandatoryCompleted ?? 0
-      ]);
-    });
-
-    employeeSheet.columns.forEach((column) => {
-      column.width = 20;
-    });
-
-    employeeSheet.getColumn(2).width = 25;
-    employeeSheet.getColumn(3).width = 32;
-    employeeSheet.getColumn(4).width = 25;
-    employeeSheet.getColumn(5).width = 32;
-
-    // =========================
-    // DOWNLOAD
-    // =========================
     const fileName =
-      `Fairmacs_HR_Training_Report_${new Date()
+      `Fairmacs_${isTrainer ? 'Trainer' : 'HR'}_Training_Report_${new Date()
         .toISOString()
         .split('T')[0]}.xlsx`;
 
     await downloadExcelWorkbook(workbook, fileName);
-
   } catch (err) {
-    console.error('HR Excel export error:', err);
-    alert(err.message || 'Unable to export HR report.');
+    console.error('Training report Excel export error:', err);
+    alert(err.message || 'Unable to export the report.');
   }
 };
 
@@ -813,7 +730,7 @@ const exportEmployeeReportToExcel = async (employee) => {
     const summarySheet = workbook.addWorksheet('Employee Summary');
 
     summarySheet.addRows([
-      ['FAIRMACS LEARNING ACADEMY - EMPLOYEE TRAINING REPORT'],
+      ['FAIRMACS KMS - EMPLOYEE TRAINING REPORT'],
       [],
       ['Generated On', new Date().toLocaleString('en-IN')],
       [],
@@ -1480,19 +1397,7 @@ const exportEmployeeReportToExcel = async (employee) => {
 
           <div
 
-            style={{
-
-              display: 'grid',
-
-              gridTemplateColumns:
-
-                'repeat(4, minmax(0, 1fr))',
-
-              gap: '16px',
-
-              marginBottom: '26px'
-
-            }}
+            className="mn-kpi-grid-4" style={{ marginBottom: '26px' }}
 
           >
 
@@ -1578,7 +1483,7 @@ const exportEmployeeReportToExcel = async (employee) => {
 
               gridTemplateColumns:
 
-                'minmax(0, 2fr) minmax(300px, 1fr)',
+                'minmax(0, 2fr) minmax(min(300px, 100%), 1fr)',
 
               gap: '24px',
 
@@ -2510,7 +2415,7 @@ const exportEmployeeReportToExcel = async (employee) => {
   // HR ADMIN & TRAINER ANALYTICS REPORTS
   // ============================================================
 
-  if (isAnalyticsRole && hrLoading) {
+  if (isAnalyticsRole && hrLoading && !hrReport) {
     return (
       <div style={{
         minHeight: embedded ? '300px' : '500px',
@@ -2534,7 +2439,7 @@ const exportEmployeeReportToExcel = async (employee) => {
     );
   }
 
-  if (isAnalyticsRole && hrError) {
+  if (isAnalyticsRole && hrError && !hrReport) {
     return (
       <div style={{
         padding: embedded ? '1rem 0' : '40px 56px',
@@ -2721,12 +2626,147 @@ const exportEmployeeReportToExcel = async (employee) => {
           </div>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-          gap: '16px',
-          marginBottom: '16px'
-        }}>
+        {isHR && (
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            marginBottom: '16px'
+          }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'flex-end' }}>
+              {[
+                {
+                  label: 'Department',
+                  control: (
+                    <select
+                      value={hrFilters.department}
+                      onChange={(e) => updateHrFilter('department', e.target.value)}
+                      style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', minWidth: '170px' }}
+                    >
+                      <option value="ALL">All departments</option>
+                      {(hrReport?.filterOptions?.departments || []).map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  )
+                },
+                {
+                  label: 'Course',
+                  control: (
+                    <select
+                      value={hrFilters.courseId}
+                      onChange={(e) => updateHrFilter('courseId', e.target.value)}
+                      style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', minWidth: '210px', maxWidth: '280px' }}
+                    >
+                      <option value="">All courses</option>
+                      {(hrReport?.filterOptions?.courses || []).map((c) => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))}
+                    </select>
+                  )
+                },
+                {
+                  label: 'Assignment type',
+                  control: (
+                    <select
+                      value={hrFilters.enrollmentType}
+                      onChange={(e) => updateHrFilter('enrollmentType', e.target.value)}
+                      style={{ padding: '8px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', minWidth: '150px' }}
+                    >
+                      <option value="ALL">All types</option>
+                      <option value="MANDATORY">Mandatory</option>
+                      <option value="RECOMMENDED">Recommended</option>
+                      <option value="SELF_SELECTED">Self selected</option>
+                    </select>
+                  )
+                },
+                {
+                  label: 'Assigned from',
+                  control: (
+                    <input
+                      type="date"
+                      value={hrFilters.from}
+                      max={hrFilters.to || undefined}
+                      onChange={(e) => updateHrFilter('from', e.target.value)}
+                      style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                    />
+                  )
+                },
+                {
+                  label: 'Assigned to',
+                  control: (
+                    <input
+                      type="date"
+                      value={hrFilters.to}
+                      min={hrFilters.from || undefined}
+                      onChange={(e) => updateHrFilter('to', e.target.value)}
+                      style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                    />
+                  )
+                }
+              ].map((field) => (
+                <label key={field.label} style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', fontWeight: 600, color: '#475569' }}>
+                  {field.label}
+                  {field.control}
+                </label>
+              ))}
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#334155', paddingBottom: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={hrFilters.employeeStatus === 'ALL'}
+                  onChange={(e) => updateHrFilter('employeeStatus', e.target.checked ? 'ALL' : 'CURRENT')}
+                />
+                Include inactive employees
+              </label>
+
+              <button
+                type="button"
+                onClick={resetHrFilters}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  background: '#ffffff',
+                  color: '#334155',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Reset filters
+              </button>
+            </div>
+
+            <div style={{ marginTop: '10px', fontSize: '12.5px', color: '#64748b', display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center' }}>
+              <span>
+                Showing {hrReport?.totalAssignments ?? 0} assignments for {hrReport?.totalEmployees ?? 0} employees
+                {hrReport?.excludedInactiveEmployees > 0
+                  ? ` (${hrReport.excludedInactiveEmployees} inactive/terminated excluded)`
+                  : ''}
+              </span>
+              {hrLoading && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Updating...
+                </span>
+              )}
+              {hrError && <span style={{ color: '#be123c', fontWeight: 600 }}>{hrError}</span>}
+            </div>
+
+            {Array.isArray(hrReport?.definitions) && hrReport.definitions.length > 0 && (
+              <details style={{ marginTop: '10px', fontSize: '12.5px', color: '#475569' }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>How these numbers are calculated</summary>
+                <ul style={{ margin: '8px 0 0 0', paddingLeft: '18px', lineHeight: 1.55 }}>
+                  {hrReport.definitions.map((d) => (
+                    <li key={d.metric}><strong>{d.metric}:</strong> {d.definition}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
+        <div className="mn-kpi-grid-4" style={{ marginBottom: '16px' }}>
           <MetricCard icon={<Users size={21} />}
             iconBackground="#e0f2fe" iconColor="#0284c7"
             value={hrReport?.totalEmployees ?? 0}
@@ -2745,12 +2785,7 @@ const exportEmployeeReportToExcel = async (employee) => {
             label="Certificates Issued" />
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-          gap: '16px',
-          marginBottom: '26px'
-        }}>
+        <div className="mn-kpi-grid-4" style={{ marginBottom: '26px' }}>
           <MetricCard icon={<BarChart3 size={21} />}
             iconBackground="#e0f2fe" iconColor="#0284c7"
             value={`${hrReport?.averageProgress ?? 0}%`}
@@ -2769,12 +2804,7 @@ const exportEmployeeReportToExcel = async (employee) => {
             label="Overdue Training" />
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '24px',
-          marginBottom: '24px'
-        }}>
+        <div className="mn-grid-2" style={{ marginBottom: '24px' }}>
           <section style={{
             background: '#fff',
             border: '1px solid #e2e8f0',
@@ -4579,19 +4609,7 @@ const TranscriptModal = ({
 
                 <div
 
-                  style={{
-
-                    display: 'grid',
-
-                    gridTemplateColumns:
-
-                      'minmax(0, 1.5fr) repeat(3, minmax(0, 1fr))',
-
-                    gap: '12px',
-
-                    marginBottom: '20px'
-
-                  }}
+                  className="mn-transcript-meta-grid" style={{ marginBottom: '20px' }}
 
                 >
 
@@ -4745,19 +4763,7 @@ const TranscriptModal = ({
 
                 <div
 
-                  style={{
-
-                    display: 'grid',
-
-                    gridTemplateColumns:
-
-                      'repeat(6, minmax(0, 1fr))',
-
-                    gap: '12px',
-
-                    marginBottom: '24px'
-
-                  }}
+                  className="mn-kpi-grid-6" style={{ marginBottom: '24px' }}
 
                 >
 

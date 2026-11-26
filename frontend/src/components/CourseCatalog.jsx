@@ -765,7 +765,7 @@ export default function CourseCatalog({
 
       {/* Course Cards Grid */}
       {displayedCourses.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(340px, 100%), 1fr))', gap: '1.5rem' }}>
           {displayedCourses.map((course) => {
             const courseId = course.id || course.courseId;
             const moduleCount = course.modules?.length || course.moduleCount || 0;

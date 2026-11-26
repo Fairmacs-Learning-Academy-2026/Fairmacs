@@ -1,69 +1,147 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { X, Printer, Award, Download, Loader2, RefreshCw } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
-import React, { useState } from 'react';
-import { X, Printer, Award, ShieldCheck, Download, Loader2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 
-export default function CertificateViewer({ certificate, onClose, verificationData }) {
-  const { user } = useAuth();
-  const [downloading, setDownloading] = useState(false);
+// Configure PDF.js worker (same setup as the policy viewer)
+if (typeof window !== 'undefined' && pdfjsLib?.GlobalWorkerOptions) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+}
 
+const RENDER_WIDTH_PX = 1800;
+
+function getStoredToken() {
+  return (
+    localStorage.getItem('fairmacs_token') ||
+    localStorage.getItem('fairmacs_lms_token') ||
+    localStorage.getItem('token') ||
+    sessionStorage.getItem('token') ||
+    ''
+  );
+}
+
+/**
+ * Shows the certificate exactly as the server generates it. The PDF is fetched once and drawn
+ * on a canvas, so the preview, the printout and the downloaded file are always identical
+ * (the layout, fonts and organisation name all come from the backend).
+ */
+export default function CertificateViewer({ certificate, onClose }) {
   const certData = certificate || {};
+  const certId = certData.certId || certData.certificateId || '';
 
-  const formatCompletionDate = (val) => {
-    if (!val) return new Date().toLocaleDateString('en-GB');
-    try {
-      const d = new Date(val);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleDateString('en-GB');
-      }
-    } catch {
-      // fallback
+  const canvasRef = useRef(null);
+  const pdfBlobRef = useRef(null);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const fetchPdfBlob = useCallback(async () => {
+    if (!certId) {
+      throw new Error('This certificate has no certificate ID.');
     }
-    return String(val);
-  };
+    const token = getStoredToken();
+    const response = await authFetch(
+      `${SHARED_API_BASE_URL}/certificates/${encodeURIComponent(certId)}/pdf`,
+      { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+    );
+    if (!response.ok) {
+      throw new Error(
+        response.status === 404
+          ? 'Certificate not found.'
+          : response.status === 403
+            ? 'You do not have permission to view this certificate.'
+            : `Unable to load the certificate (error ${response.status}).`
+      );
+    }
+    return response.blob();
+  }, [certId]);
 
-  const employeeName = certData.userName || certData.name || user?.name || 'Fairmacs Professional';
-  const courseTitle = certData.courseTitle || 'Freight Forwarding & Operational Excellence';
-  const certId = certData.certId || certData.certificateId || 'OP001';
-  const issueDate = formatCompletionDate(certData.issueDate || certData.issuedDate || certData.issuedAt);
+  // Load + draw the PDF
+  useEffect(() => {
+    let cancelled = false;
+    let pdfDoc = null;
 
-  const handlePrint = () => {
-    window.print();
-  };
+    (async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const blob = await fetchPdfBlob();
+        if (cancelled) return;
+        pdfBlobRef.current = blob;
+
+        const buffer = await blob.arrayBuffer();
+        pdfDoc = await pdfjsLib.getDocument({ data: buffer }).promise;
+        const page = await pdfDoc.getPage(1);
+        if (cancelled) return;
+
+        const unscaled = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: RENDER_WIDTH_PX / unscaled.width });
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Certificate preview failed:', err);
+          setError(err.message || 'Unable to load the certificate preview.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (pdfDoc) {
+        try {
+          pdfDoc.destroy();
+        } catch {
+          // ignore cleanup errors
+        }
+      }
+    };
+  }, [fetchPdfBlob, reloadKey]);
 
   const handleDownloadPdf = async () => {
     try {
       setDownloading(true);
-      const token =
-        localStorage.getItem('fairmacs_token') ||
-        localStorage.getItem('fairmacs_lms_token') ||
-        localStorage.getItem('token') ||
-        sessionStorage.getItem('token') ||
-        '';
-      const response = await authFetch(`${SHARED_API_BASE_URL}/certificates/${certId}/pdf`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-
-      if (!response.ok) {
-        window.print();
-        return;
-      }
-
-      const blob = await response.blob();
+      const blob = pdfBlobRef.current || (await fetchPdfBlob());
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `Fairmacs_Certificate_${certId}.pdf`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Download error:', err);
-      window.print();
+      setError(err.message || 'Unable to download the certificate.');
     } finally {
       setDownloading(false);
     }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const topButtonStyle = {
+    padding: '0.45rem 0.85rem',
+    fontSize: '0.82rem',
+    background: 'rgba(255,255,255,0.12)',
+    color: 'white',
+    border: '1px solid rgba(255,255,255,0.25)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
   };
 
   return (
@@ -77,7 +155,7 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
           overflow: 'hidden',
           borderRadius: '16px',
           boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.45)',
-          background: '#0a192f'
+          background: '#0a192f',
         }}
       >
         {/* Modal Top Bar */}
@@ -89,32 +167,32 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
             justifyContent: 'space-between',
             alignItems: 'center',
             color: 'white',
-            borderBottom: '1px solid rgba(255,255,255,0.1)'
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 700, fontSize: '0.95rem' }}>
             <Award style={{ width: 20, height: 20, color: '#38bdf8' }} />
-            <span>Fairmacs Learning Academy • {certId}</span>
+            <span>Fairmacs - KMS • {certId}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
               className="btn-primary"
               onClick={handleDownloadPdf}
-              disabled={downloading}
+              disabled={downloading || loading}
               style={{
                 padding: '0.45rem 1rem',
                 fontSize: '0.82rem',
                 background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem'
+                gap: '0.4rem',
               }}
             >
               {downloading ? (
                 <>
                   <Loader2 style={{ width: 15, height: 15, animation: 'spin 1s linear infinite' }} />
-                  Generating PDF...
+                  Preparing...
                 </>
               ) : (
                 <>
@@ -124,26 +202,14 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
               )}
             </button>
 
-            <button
-              className="btn-secondary"
-              onClick={handlePrint}
-              style={{
-                padding: '0.45rem 0.85rem',
-                fontSize: '0.82rem',
-                background: 'rgba(255,255,255,0.12)',
-                color: 'white',
-                border: '1px solid rgba(255,255,255,0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem'
-              }}
-            >
+            <button className="btn-secondary" onClick={handlePrint} disabled={loading || !!error} style={topButtonStyle}>
               <Printer style={{ width: 15, height: 15 }} />
               Print
             </button>
 
             <button
               onClick={onClose}
+              aria-label="Close certificate"
               style={{
                 background: 'rgba(255,255,255,0.1)',
                 border: 'none',
@@ -153,7 +219,7 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
               }}
             >
               <X style={{ width: 18, height: 18 }} />
@@ -171,136 +237,82 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
               borderRadius: '8px',
               overflow: 'hidden',
               boxShadow: '0 10px 30px rgba(0,0,0,0.35)',
-              lineHeight: 1
+              lineHeight: 1,
+              background: '#ffffff',
+              minHeight: loading || error ? '260px' : undefined,
             }}
           >
-            {/* Background Image: User Reference Template */}
-            <img
-              src="/certificate-template.jpg"
-              alt="Fairmacs Certificate Template"
+            <canvas
+              ref={canvasRef}
               style={{
                 width: '100%',
                 height: 'auto',
-                display: 'block'
+                display: loading || error ? 'none' : 'block',
               }}
             />
 
-            {/* Overlay: Learner Name */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '44%',
-                left: '26%',
-                width: '48%',
-                textAlign: 'center',
-                background: '#ffffff',
-                padding: '3px 0'
-              }}
-            >
-              <span
+            {loading && (
+              <div
                 style={{
-                  fontFamily: 'Georgia, "Times New Roman", serif',
-                  fontStyle: 'italic',
-                  fontWeight: 700,
-                  fontSize: 'clamp(1rem, 2.7vw, 2rem)',
-                  color: '#0c4a6e',
-                  letterSpacing: '0.5px'
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.6rem',
+                  color: '#475569',
+                  fontSize: '0.9rem',
                 }}
               >
-                {employeeName}
-              </span>
-            </div>
+                <Loader2 style={{ width: 18, height: 18, animation: 'spin 1s linear infinite' }} />
+                Preparing your certificate...
+              </div>
+            )}
 
-            {/* Overlay: Course Title */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '60.3%',
-                left: '24%',
-                width: '52%',
-                textAlign: 'center',
-                background: '#ffffff',
-                padding: '2px 0'
-              }}
-            >
-              <span
+            {!loading && error && (
+              <div
                 style={{
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  fontWeight: 800,
-                  fontSize: 'clamp(0.75rem, 1.9vw, 1.4rem)',
-                  color: '#0f172a',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.8rem',
+                  padding: '1rem',
+                  textAlign: 'center',
+                  color: '#991b1b',
+                  fontSize: '0.9rem',
                 }}
               >
-                {courseTitle}
-              </span>
-            </div>
-
-            {/* Overlay: Certificate ID */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '84.8%',
-                right: '6.5%',
-                width: '18%',
-                textAlign: 'left',
-                background: '#ffffff',
-                padding: '1px 2px'
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: 'monospace, monospace',
-                  fontWeight: 700,
-                  fontSize: 'clamp(0.65rem, 1.25vw, 0.95rem)',
-                  color: '#0f172a'
-                }}
-              >
-                {certId}
-              </span>
-            </div>
-
-            {/* Overlay: Date of Completion */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '90.5%',
-                right: '6.5%',
-                width: '18%',
-                textAlign: 'left',
-                background: '#ffffff',
-                padding: '1px 2px'
-              }}
-            >
-              <span
-                style={{
-                  fontFamily: 'system-ui, -apple-system, sans-serif',
-                  fontWeight: 600,
-                  fontSize: 'clamp(0.65rem, 1.2vw, 0.9rem)',
-                  color: '#0f172a'
-                }}
-              >
-                {issueDate}
-              </span>
-            </div>
+                <span>{error}</span>
+                <button
+                  type="button"
+                  onClick={() => setReloadKey((key) => key + 1)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    padding: '0.45rem 0.9rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    background: '#ffffff',
+                    color: '#0f172a',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                >
+                  <RefreshCw size={14} /> Try again
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div
-          style={{
-            padding: '0.85rem 1.5rem',
-            background: '#0a192f',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-            fontSize: '0.78rem',
-            color: '#94a3b8'
-          }} />
-        {/* Print stylesheet to ensure landscape certificate prints cleanly without modal overlays */}
-        <style dangerouslySetInnerHTML={{ __html: `
+        {/* Print stylesheet: only the certificate is printed, on a landscape page without margins */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
           @media print {
             body * { visibility: hidden !important; }
             .certificate-print-area, .certificate-print-area * { visibility: visible !important; }
@@ -316,12 +328,19 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
               box-shadow: none !important;
               border-radius: 0 !important;
             }
+            .certificate-print-area canvas {
+              width: 100% !important;
+              height: 100% !important;
+              object-fit: contain !important;
+            }
             @page {
               size: A4 landscape;
               margin: 0;
             }
           }
-        `}} />
+        `,
+          }}
+        />
       </div>
     </div>
   );

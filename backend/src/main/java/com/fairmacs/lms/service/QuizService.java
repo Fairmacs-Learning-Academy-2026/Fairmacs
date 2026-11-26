@@ -169,8 +169,49 @@ public class QuizService {
 
     private static final int DEFAULT_COOLDOWN_MINUTES = 5;
 
+    @Autowired(required = false)
+    private SystemSettingsService systemSettingsService;
+
+    /** Cooldown configured by HR in System Settings (falls back to 5 minutes). */
+    private int defaultCooldownMinutes() {
+        if (systemSettingsService != null) {
+            int configured = systemSettingsService.getInt(SystemSettingsService.QUIZ_COOLDOWN_MINUTES);
+            if (configured > 0) {
+                return configured;
+            }
+        }
+        return DEFAULT_COOLDOWN_MINUTES;
+    }
+
+    /** Maximum attempts per quiz configured by HR; 0 means unlimited. */
+    private int maxQuizAttempts() {
+        if (systemSettingsService == null) {
+            return 0;
+        }
+        return Math.max(0, systemSettingsService.getInt(SystemSettingsService.QUIZ_MAX_ATTEMPTS));
+    }
+
+    private void enforceAttemptLimit(Long quizId, Long userId) {
+        int maxAttempts = maxQuizAttempts();
+        if (maxAttempts <= 0) {
+            return;
+        }
+        long used = quizAttemptRepository.countByQuiz_IdAndUser_IdAndCompletedAtIsNotNull(quizId, userId);
+        if (used >= maxAttempts) {
+            throw new IllegalStateException(
+                    "You have used all " + maxAttempts
+                            + " attempts allowed for this assessment. Please contact HR for help.");
+        }
+    }
+
     public Map<String, Object> getCooldownStatus(Long quizId, Long userId) {
         Map<String, Object> result = new LinkedHashMap<>();
+        int attemptCap = maxQuizAttempts();
+        result.put("maxAttempts", attemptCap);
+        if (attemptCap > 0) {
+            result.put("attemptsUsed",
+                    quizAttemptRepository.countByQuiz_IdAndUser_IdAndCompletedAtIsNotNull(quizId, userId));
+        }
 
         Optional<QuizAttempt> latestAttempt =
                 quizAttemptRepository
@@ -183,7 +224,7 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(quizId).orElse(null);
         int cooldownMinutes = (quiz != null && quiz.getCooldownMinutes() != null && quiz.getCooldownMinutes() > 0)
                 ? quiz.getCooldownMinutes()
-                : DEFAULT_COOLDOWN_MINUTES;
+                : defaultCooldownMinutes();
 
         if (latestAttempt.isPresent()) {
             QuizAttempt attempt = latestAttempt.get();
@@ -317,6 +358,7 @@ public class QuizService {
         }
 
         enforceFailedAttemptCooldown(quizId, userId);
+        enforceAttemptLimit(quizId, userId);
 
         if (!Boolean.TRUE.equals(quiz.getActive())) {
             throw new IllegalStateException(

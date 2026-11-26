@@ -301,6 +301,16 @@ export default function CourseBuilderModal({ courseId = '', initialCourseId = ''
     if (!bulkImportTarget) return;
     const { setter, heading } = bulkImportTarget;
     setter((oldQuiz) => {
+      const existingNonEmpty = (oldQuiz.questions || []).filter(
+        (q) =>
+          (q.questionText ?? '').trim() ||
+          (q.optionA ?? '').trim() ||
+          (q.optionB ?? '').trim() ||
+          (q.optionC ?? '').trim() ||
+          (q.optionD ?? '').trim()
+      );
+
+      const baseList = mode === 'replace' ? [] : existingNonEmpty;
       const formatted = importedQuestions.map((q, idx) => ({
         questionText: q.questionText,
         questionType: q.questionType || 'SINGLE_CHOICE',
@@ -310,12 +320,10 @@ export default function CourseBuilderModal({ courseId = '', initialCourseId = ''
         optionD: q.optionD || '',
         correctAnswer: q.correctAnswer || 'A',
         explanation: q.explanation || '',
-        orderIndex: mode === 'replace' ? idx + 1 : (oldQuiz.questions?.length || 0) + idx + 1
+        orderIndex: baseList.length + idx + 1
       }));
 
-      const newQuestions = mode === 'replace'
-        ? formatted
-        : [...(oldQuiz.questions || []), ...formatted];
+      const newQuestions = [...baseList, ...formatted];
 
       return {
         ...oldQuiz,
@@ -1318,7 +1326,7 @@ export default function CourseBuilderModal({ courseId = '', initialCourseId = ''
               <label style={{ ...labelStyle, fontSize: '0.9rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
                 Course Category & Assessment Model <span style={{ color: '#e11d48' }}>*</span>
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginTop: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 12, marginTop: 8 }}>
                 <label style={{
                   display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, borderRadius: 8, cursor: 'pointer',
                   border: !courseInfo.foundation ? '2px solid #0284c7' : '1px solid #e2e8f0',

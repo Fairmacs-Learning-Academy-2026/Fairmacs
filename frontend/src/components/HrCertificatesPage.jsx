@@ -119,7 +119,7 @@ export default function HrCertificatesPage({ onViewCertificate }) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
           gap: '1.25rem',
         }}
       >

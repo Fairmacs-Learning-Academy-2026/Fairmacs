@@ -1431,10 +1431,8 @@ export default function QuizModal({
               </p>
 
               <div
+                className="mn-kpi-grid-4"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns:
-                    'repeat(4, 1fr)',
                   gap: '0.75rem',
                   maxWidth: '560px',
                   margin:

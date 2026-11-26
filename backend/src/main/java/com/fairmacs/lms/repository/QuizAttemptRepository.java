@@ -43,6 +43,8 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
 
     long countByQuizIdAndUserId(Long quizId, Long userId);
 
+    long countByQuiz_IdAndUser_IdAndCompletedAtIsNotNull(Long quizId, Long userId);
+
     boolean existsByQuizId(Long quizId);
 
     Optional<QuizAttempt> findTopByQuiz_IdAndUser_IdAndCompletedAtIsNullOrderByStartedAtDesc(

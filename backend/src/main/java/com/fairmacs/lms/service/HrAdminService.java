@@ -35,6 +35,9 @@ import com.fairmacs.lms.security.PasswordSecurityUtil;
 @Transactional
 public class HrAdminService {
 
+    @Autowired(required = false)
+    private SystemSettingsService systemSettingsService;
+
     private static final Logger log = LoggerFactory.getLogger(HrAdminService.class);
 
     private final UserRepository userRepository;
@@ -127,10 +130,15 @@ public class HrAdminService {
 
         String suppliedPassword = text(request.get("password"));
         String initialPassword;
+        String sharedPasswordHash = null;
         if (suppliedPassword != null && !suppliedPassword.isBlank()) {
             PasswordSecurityUtil.validatePasswordStrength(suppliedPassword);
             initialPassword = suppliedPassword;
         } else {
+            // No password typed: use the shared initial password HR configured in System Settings.
+            sharedPasswordHash = systemSettingsService != null
+                    ? systemSettingsService.getInitialPasswordHash().orElse(null)
+                    : null;
             initialPassword = PasswordSecurityUtil.generateSecureTemporaryPassword();
         }
 
@@ -138,7 +146,7 @@ public class HrAdminService {
         user.setEmployeeId(employeeId.trim());
         user.setName(name.trim());
         user.setEmail(email.trim().toLowerCase());
-        user.setPassword(passwordEncoder.encode(initialPassword));
+        user.setPassword(sharedPasswordHash != null ? sharedPasswordHash : passwordEncoder.encode(initialPassword));
         user.setMustChangePassword(true);
         user.setPasswordChangedAt(LocalDateTime.now());
 

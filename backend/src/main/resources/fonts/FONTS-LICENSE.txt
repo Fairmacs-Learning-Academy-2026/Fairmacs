@@ -1,0 +1,8 @@
+Fonts embedded in generated certificates
+----------------------------------------
+Open Sans (OpenSans-*.ttf) and Lora (Lora-BoldItalic.ttf) are licensed under the
+SIL Open Font License, Version 1.1 (https://openfontlicense.org). They may be used,
+embedded and redistributed, including commercially, provided this notice is kept.
+The full Open Sans licence text is in OpenSans-OFL.txt.
+The files here are static instances (Regular/Bold weights) generated from the
+original variable fonts; the design is unchanged.

@@ -33,11 +33,14 @@ async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(
+    const failure = new Error(
       data?.message ||
         data?.error ||
         `HR request failed with status ${response.status}`
     );
+    failure.status = response.status;
+    failure.data = data;
+    throw failure;
   }
 
   return data;
@@ -52,6 +55,21 @@ function validateEmployeeId(employeeId) {
 }
 
 export const hrAdminService = {
+  async getSettings() {
+    return request("/settings");
+  },
+
+  async updateSettings(values) {
+    if (!values || Object.keys(values).length === 0) {
+      throw new Error("No settings to save.");
+    }
+
+    return request("/settings", {
+      method: "PUT",
+      body: JSON.stringify({ values }),
+    });
+  },
+
   async getEmployees() {
     return request("/employees");
   },

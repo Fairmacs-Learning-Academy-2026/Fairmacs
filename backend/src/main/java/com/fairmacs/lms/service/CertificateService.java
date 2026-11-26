@@ -383,6 +383,23 @@ public class CertificateService {
     // CREATE PDF CONTENT
     // =========================================================
 
+    @Autowired(required = false)
+    private SystemSettingsService systemSettingsService;
+
+    private String resolveOrganisationName() {
+        try {
+            if (systemSettingsService != null) {
+                String name = systemSettingsService.getString(SystemSettingsService.ORGANIZATION_NAME);
+                if (name != null && !name.isBlank()) {
+                    return name;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // fall through to the default
+        }
+        return "FAIRMACS";
+    }
+
     byte[] createCertificatePdf(
             Certificate certificate)
             throws IOException {
@@ -399,69 +416,14 @@ public class CertificateService {
                         50
                 );
 
-        java.io.InputStream templateStream = getClass().getResourceAsStream("/certificate-template.jpg");
-        if (templateStream != null) {
-            try {
-                byte[] bgBytes = templateStream.readAllBytes();
-                Image bgImage = Image.getInstance(bgBytes);
-                bgImage.setAbsolutePosition(0, 0);
-                bgImage.scaleAbsolute(PageSize.A4.rotate().getWidth(), PageSize.A4.rotate().getHeight());
-
-                PdfWriter writer = PdfWriter.getInstance(document, outputStream);
-                document.open();
-
-                PdfContentByte canvas = writer.getDirectContentUnder();
-                canvas.addImage(bgImage);
-
-                PdfContentByte over = writer.getDirectContent();
-
-                // Mask placeholder text regions with white fill
-                over.saveState();
-                over.setColorFill(java.awt.Color.WHITE);
-                float pageWidth = PageSize.A4.rotate().getWidth();
-                over.rectangle(pageWidth * 0.25f, 345, pageWidth * 0.5f, 35);
-                over.rectangle(pageWidth * 0.25f, 255, pageWidth * 0.5f, 30);
-                over.rectangle(705, 94, 100, 15);
-                over.rectangle(705, 59, 100, 15);
-                over.fill();
-                over.restoreState();
-
-                over.beginText();
-
-                // 1. Learner Name (Centered at X = midpoint, Y = 355)
-                BaseFont serifFont = BaseFont.createFont(BaseFont.TIMES_BOLDITALIC, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
-                over.setFontAndSize(serifFont, 26);
-                over.setColorFill(new java.awt.Color(12, 74, 110));
-                String learnerName = certificate.getUser() != null ? certificate.getUser().getName() : "Learner Name";
-                over.showTextAligned(Element.ALIGN_CENTER, learnerName, PageSize.A4.rotate().getWidth() / 2, 355, 0);
-
-                // 2. Course Title (Centered at X = midpoint, Y = 265)
-                BaseFont sansBold = BaseFont.createFont(BaseFont.HELVETICA_BOLD, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
-                over.setFontAndSize(sansBold, 20);
-                over.setColorFill(new java.awt.Color(15, 23, 42));
-                String courseTitle = certificate.getCourse() != null ? certificate.getCourse().getTitle() : "Course Title";
-                over.showTextAligned(Element.ALIGN_CENTER, courseTitle.toUpperCase(Locale.ROOT), PageSize.A4.rotate().getWidth() / 2, 265, 0);
-
-                // 3. Certificate ID (Bottom right at X = 708, Y = 98)
-                BaseFont sansNormal = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.CP1252, BaseFont.NOT_EMBEDDED);
-                over.setFontAndSize(sansBold, 10);
-                over.setColorFill(new java.awt.Color(15, 23, 42));
-                over.showTextAligned(Element.ALIGN_LEFT, certificate.getCertificateId() != null ? certificate.getCertificateId() : "", 708, 98, 0);
-
-                // 4. Date of Completion (Bottom right at X = 708, Y = 63)
-                String completionDate = certificate.getIssuedAt() != null
-                        ? certificate.getIssuedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
-                        : java.time.LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-                over.setFontAndSize(sansNormal, 10);
-                over.showTextAligned(Element.ALIGN_LEFT, completionDate, 708, 63, 0);
-
-                over.endText();
-                document.close();
-                return outputStream.toByteArray();
-            } catch (Exception e) {
-                outputStream.reset();
-                document = new Document(PageSize.A4.rotate(), 50, 50, 50, 50);
-            }
+        try {
+            return CertificatePdfRenderer.render(certificate, resolveOrganisationName());
+        } catch (Exception e) {
+            // The branded template could not be drawn; fall back to the plain layout below.
+            org.slf4j.LoggerFactory.getLogger(CertificateService.class)
+                    .warn("Branded certificate rendering failed, using plain layout: {}", e.toString());
+            outputStream.reset();
+            document = new Document(PageSize.A4.rotate(), 50, 50, 50, 50);
         }
 
         try {

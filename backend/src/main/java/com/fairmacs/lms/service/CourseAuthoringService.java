@@ -104,6 +104,20 @@ import java.util.stream.Collectors;
 
 public class CourseAuthoringService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private SystemSettingsService systemSettingsService;
+
+    /** Default passing score configured by HR in System Settings (falls back to 70). */
+    private int defaultPassingScore() {
+        if (systemSettingsService != null) {
+            int configured = systemSettingsService.getInt(SystemSettingsService.QUIZ_PASSING_SCORE);
+            if (configured >= 1 && configured <= 100) {
+                return configured;
+            }
+        }
+        return 70;
+    }
+
     private static final Logger log = LoggerFactory.getLogger(CourseAuthoringService.class);
 
 
@@ -920,7 +934,7 @@ private java.util.Map<String, Object> toAuthoringQuizMap(Quiz quiz) {
         course.setDescription(request.getDescription());
         course.setPassingScore(
                 request.getPassingScore() == null
-                        ? 70
+                        ? defaultPassingScore()
                         : request.getPassingScore());
         course.setFoundation(Boolean.TRUE.equals(request.getFoundation()));
         course.setRating(0.0);
@@ -1084,7 +1098,7 @@ private java.util.Map<String, Object> toAuthoringQuizMap(Quiz quiz) {
         course.setBanner(request.getBanner());
         course.setDescription(request.getDescription());
         course.setPassingScore(request.getPassingScore() == null
-                ? 70 : request.getPassingScore());
+                ? defaultPassingScore() : request.getPassingScore());
         course.setFoundation(Boolean.TRUE.equals(request.getFoundation()));
 
         course.setDraft(!publish);
@@ -1809,7 +1823,7 @@ private java.util.Map<String, Object> toAuthoringQuizMap(Quiz quiz) {
 
                 input.getPassingScore() == null
 
-                        ? 70
+                        ? defaultPassingScore()
 
                         : input.getPassingScore());
 

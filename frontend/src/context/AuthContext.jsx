@@ -329,7 +329,8 @@ export function AuthProvider({ children }) {
       console.error('Import employees failed:', error);
       return {
         success: false,
-        message: error.message || 'Unable to import employees.'
+        message: error.message || 'Unable to import employees.',
+        errors: Array.isArray(error.data?.errors) ? error.data.errors : []
       };
     }
   };

@@ -1,5 +1,6 @@
-import { API_BASE_URL as SHARED_API_BASE_URL, authFetch } from '../utils/apiConfig';
-import React, { useState, useRef } from 'react';
+import { API_BASE_URL as SHARED_API_BASE_URL, authFetch, getAuthToken as getSharedAuthToken } from '../utils/apiConfig';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X, Upload, Download, AlertCircle, CheckCircle2,
   Trash2, Plus, Edit3, FileSpreadsheet, ArrowRight,
@@ -21,15 +22,27 @@ export default function BulkQuizImportModal({
   const [fileName, setFileName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && !isProcessing && !isSubmitting) {
+        e.stopPropagation();
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [isOpen, isProcessing, isSubmitting, onClose]);
 
   if (!isOpen) return null;
 
   const API_BASE_URL = SHARED_API_BASE_URL;
 
   const getAuthToken = () =>
-    localStorage.getItem('fairmacs_token') ||
-    localStorage.getItem('fairmacs_lms_token') ||
+    getSharedAuthToken() ||
     localStorage.getItem('accessToken') ||
     localStorage.getItem('token') ||
     '';
@@ -164,10 +177,27 @@ export default function BulkQuizImportModal({
     return Array.from(letters).sort().join(',');
   };
 
+  const findHeaderColumn = (headers, terms) => {
+    const normalized = headers.map((h) => String(h || '').trim().toLowerCase());
+    // Pass 1: exact header match in priority order of terms
+    for (const term of terms) {
+      const t = term.toLowerCase();
+      const exactIdx = normalized.findIndex((h) => h === t);
+      if (exactIdx !== -1) return exactIdx;
+    }
+    // Pass 2: substring match only for multi-character terms (never single-letter 'a'/'b'/'c'/'d')
+    for (const term of terms) {
+      const t = term.toLowerCase();
+      if (t.length <= 1) continue;
+      const subIdx = normalized.findIndex((h) => h && h.includes(t));
+      if (subIdx !== -1) return subIdx;
+    }
+    return -1;
+  };
+
   // --- PARSERS ---
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
+  const processSelectedFile = async (file) => {
     if (!file) return;
 
     setFileName(file.name);
@@ -196,23 +226,27 @@ export default function BulkQuizImportModal({
             if (data?.sourceType === 'LEGACY_DOC') {
               throw new Error(data.message || 'Legacy Word (.doc) format is not supported. Please convert to .docx and re-upload.');
             }
-            if (data?.message && (!data?.questions || data.questions.length === 0)) {
-              throw new Error(data.message);
-            }
             if (Array.isArray(data?.questions) && data.questions.length > 0) {
               setParsedQuestions(data.questions);
               setActiveTab('preview');
               return;
             }
+            if (data?.message && (lowerName.endsWith('.pdf') || lowerName.endsWith('.docx'))) {
+              throw new Error(data.message);
+            }
           } else {
             const errJson = await response.json().catch(() => null);
-            if (errJson?.message) {
+            if (errJson?.message && (lowerName.endsWith('.pdf') || lowerName.endsWith('.docx'))) {
               throw new Error(errJson.message);
             }
           }
         } catch (serverErr) {
-          // If server reported specific scanned PDF or legacy format error, rethrow
-          if (serverErr.message && (serverErr.message.includes('Scanned') || serverErr.message.includes('Legacy Word') || serverErr.message.includes('convert your document'))) {
+          if (
+            serverErr.message &&
+            (serverErr.message.includes('Scanned') ||
+              serverErr.message.includes('Legacy Word') ||
+              serverErr.message.includes('convert your document'))
+          ) {
             throw serverErr;
           }
           console.warn('Backend parser unavailable, attempting client-side fallback:', serverErr);
@@ -229,11 +263,11 @@ export default function BulkQuizImportModal({
         const text = await file.text();
         parseRawText(text);
       } else if (lowerName.endsWith('.pdf')) {
-        throw new Error('PDF parsing requires active backend connection. Please ensure backend is running.');
+        throw new Error('PDF parsing requires an active backend connection. Please ensure the backend server is running.');
       } else if (lowerName.endsWith('.doc')) {
         throw new Error('Legacy Word (.doc) format is not supported. Please save or convert your document to .docx format and re-upload.');
       } else if (lowerName.endsWith('.docx')) {
-        throw new Error('Word (.docx) parsing requires active backend connection. Please ensure backend is running.');
+        throw new Error('Word (.docx) parsing requires an active backend connection. Please ensure the backend server is running.');
       } else {
         throw new Error('Unsupported file format. Please upload an Excel (.xlsx, .xls), CSV (.csv), Word (.docx), PDF (.pdf), or Text file.');
       }
@@ -244,6 +278,11 @@ export default function BulkQuizImportModal({
       setIsProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    await processSelectedFile(file);
   };
 
   const parseExcelFile = async (file) => {
@@ -288,27 +327,22 @@ export default function BulkQuizImportModal({
     }
 
     const headerRow = (rows[0] || []).map(h => String(h || '').trim().toLowerCase());
-    const findCol = (terms) => {
-      for (let i = 0; i < headerRow.length; i++) {
-        const h = headerRow[i];
-        if (h && terms.some(t => String(h).toLowerCase().includes(t))) return i;
-      }
-      return -1;
-    };
+    const hasHeader = headerRow.some(h => h.includes('question') || h.includes('option') || h.includes('correct') || h.includes('answer'));
+    const startRow = hasHeader ? 1 : 0;
 
-    const qTextCol = findCol(['question', 'text']);
-    const qTypeCol = findCol(['type']);
-    const optACol = findCol(['option a', 'opt a', 'option_a', 'a']);
-    const optBCol = findCol(['option b', 'opt b', 'option_b', 'b']);
-    const optCCol = findCol(['option c', 'opt c', 'option_c', 'c']);
-    const optDCol = findCol(['option d', 'opt d', 'option_d', 'd']);
-    const ansCol = findCol(['correct', 'answer', 'ans', 'key']);
-    const expCol = findCol(['explanation', 'explain']);
+    const qTextCol = hasHeader ? findHeaderColumn(headerRow, ['question text', 'question', 'qtext', 'text']) : 0;
+    const qTypeCol = hasHeader ? findHeaderColumn(headerRow, ['question type', 'qtype', 'type']) : -1;
+    const optACol = hasHeader ? findHeaderColumn(headerRow, ['option a', 'opt a', 'option_a', 'opta', 'choice a', 'a']) : 1;
+    const optBCol = hasHeader ? findHeaderColumn(headerRow, ['option b', 'opt b', 'option_b', 'optb', 'choice b', 'b']) : 2;
+    const optCCol = hasHeader ? findHeaderColumn(headerRow, ['option c', 'opt c', 'option_c', 'optc', 'choice c', 'c']) : 3;
+    const optDCol = hasHeader ? findHeaderColumn(headerRow, ['option d', 'opt d', 'option_d', 'optd', 'choice d', 'd']) : 4;
+    const ansCol = hasHeader ? findHeaderColumn(headerRow, ['correct answer', 'correct answers', 'correct', 'answer', 'ans', 'key']) : 5;
+    const expCol = hasHeader ? findHeaderColumn(headerRow, ['explanation', 'explain', 'rationale', 'notes']) : 6;
 
     const questions = [];
     const seenTexts = new Set();
 
-    for (let r = 1; r < rows.length; r++) {
+    for (let r = startRow; r < rows.length; r++) {
       const row = rows[r] || [];
       const getVal = (idx, fallbackCol) => {
         const targetIdx = idx !== -1 ? idx : fallbackCol;
@@ -324,16 +358,9 @@ export default function BulkQuizImportModal({
       const optionB = cleanOptionPrefix(getVal(optBCol, 2));
       const optionC = cleanOptionPrefix(getVal(optCCol, 3));
       const optionD = cleanOptionPrefix(getVal(optDCol, 4));
-      let correctAnswer = getVal(ansCol, 5).toUpperCase();
+      const rawAns = getVal(ansCol, 5);
+      const correctAnswer = normalizeAnswers(rawAns, optionA, optionB, optionC, optionD);
       const explanation = getVal(expCol, 6);
-
-      correctAnswer = correctAnswer
-        .replace(/\b1\b/g, 'A')
-        .replace(/\b2\b/g, 'B')
-        .replace(/\b3\b/g, 'C')
-        .replace(/\b4\b/g, 'D')
-        .replace(/[^A-D,]/g, '')
-        .replace(/,+/g, ',');
 
       const isMulti = String(correctAnswer).includes(',') || String(rawType).toUpperCase().includes('MULTI');
       const questionType = isMulti ? 'MULTI_SELECT' : 'SINGLE_CHOICE';
@@ -394,27 +421,22 @@ export default function BulkQuizImportModal({
     const delimiter = explicitDelimiter || (firstLine.includes('\t') ? '\t' : (firstLine.includes(';') && !firstLine.includes(',')) ? ';' : ',');
 
     const header = splitCsvLine(firstLine, delimiter).map(h => String(h || '').trim().toLowerCase());
-    const findCol = (terms) => {
-      for (let i = 0; i < header.length; i++) {
-        const h = header[i];
-        if (h && terms.some(t => String(h).toLowerCase().includes(t))) return i;
-      }
-      return -1;
-    };
+    const hasHeader = header.some(h => h.includes('question') || h.includes('option') || h.includes('correct') || h.includes('answer'));
+    const startIdx = hasHeader ? 1 : 0;
 
-    const qTextCol = findCol(['question', 'text']);
-    const qTypeCol = findCol(['type']);
-    const optACol = findCol(['option a', 'opt a', 'option_a', 'a']);
-    const optBCol = findCol(['option b', 'opt b', 'option_b', 'b']);
-    const optCCol = findCol(['option c', 'opt c', 'option_c', 'c']);
-    const optDCol = findCol(['option d', 'opt d', 'option_d', 'd']);
-    const ansCol = findCol(['correct', 'answer', 'ans', 'key']);
-    const expCol = findCol(['explanation', 'explain']);
+    const qTextCol = hasHeader ? findHeaderColumn(header, ['question text', 'question', 'qtext', 'text']) : 0;
+    const qTypeCol = hasHeader ? findHeaderColumn(header, ['question type', 'qtype', 'type']) : -1;
+    const optACol = hasHeader ? findHeaderColumn(header, ['option a', 'opt a', 'option_a', 'opta', 'choice a', 'a']) : 1;
+    const optBCol = hasHeader ? findHeaderColumn(header, ['option b', 'opt b', 'option_b', 'optb', 'choice b', 'b']) : 2;
+    const optCCol = hasHeader ? findHeaderColumn(header, ['option c', 'opt c', 'option_c', 'optc', 'choice c', 'c']) : 3;
+    const optDCol = hasHeader ? findHeaderColumn(header, ['option d', 'opt d', 'option_d', 'optd', 'choice d', 'd']) : 4;
+    const ansCol = hasHeader ? findHeaderColumn(header, ['correct answer', 'correct answers', 'correct', 'answer', 'ans', 'key']) : 5;
+    const expCol = hasHeader ? findHeaderColumn(header, ['explanation', 'explain', 'rationale', 'notes']) : 6;
 
     const questions = [];
     const seenTexts = new Set();
 
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = startIdx; i < lines.length; i++) {
       const row = splitCsvLine(lines[i], delimiter);
       if (row.length < 2) continue;
 
@@ -432,16 +454,9 @@ export default function BulkQuizImportModal({
       const optB = cleanOptionPrefix(getVal(optBCol, 2));
       const optC = cleanOptionPrefix(getVal(optCCol, 3));
       const optD = cleanOptionPrefix(getVal(optDCol, 4));
-      let ans = getVal(ansCol, 5).toUpperCase();
+      const rawAns = getVal(ansCol, 5);
+      const ans = normalizeAnswers(rawAns, optA, optB, optC, optD);
       const exp = getVal(expCol, 6);
-
-      ans = ans
-        .replace(/\b1\b/g, 'A')
-        .replace(/\b2\b/g, 'B')
-        .replace(/\b3\b/g, 'C')
-        .replace(/\b4\b/g, 'D')
-        .replace(/[^A-D,]/g, '')
-        .replace(/,+/g, ',');
 
       const isMulti = String(ans).includes(',') || String(rawType).toUpperCase().includes('MULTI');
 
@@ -804,9 +819,20 @@ export default function BulkQuizImportModal({
   const validCount = parsedQuestions.filter(q => q.valid).length;
   const invalidCount = parsedQuestions.length - validCount;
 
-  return (
-    <div className="modal-overlay" style={{ zIndex: 11000 }}>
+  const modalNode = (
+    <div
+      className="modal-overlay"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget && !isProcessing && !isSubmitting) {
+          onClose?.();
+        }
+      }}
+      style={{ zIndex: 120000 }}
+    >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Import Questions into ${targetTitle}`}
         className="modal-content animate-fade-in"
         style={{
           maxWidth: 1040,
@@ -941,12 +967,30 @@ export default function BulkQuizImportModal({
 
               {/* Upload Drop Zone */}
               <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!isProcessing) setIsDragOver(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragOver(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragOver(false);
+                  if (isProcessing) return;
+                  const droppedFile = e.dataTransfer?.files?.[0];
+                  if (droppedFile) processSelectedFile(droppedFile);
+                }}
                 style={{
-                  border: '2px dashed #94a3b8',
+                  border: isDragOver ? '2px dashed #0284c7' : '2px dashed #94a3b8',
                   borderRadius: 10,
                   padding: '36px 20px',
                   textAlign: 'center',
-                  background: '#f8fafc',
+                  background: isDragOver ? '#f0f9ff' : '#f8fafc',
                   cursor: isProcessing ? 'wait' : 'pointer',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1358,4 +1402,6 @@ Explanation: These are commonly used import documentation records.`}
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : modalNode;
 }

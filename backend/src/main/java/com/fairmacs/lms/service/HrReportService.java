@@ -7,6 +7,7 @@ import com.fairmacs.lms.entity.EnrollmentType;
 import com.fairmacs.lms.entity.QuizAttempt;
 import com.fairmacs.lms.entity.Role;
 import com.fairmacs.lms.entity.User;
+import com.fairmacs.lms.entity.UserStatus;
 import com.fairmacs.lms.repository.CourseRepository;
 import com.fairmacs.lms.repository.EnrollmentRepository;
 import com.fairmacs.lms.repository.QuizAttemptRepository;
@@ -17,6 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -57,16 +61,56 @@ public class HrReportService {
     // HR TRAINING REPORT
     // =========================================================
 
+    /** Training metrics are day-based; evaluate "today" in the organisation's time zone, not the server's. */
+    private static final ZoneId REPORT_ZONE = ZoneId.of("Asia/Kolkata");
+
+    private static final int MAX_DETAIL_ROWS = 20000;
+
     public Map<String, Object> getHrTrainingReport() {
+        return getHrTrainingReport(null, null, null, null, null, null);
+    }
+
+    /**
+     * HR report with filters. Every argument is optional.
+     *
+     * @param department     employee department (null / "ALL" = every department)
+     * @param courseId       course database id (null = every course)
+     * @param employeeStatus "ALL" includes inactive/terminated employees; anything else = current staff only
+     * @param enrollmentType MANDATORY, RECOMMENDED or SELF_SELECTED (null / "ALL" = every type)
+     * @param from           only assignments made on or after this date
+     * @param to             only assignments made on or before this date
+     */
+    public Map<String, Object> getHrTrainingReport(
+            String department,
+            Long courseId,
+            String employeeStatus,
+            String enrollmentType,
+            LocalDate from,
+            LocalDate to
+    ) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("The 'from' date must not be after the 'to' date.");
+        }
+
+        boolean includeInactive = employeeStatus != null && "ALL".equalsIgnoreCase(employeeStatus.trim());
+        String departmentFilter = normaliseFilter(department);
+        EnrollmentType typeFilter = parseEnrollmentTypeFilter(enrollmentType);
 
         // -----------------------------------------------------
-        // Only actual employees
+        // Only actual employees (role EMPLOYEE)
         // -----------------------------------------------------
 
-        List<User> employees =
+        List<User> allEmployees =
                 userRepository.findAll()
                         .stream()
                         .filter(user -> user.getRole() == Role.EMPLOYEE)
+                        .toList();
+
+        List<User> employees =
+                allEmployees
+                        .stream()
+                        .filter(user -> includeInactive || isCountedEmployee(user))
+                        .filter(user -> matchesDepartmentFilter(user, departmentFilter))
                         .toList();
 
         List<Enrollment> enrollments =
@@ -77,21 +121,226 @@ public class HrReportService {
                                 e.getUser().getRole() == Role.EMPLOYEE &&
                                 e.getStatus() != EnrollmentStatus.REVOKED
                         )
+                        .filter(e -> includeInactive || isCountedEmployee(e.getUser()))
+                        .filter(e -> matchesDepartmentFilter(e.getUser(), departmentFilter))
+                        .filter(this::isEnrollmentInScope)
+                        .filter(e -> courseId == null
+                                || (e.getCourse() != null && courseId.equals(e.getCourse().getId())))
+                        .filter(e -> typeFilter == null || e.getEnrollmentType() == typeFilter)
+                        .filter(e -> isAssignedWithin(e, from, to))
                         .toList();
 
-        List<Course> courses = courseRepository != null
+        List<Course> allCourses = courseRepository != null
                 ? courseRepository.findAll()
                 : extractCoursesFromEnrollments(enrollments);
 
+        List<Course> courses = allCourses
+                .stream()
+                .filter(c -> courseId == null || courseId.equals(c.getId()))
+                .toList();
+
         List<QuizAttempt> completedAttempts = loadCompletedQuizAttempts();
 
-        return buildScopedAnalyticsReport(
-                courses,
-                employees,
-                enrollments,
-                completedAttempts,
-                true
+        Map<String, Object> response = new LinkedHashMap<>(
+                buildScopedAnalyticsReport(
+                        courses,
+                        employees,
+                        enrollments,
+                        completedAttempts,
+                        true
+                )
         );
+
+        long countedHeadcount = allEmployees.stream().filter(this::isCountedEmployee).count();
+
+        Map<String, Object> filters = new LinkedHashMap<>();
+        filters.put("department", departmentFilter == null ? "ALL" : departmentFilter);
+        filters.put("courseId", courseId);
+        filters.put("employeeStatus", includeInactive ? "ALL" : "CURRENT");
+        filters.put("enrollmentType", typeFilter == null ? "ALL" : typeFilter.name());
+        filters.put("from", from != null ? from.toString() : null);
+        filters.put("to", to != null ? to.toString() : null);
+
+        response.put("generatedAt", LocalDateTime.now(REPORT_ZONE).toString());
+        response.put("filters", filters);
+        response.put("filterOptions", buildFilterOptions(allEmployees, allCourses));
+        response.put("excludedInactiveEmployees", includeInactive ? 0L : allEmployees.size() - countedHeadcount);
+        response.put("definitions", metricDefinitions());
+        response.put("assignmentDetails", buildAssignmentDetails(enrollments, completedAttempts));
+
+        return response;
+    }
+
+    // ---- filter helpers ----
+
+    private String normaliseFilter(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() || "ALL".equalsIgnoreCase(trimmed) ? null : trimmed;
+    }
+
+    private EnrollmentType parseEnrollmentTypeFilter(String value) {
+        String normalised = normaliseFilter(value);
+        if (normalised == null) {
+            return null;
+        }
+        try {
+            return EnrollmentType.valueOf(normalised.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException(
+                    "Unknown enrollment type '" + value + "'. Use ALL, MANDATORY, RECOMMENDED or SELF_SELECTED.");
+        }
+    }
+
+    /** Current staff: everyone except inactive / terminated accounts (a missing status counts as current). */
+    private boolean isCountedEmployee(User user) {
+        return user != null
+                && user.getStatus() != UserStatus.INACTIVE
+                && user.getStatus() != UserStatus.TERMINATED;
+    }
+
+    private boolean matchesDepartmentFilter(User user, String departmentFilter) {
+        if (departmentFilter == null) {
+            return true;
+        }
+        return user != null
+                && user.getDepartment() != null
+                && departmentFilter.equalsIgnoreCase(user.getDepartment().trim());
+    }
+
+    /**
+     * Drafts never count. A deactivated course creates no obligation any more, so its open
+     * assignments are ignored, but learners who already completed it keep that history.
+     */
+    private boolean isEnrollmentInScope(Enrollment e) {
+        Course course = e.getCourse();
+        if (course == null) {
+            return true;
+        }
+        if (Boolean.TRUE.equals(course.getDraft())) {
+            return false;
+        }
+        boolean deactivated = Boolean.FALSE.equals(course.getActive()) && course.getPublishedAt() != null;
+        return !deactivated || e.getStatus() == EnrollmentStatus.COMPLETED;
+    }
+
+    private boolean isAssignedWithin(Enrollment e, LocalDate from, LocalDate to) {
+        if (from == null && to == null) {
+            return true;
+        }
+        if (e.getEnrolledAt() == null) {
+            return false;
+        }
+        LocalDate assigned = e.getEnrolledAt().toLocalDate();
+        if (from != null && assigned.isBefore(from)) {
+            return false;
+        }
+        return to == null || !assigned.isAfter(to);
+    }
+
+    private Map<String, Object> buildFilterOptions(List<User> allEmployees, List<Course> allCourses) {
+        List<String> departments = allEmployees.stream()
+                .map(User::getDepartment)
+                .filter(d -> d != null && !d.isBlank())
+                .map(String::trim)
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+
+        List<Map<String, Object>> courseOptions = new ArrayList<>();
+        allCourses.stream()
+                .filter(c -> c != null && !Boolean.TRUE.equals(c.getDraft()) && c.getTitle() != null)
+                .sorted(Comparator.comparing(Course::getTitle, String.CASE_INSENSITIVE_ORDER))
+                .forEach(c -> {
+                    Map<String, Object> option = new LinkedHashMap<>();
+                    option.put("id", c.getId());
+                    option.put("code", c.getCourseId());
+                    option.put("title", c.getTitle());
+                    courseOptions.add(option);
+                });
+
+        Map<String, Object> options = new LinkedHashMap<>();
+        options.put("departments", departments);
+        options.put("courses", courseOptions);
+        options.put("enrollmentTypes", List.of("MANDATORY", "RECOMMENDED", "SELF_SELECTED"));
+        return options;
+    }
+
+    private List<Map<String, Object>> metricDefinitions() {
+        List<Map<String, Object>> definitions = new ArrayList<>();
+        String[][] rows = {
+                {"Total employees", "Employees (role Employee) in the selected scope. Inactive and terminated accounts are excluded unless 'Include inactive employees' is ticked."},
+                {"Active employees", "Employees whose status is Active. Staff on leave are in scope but not counted as active."},
+                {"Training assignments", "Enrollments of in-scope employees. Revoked enrollments and draft courses are excluded; a deactivated course counts only for employees who already completed it."},
+                {"Completion rate", "Completed assignments divided by all assignments."},
+                {"Overdue training", "Assignments with a due date before today (India time) that are not completed."},
+                {"Average progress", "Mean progress percentage across all assignments."},
+                {"Mandatory compliance", "Mandatory assignments that are completed, divided by all mandatory assignments (including ones not yet due)."},
+                {"Average score", "Mean of each assignment's score: the result recorded when the course was completed, otherwise the learner's best quiz score for that course. Assignments without a score are ignored."},
+                {"Certificates issued", "Assignments that have a certificate."}
+        };
+        for (String[] row : rows) {
+            Map<String, Object> definition = new LinkedHashMap<>();
+            definition.put("metric", row[0]);
+            definition.put("definition", row[1]);
+            definitions.add(definition);
+        }
+        return definitions;
+    }
+
+    /** One row per employee and course: the raw data behind every figure in the report. */
+    private List<Map<String, Object>> buildAssignmentDetails(
+            List<Enrollment> enrollments,
+            List<QuizAttempt> completedAttempts
+    ) {
+        List<QuizAttempt> usableAttempts = completedAttempts == null
+                ? List.of()
+                : completedAttempts.stream()
+                        .filter(Objects::nonNull)
+                        .filter(qa -> qa.getCompletedAt() != null && qa.getScore() != null)
+                        .toList();
+
+        LocalDate today = LocalDate.now(REPORT_ZONE);
+        List<Map<String, Object>> rows = new ArrayList<>();
+
+        for (Enrollment e : enrollments) {
+            if (rows.size() >= MAX_DETAIL_ROWS) {
+                break;
+            }
+            User user = e.getUser();
+            Course course = e.getCourse();
+            boolean overdue = isOverdue(e);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("employeeId", user != null ? user.getEmployeeId() : null);
+            row.put("employeeName", user != null ? user.getName() : null);
+            row.put("department", user != null ? user.getDepartment() : null);
+            row.put("designation", user != null ? user.getDesignation() : null);
+            row.put("branch", user != null ? user.getBranch() : null);
+            row.put("courseCode", course != null ? course.getCourseId() : null);
+            row.put("courseTitle", course != null ? course.getTitle() : null);
+            row.put("courseCategory", course != null ? resolveCourseCategory(course) : null);
+            row.put("enrollmentType", e.getEnrollmentType() != null ? e.getEnrollmentType().name() : null);
+            row.put("status", e.getStatus() != null ? e.getStatus().name() : null);
+            row.put("progressPercent", e.getProgressPercent() != null ? e.getProgressPercent() : 0);
+            row.put("score", resolveEnrollmentScore(e, usableAttempts));
+            row.put("assignedDate", e.getEnrolledAt() != null ? e.getEnrolledAt().toLocalDate().toString() : null);
+            row.put("dueDate", e.getDueDate() != null ? e.getDueDate().toString() : null);
+            row.put("completedDate",
+                    e.getCompletedDate() != null ? e.getCompletedDate().toLocalDate().toString() : null);
+            row.put("overdue", overdue);
+            row.put("daysOverdue", overdue ? ChronoUnit.DAYS.between(e.getDueDate(), today) : 0L);
+            row.put("certificateId", e.getCertificateId());
+            rows.add(row);
+        }
+
+        rows.sort(Comparator
+                .comparing((Map<String, Object> r) -> String.valueOf(r.get("department")), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(r -> String.valueOf(r.get("employeeName")), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(r -> String.valueOf(r.get("courseTitle")), String.CASE_INSENSITIVE_ORDER));
+        return rows;
     }
 
     // =========================================================
@@ -668,19 +917,11 @@ public class HrReportService {
     // SCORE, EXTRACTION & OVERDUE HELPERS
     // =========================================================
 
+    /**
+     * Average of one score per assignment (never of raw attempts, so a learner who failed three
+     * times does not weigh three times more than one who passed first time).
+     */
     private double computeAverageScore(List<Enrollment> enrollments, List<QuizAttempt> completedAttempts) {
-        if (completedAttempts != null && !completedAttempts.isEmpty()) {
-            boolean anyEnrollmentHasDirectScore = enrollments != null && enrollments.stream()
-                    .anyMatch(e -> e != null && e.getScore() != null);
-            if (!anyEnrollmentHasDirectScore) {
-                return completedAttempts.stream()
-                        .map(QuizAttempt::getScore)
-                        .filter(Objects::nonNull)
-                        .mapToInt(Integer::intValue)
-                        .average()
-                        .orElse(0.0);
-            }
-        }
         if (enrollments == null || enrollments.isEmpty()) {
             return 0.0;
         }
@@ -707,7 +948,7 @@ public class HrReportService {
                 .filter(qa -> qa.getQuiz() != null && qa.getQuiz().getCourse() != null
                         && Objects.equals(qa.getQuiz().getCourse().getId(), e.getCourse().getId()))
                 .filter(qa -> qa.getScore() != null)
-                .max(Comparator.comparing(QuizAttempt::getCompletedAt, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .max(Comparator.comparing(QuizAttempt::getScore))
                 .map(QuizAttempt::getScore)
                 .orElse(null);
     }
@@ -789,7 +1030,7 @@ public class HrReportService {
         }
 
         return enrollment.getDueDate()
-                .isBefore(LocalDate.now());
+                .isBefore(LocalDate.now(REPORT_ZONE));
     }
 
     // =========================================================
@@ -826,10 +1067,8 @@ public class HrReportService {
         if (e.getUser() == null || e.getUser().getDepartment() == null) {
             return false;
         }
-        if (department.equalsIgnoreCase(e.getUser().getDepartment())) {
-            return true;
-        }
-        return isCourseOwnedByDepartment(e.getCourse(), department) && e.getStatus() == EnrollmentStatus.COMPLETED;
+        // An assignment belongs to the department of the employee, so department totals add up to the overall total.
+        return department.equalsIgnoreCase(e.getUser().getDepartment().trim());
     }
 
     private double round(double value) {

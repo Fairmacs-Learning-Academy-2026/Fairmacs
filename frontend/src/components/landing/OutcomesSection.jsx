@@ -8,10 +8,6 @@ export default function OutcomesSection() {
     <section id="outcomes" aria-labelledby="fla-outcomes-heading" className="fla-section fla-wash-mint z-10">
       <div className="fla-container">
         <Reveal className="text-center max-w-2xl mx-auto">
-          <span className="inline-flex items-center gap-1.5 glass-pill rounded-full px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-[#0B5CAB]">
-            <BarChart3 size={13} aria-hidden="true" />
-            Platform Architecture &amp; Reach
-          </span>
           <h2 id="fla-outcomes-heading" className="fla-display-h2 mt-4">
             Built for measurable capability across every branch and desk.
           </h2>

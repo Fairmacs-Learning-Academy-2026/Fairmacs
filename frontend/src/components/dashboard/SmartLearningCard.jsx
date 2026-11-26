@@ -342,7 +342,7 @@ export default function SmartLearningCard({
           <div className="skeleton-shimmer" style={{ width: '48px', height: '48px', borderRadius: '14px', flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div className="skeleton-shimmer" style={{ width: '160px', height: '18px', borderRadius: '999px' }} />
-            <div className="skeleton-shimmer" style={{ width: '280px', height: '22px', borderRadius: '6px' }} />
+            <div className="skeleton-shimmer" style={{ width: 'min(280px, 100%)', height: '22px', borderRadius: '6px' }} />
             <div className="skeleton-shimmer" style={{ width: '220px', height: '14px', borderRadius: '6px' }} />
           </div>
           <div className="skeleton-shimmer" style={{ width: '150px', height: '40px', borderRadius: '12px', flexShrink: 0 }} />
