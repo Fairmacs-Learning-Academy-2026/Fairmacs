@@ -499,8 +499,14 @@ export default function Sidebar({
   // Show floating tooltip beside target element
   const showTooltip = useCallback(
     (e, config) => {
-      // Don't show floating desktop hover tooltips in open mobile drawer
-      if (typeof window !== 'undefined' && window.innerWidth <= 768 && mobileOpen) return;
+      // Gate hover tooltips strictly to fine-pointer hover devices (mobile-native rule)
+      if (
+        typeof window !== 'undefined' &&
+        ((window.innerWidth <= 768 && mobileOpen) ||
+          !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches)
+      ) {
+        return;
+      }
 
       if (hoverTimeoutRef.current) {
         clearTimeout(hoverTimeoutRef.current);

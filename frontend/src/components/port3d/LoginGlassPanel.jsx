@@ -91,6 +91,10 @@ export default function LoginGlassPanel({
                   id="login-id"
                   type="text"
                   autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="next"
                   placeholder={
                     idFocused ? 'e.g. EMP001 or abc@fairmacs.com' : ''
                   }
@@ -119,6 +123,10 @@ export default function LoginGlassPanel({
                   id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="go"
                   placeholder={pwFocused ? 'Enter your password' : ''}
                   value={password}
                   onFocus={() => setPwFocused(true)}

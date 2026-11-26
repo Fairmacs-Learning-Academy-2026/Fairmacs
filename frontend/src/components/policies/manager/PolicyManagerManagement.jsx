@@ -148,7 +148,7 @@ export default function PolicyManagerManagement() {
   const overdueCount = overview?.totalOverdue || 0;
 
   return (
-    <div className="min-h-screen bg-slate-50/60 pb-16">
+    <div className="min-h-dvh bg-slate-50/60 pb-16">
       {/* Toast Notice Banner */}
       {notice && (
         <div

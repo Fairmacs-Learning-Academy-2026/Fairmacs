@@ -151,7 +151,7 @@ assert(
 );
 
 assert(
-  courseViewerCode.includes("maxHeight: '72vh'") &&
+  (courseViewerCode.includes("maxHeight: '72dvh'") || courseViewerCode.includes("maxHeight: '72vh'")) &&
   courseViewerCode.includes('pdfPageCount > 0'),
   'CourseViewer renders clean standard embedded layout with page count badge'
 );

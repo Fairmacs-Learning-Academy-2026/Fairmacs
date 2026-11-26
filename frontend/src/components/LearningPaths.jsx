@@ -442,7 +442,7 @@ export default function LearningPaths() {
               background: 'white',
               width: '100%',
               maxWidth: '560px',
-              maxHeight: '85vh',
+              maxHeight: '85dvh',
               overflowY: 'auto',
               borderRadius: '14px',
               padding: '1.5rem',

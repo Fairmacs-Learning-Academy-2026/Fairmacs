@@ -169,7 +169,7 @@ export default function PolicyManagerSubmitModal({
       }}
     >
       <div
-        className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh] overflow-hidden z-10"
+        className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] overflow-hidden z-10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

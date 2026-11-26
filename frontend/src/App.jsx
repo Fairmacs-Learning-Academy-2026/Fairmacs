@@ -290,10 +290,11 @@ function MainApp() {
       <div
         className="app-container"
         style={{
-          minHeight: '100vh',
+          minHeight: '100dvh',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          padding: 'max(1rem, env(safe-area-inset-top, 1rem)) max(1rem, env(safe-area-inset-right, 1rem)) max(1rem, env(safe-area-inset-bottom, 1rem)) max(1rem, env(safe-area-inset-left, 1rem))'
         }}
       >
         <PasswordModal forceChange={true} />
@@ -588,16 +589,12 @@ function MainApp() {
     }
 
     if (location.pathname === '/hr/employees') {
-      return (
-        <div style={{ background: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-          <EmployeeManagement />
-        </div>
-      );
+      return <EmployeeManagement />;
     }
 
     if (location.pathname === '/hr/departments') {
       return (
-        <div style={{ background: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+        <div style={{ background: '#FFFFFF', borderRadius: '14px', border: '1px solid #E2E8F0', padding: 'clamp(0.85rem, 2.5vw, 1.5rem)', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
           <DepartmentManagement />
         </div>
       );
@@ -613,7 +610,7 @@ function MainApp() {
 
     if (location.pathname === '/hr/reports') {
       return (
-        <div style={{ background: '#FFFFFF', borderRadius: '8px', border: '1px solid #E2E8F0', padding: '1.5rem', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
+        <div style={{ background: '#FFFFFF', borderRadius: '14px', border: '1px solid #E2E8F0', padding: 'clamp(0.85rem, 2.5vw, 1.5rem)', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
           <ReportsView currentRole="HR_ADMIN" embedded={true} />
         </div>
       );

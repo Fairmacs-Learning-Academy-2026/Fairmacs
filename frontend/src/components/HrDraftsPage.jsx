@@ -295,6 +295,7 @@ export default function HrDraftsPage() {
                     transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
                     e.currentTarget.style.borderColor = '#CBD5E1';
                     e.currentTarget.style.boxShadow = '0 1px 3px 0 rgba(0, 0, 0, 0.08)';
                   }}

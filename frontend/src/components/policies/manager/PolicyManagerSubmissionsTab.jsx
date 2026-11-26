@@ -74,7 +74,7 @@ export default function PolicyManagerSubmissionsTab({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all text-slate-800"
-            />
+             enterKeyHint="search" />
           </div>
 
           <div className="flex items-center gap-2">

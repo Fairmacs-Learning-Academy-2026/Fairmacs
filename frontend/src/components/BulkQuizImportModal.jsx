@@ -812,7 +812,7 @@ export default function BulkQuizImportModal({
           maxWidth: 1040,
           width: 'min(1040px, 96vw)',
           padding: 0,
-          maxHeight: '90vh',
+          maxHeight: '90dvh',
           display: 'flex',
           flexDirection: 'column',
           background: '#fff',

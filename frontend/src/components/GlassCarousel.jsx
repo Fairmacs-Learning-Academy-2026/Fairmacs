@@ -150,7 +150,11 @@ export default function GlassCarousel({
       aria-label={title || 'Featured Courses Carousel'}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onMouseEnter={() => setIsPaused(true)}
+      onMouseEnter={() => {
+        if (typeof window === 'undefined' || window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) {
+          setIsPaused(true);
+        }
+      }}
       onMouseLeave={() => setIsPaused(false)}
       onFocus={() => setIsPaused(true)}
       onBlur={() => setIsPaused(false)}
@@ -213,6 +217,7 @@ export default function GlassCarousel({
       {/* Viewport and sliding track */}
       <div
         className="glass-carousel-viewport"
+        style={{ touchAction: 'pan-y' }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

@@ -512,7 +512,7 @@ export default function DepartmentCourseEmployees() {
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search employee, ID or email..."
                   className="h-[42px] w-full rounded-[11px] border border-[#dce5ef] bg-white pl-10 pr-4 text-[13px] text-[#22364e] outline-none placeholder:text-[#8b9cb1] focus:border-[#73b9e7] focus:ring-4 focus:ring-[#eaf6fd]"
-                />
+                 enterKeyHint="search" />
               </div>
             </div>
 

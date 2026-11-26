@@ -309,7 +309,7 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
               left: 0 !important;
               top: 0 !important;
               width: 100vw !important;
-              height: 100vh !important;
+              height: 100dvh !important;
               margin: 0 !important;
               padding: 0 !important;
               background: #fff !important;

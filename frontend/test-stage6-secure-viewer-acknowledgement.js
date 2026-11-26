@@ -57,7 +57,7 @@ assert(modalCode.includes('z-[99999]'), 'PolicyPdfViewerModal uses top-tier stac
 assert(modalCode.includes('relative z-30') && modalCode.includes('shrink-0'), 'Modal header is fixed at top with high stacking context');
 assert(modalCode.includes('min-h-0') && modalCode.includes('flex-1'), 'Scrollable viewer content area uses flex-1 min-h-0 for precise height calculation');
 assert(modalCode.includes('overflow-y-auto'), 'Viewer content area is independently scrollable');
-assert(modalCode.includes('h-[92vh]') || modalCode.includes('h-[95vh]'), 'Modal container constrained to viewport height');
+assert(modalCode.includes('h-[92dvh]') || modalCode.includes('h-[92vh]') || modalCode.includes('h-[95vh]'), 'Modal container constrained to viewport height');
 
 // Checkbox and Explicit Acknowledgement
 assert(

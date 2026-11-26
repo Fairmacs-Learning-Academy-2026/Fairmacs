@@ -323,7 +323,7 @@ export default function PasswordModal({ onClose, forceChange = false }) {
               placeholder="Enter current password"
               disabled={loading}
               style={inputStyle}
-            />
+             autoCapitalize="none" autoCorrect="off" />
           </div>
 
           {/* New Password */}
@@ -342,7 +342,7 @@ export default function PasswordModal({ onClose, forceChange = false }) {
               placeholder="Min. 8 characters..."
               disabled={loading}
               style={inputStyle}
-            />
+             autoCapitalize="none" autoCorrect="off" />
             <div style={{ fontSize: '0.73rem', color: '#64748b', marginTop: '0.3rem', lineHeight: 1.45 }}>
               Must include at least 8 characters, uppercase, lowercase, number, and special character.
             </div>
@@ -364,7 +364,7 @@ export default function PasswordModal({ onClose, forceChange = false }) {
               placeholder="Re-enter new password"
               disabled={loading}
               style={inputStyle}
-            />
+             autoCapitalize="none" autoCorrect="off" />
           </div>
 
           {/* Buttons */}

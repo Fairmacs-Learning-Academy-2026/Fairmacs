@@ -180,7 +180,7 @@ export default function DepartmentDetails() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F4F7FB] font-sans text-slate-900 antialiased">
+    <div className="min-h-dvh w-full bg-[#F4F7FB] font-sans text-slate-900 antialiased">
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -right-40 -top-40 h-[30rem] w-[30rem] rounded-full bg-white blur-3xl" />
@@ -213,7 +213,7 @@ export default function DepartmentDetails() {
         </div>
 
         {loading ? (
-          <div className="flex min-h-[70vh] items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex min-h-[70dvh] items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="text-center">
               <RefreshCw className="mx-auto mb-3 h-7 w-7 animate-spin text-sky-600" />
               <p className="text-sm font-semibold text-slate-600">
@@ -380,7 +380,7 @@ export default function DepartmentDetails() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="Search employees"
                       className="h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-sky-400 focus:ring-4 focus:ring-sky-50"
-                    />
+                     enterKeyHint="search" />
                   </div>
                 </div>
 

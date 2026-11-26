@@ -788,7 +788,7 @@ export default function TrainerDashboard({ onSelectCourse }) {
                       outline: 'none',
                       width: '160px',
                     }}
-                  />
+                   enterKeyHint="search" />
                 </div>
 
                 <select
@@ -1185,7 +1185,7 @@ export default function TrainerDashboard({ onSelectCourse }) {
                     minWidth: '160px',
                     outline: 'none',
                   }}
-                />
+                 enterKeyHint="search" />
 
                 <select
                   value={analyticsDeptFilter}

@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Building2, FileText, LogIn, Mail, MapPin, ShieldCheck } from 'lucide-react';
+import '../styles/landing-glass.css';
 import FairmacsEmblem from './FairmacsEmblem';
-import FairmacsFooter from './footer/FairmacsFooter';
+import AmbientBackground from './landing/AmbientBackground';
+import LightGlassFooter from './landing/LightGlassFooter';
 
 const PRIVACY_SECTIONS = [
   {
@@ -64,72 +66,69 @@ export default function LegalDocumentPage({ type = 'privacy' }) {
   }, [type]);
 
   return (
-    <div className="min-h-screen bg-[#06111f] text-white flex flex-col">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#06111f]/90 backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-3">
+    <div className="fla-daylight-root flex flex-col justify-between">
+      <AmbientBackground />
+
+      <header className="sticky top-0 z-40 fla-safe-top px-3 sm:px-6">
+        <div className="mx-auto max-w-[1240px] glass glass--strong rounded-full px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="flex items-center gap-3 text-left"
+            className="flex items-center gap-2.5 text-left"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white p-1.5 shadow">
-              <FairmacsEmblem size={22} fill="#1B365D" />
-            </div>
-            <div>
-              <div className="fairmacs-brand-wordmark text-base font-bold tracking-wide text-white">
-                FAIRMACS
-              </div>
-              <div className="fairmacs-brand-tagline text-[9px] uppercase tracking-[0.16em] text-slate-300">
-                LEARNING ACADEMY
-              </div>
-            </div>
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm border border-black/5">
+              <FairmacsEmblem size={21} fill="#0B5CAB" />
+            </span>
+            <span className="leading-tight">
+              <span className="block text-sm font-bold text-[#1F2328]">Fairmacs</span>
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4A5058]">
+                Learning Academy
+              </span>
+            </span>
           </button>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-200 hover:bg-white/10 transition"
+              className="fla-btn-secondary !py-2 !px-3.5 text-xs"
             >
-              <ArrowLeft size={15} />
-              <span className="hidden sm:inline">Back to Home</span>
-              <span className="sm:hidden">Home</span>
+              <ArrowLeft size={14} aria-hidden="true" />
+              <span>Home</span>
             </button>
             <button
               type="button"
               onClick={() => navigate('/login')}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white hover:bg-blue-500 transition"
+              className="fla-btn-primary !py-2 !px-4 text-xs"
             >
-              <LogIn size={15} />
+              <LogIn size={14} aria-hidden="true" />
               <span>Login</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-blue-200">
+      <main className="relative z-10 mx-auto w-full max-w-4xl flex-1 px-4 sm:px-6 py-12 sm:py-16">
+        <span className="inline-flex items-center gap-2 glass-pill rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-[#0B5CAB]">
           {isPrivacy ? <ShieldCheck size={14} /> : <FileText size={14} />}
-          {isPrivacy ? 'Data Protection & Governance' : 'Platform Governance'}
-        </div>
+          <span>{isPrivacy ? 'Data Protection & Governance' : 'Platform Governance'}</span>
+        </span>
 
-        <h1 className="mt-4 text-3xl sm:text-5xl font-bold tracking-tight text-white">
+        <h1 className="fla-display-h1 !text-4xl sm:!text-5xl mt-4">
           {isPrivacy ? 'Privacy Policy' : 'Terms of Use'}
         </h1>
 
-        <p className="mt-3 text-sm text-slate-400">
+        <p className="mt-3 text-sm text-[#4A5058]">
           Effective Date: January 1, 2026 · Fairmacs Shipping &amp; Transport Services Pvt. Ltd.
         </p>
 
-        {/* Quick Document Switcher */}
-        <div className="mt-6 inline-flex rounded-xl border border-white/10 bg-white/[0.04] p-1">
+        {/* Document Switcher */}
+        <div className="mt-6 inline-flex rounded-full glass-pill p-1">
           <button
             type="button"
             onClick={() => navigate('/privacy-policy')}
-            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition ${
-              isPrivacy ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:text-white'
+            className={`rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition ${
+              isPrivacy ? 'bg-[#0B5CAB] text-white shadow-sm' : 'text-[#4A5058] hover:text-[#1F2328]'
             }`}
           >
             Privacy Policy
@@ -137,52 +136,45 @@ export default function LegalDocumentPage({ type = 'privacy' }) {
           <button
             type="button"
             onClick={() => navigate('/terms')}
-            className={`rounded-lg px-4 py-2 text-xs sm:text-sm font-semibold transition ${
-              !isPrivacy ? 'bg-blue-600 text-white shadow' : 'text-slate-300 hover:text-white'
+            className={`rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition ${
+              !isPrivacy ? 'bg-[#0B5CAB] text-white shadow-sm' : 'text-[#4A5058] hover:text-[#1F2328]'
             }`}
           >
             Terms of Use
           </button>
         </div>
 
-        {/* Clauses */}
-        <div className="mt-10 space-y-6">
+        <div className="mt-10 space-y-5">
           {sections.map((section) => (
-            <section
-              key={section.title}
-              className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 sm:p-7"
-            >
-              <h2 className="text-lg sm:text-xl font-semibold text-white">
-                {section.title}
-              </h2>
-              <p className="mt-3 text-sm sm:text-base leading-7 text-slate-300">
+            <section key={section.title} className="glass glass--strong p-6 sm:p-7">
+              <h2 className="fla-display-h3 !text-lg sm:!text-xl">{section.title}</h2>
+              <p className="mt-2.5 text-sm sm:text-base leading-relaxed text-[#4A5058]">
                 {section.body}
               </p>
             </section>
           ))}
         </div>
 
-        {/* Registered Corporate Contact Card */}
-        <section className="mt-10 rounded-2xl border border-blue-400/20 bg-gradient-to-br from-blue-500/10 to-cyan-500/5 p-6 sm:p-8">
-          <div className="flex items-center gap-2.5 text-sm font-semibold uppercase tracking-wider text-blue-300">
-            <Building2 size={17} />
-            Corporate &amp; Data Governance Contact
+        <section className="mt-8 glass glass--strong p-6 sm:p-8 bg-white/80">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#0B5CAB]">
+            <Building2 size={16} aria-hidden="true" />
+            <span>Corporate &amp; Data Governance Contact</span>
           </div>
-          <h2 className="mt-2 text-xl font-bold text-white">
+          <h2 className="fla-display-h3 mt-2">
             Fairmacs Shipping &amp; Transport Services Pvt. Ltd.
           </h2>
-          <div className="mt-4 space-y-2.5 text-sm text-slate-300">
+          <div className="mt-4 space-y-2 text-sm text-[#4A5058]">
             <div className="flex items-start gap-2.5">
-              <MapPin size={17} className="mt-0.5 shrink-0 text-blue-300" />
+              <MapPin size={16} className="mt-0.5 shrink-0 text-[#0B5CAB]" aria-hidden="true" />
               <span>
                 New No. 31, Old No. 14, Moore Street, George Town, Chennai – 600 001, Tamil Nadu, India
               </span>
             </div>
             <div className="flex items-center gap-2.5">
-              <Mail size={17} className="shrink-0 text-blue-300" />
+              <Mail size={16} className="shrink-0 text-[#0B5CAB]" aria-hidden="true" />
               <a
                 href="mailto:hr-training@fairmacs.com"
-                className="text-blue-200 hover:text-white underline underline-offset-4"
+                className="font-semibold text-[#0B5CAB] underline underline-offset-4"
               >
                 hr-training@fairmacs.com
               </a>
@@ -191,14 +183,10 @@ export default function LegalDocumentPage({ type = 'privacy' }) {
         </section>
       </main>
 
-      <FairmacsFooter
-        variant="public"
+      <LightGlassFooter
         onNavigate={(path) => {
           navigate(path);
           window.scrollTo({ top: 0, behavior: 'auto' });
-        }}
-        onScrollToSection={(sectionId) => {
-          navigate(`/#${sectionId}`);
         }}
       />
     </div>

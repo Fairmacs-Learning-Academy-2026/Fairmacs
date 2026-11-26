@@ -2,6 +2,13 @@
 @import 'tailwindcss';
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
 
 :root {
   /* Brand Typography: League Spartan (Official Standard) */
@@ -98,7 +105,7 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
   }
 
   * {
@@ -116,12 +123,12 @@
     color: var(--text-primary);
     min-height: 100vh;
     min-height: 100dvh;
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  @media (max-width: 768px), (pointer: coarse) {
+  @media (pointer: coarse) {
     body {
       background-attachment: scroll;
     }
@@ -129,11 +136,23 @@
 
   button,
   a,
-  [role="button"] {
+  summary,
+  label[for],
+  [role="button"],
+  [role="tab"],
+  .tab,
+  .chip,
+  .drag-handle {
     touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
+  }
+
+  select,
+  input[type="checkbox"],
+  input[type="radio"] {
+    touch-action: manipulation;
   }
 
   button {
@@ -203,8 +222,10 @@
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+@media (hover: hover) and (pointer: fine) {
+  ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.95);
+}
 }
 
 /* Animations */
@@ -289,11 +310,13 @@
     border-color var(--duration-normal) var(--ease-spring);
 }
 
-.glass-card:hover {
+@media (hover: hover) and (pointer: fine) {
+  .glass-card:hover {
   transform: translateY(-3px);
   background: var(--glass-surface-white-hover);
   border-color: rgba(22, 119, 255, 0.35);
   box-shadow: var(--glass-shadow-hover);
+}
 }
 
 .glass-sidebar {
@@ -323,11 +346,13 @@
   transition: all var(--duration-fast) var(--ease-spring);
 }
 
-.glass-button-primary:hover,
-.btn-primary:hover {
+@media (hover: hover) and (pointer: fine) {
+  .glass-button-primary:hover,
+  .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(22, 119, 255, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   background: linear-gradient(135deg, #2583FF 0%, #0393DE 100%);
+}
 }
 
 .glass-button-primary:active,
@@ -356,13 +381,15 @@
   transition: all var(--duration-fast) var(--ease-spring);
 }
 
-.glass-button-secondary:hover,
-.btn-secondary:hover {
+@media (hover: hover) and (pointer: fine) {
+  .glass-button-secondary:hover,
+  .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.95);
   border-color: rgba(22, 119, 255, 0.35);
   color: var(--primary-blue);
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(31, 70, 120, 0.09);
+}
 }
 
 .glass-button-secondary:active,
@@ -387,12 +414,14 @@
   transition: all var(--duration-fast) var(--ease-spring);
 }
 
-.glass-icon-button:hover:not(:disabled) {
+@media (hover: hover) and (pointer: fine) {
+  .glass-icon-button:hover:not(:disabled) {
   background: #ffffff;
   border-color: rgba(22, 119, 255, 0.4);
   color: var(--primary-blue);
   transform: translateY(-1px) scale(1.05);
   box-shadow: 0 4px 12px rgba(22, 119, 255, 0.22);
+}
 }
 
 .glass-icon-button:active:not(:disabled) {
@@ -639,8 +668,10 @@
   border-bottom: 1px solid rgba(241, 245, 249, 0.9);
 }
 
-.data-table tbody tr:hover {
+@media (hover: hover) and (pointer: fine) {
+  .data-table tbody tr:hover {
   background-color: rgba(241, 245, 249, 0.75);
+}
 }
 
 .data-table tbody td {
@@ -687,9 +718,11 @@
   transition: transform 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring);
 }
 
-.elevation-hover:hover {
+@media (hover: hover) and (pointer: fine) {
+  .elevation-hover:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-elevation-hover);
+}
 }
 
 /* =========================================================
@@ -697,8 +730,8 @@
    (Emil Kowalski / mobile-native & gestures skill rules)
 ========================================================= */
 
-/* Prevent iOS Safari auto-zoom on form focus by ensuring >= 16px on touch/mobile */
-@media (pointer: coarse), (max-width: 768px) {
+/* Prevent iOS Safari auto-zoom on form focus by ensuring >= 16px on coarse pointers */
+@media (pointer: coarse) {
   input,
   textarea,
   select,
@@ -712,44 +745,344 @@
 }
 
 /* Isolate scroll inside drawers, modals, dropdowns, and horizontal tables */
+.modal-overlay,
 .modal-content,
 .glass-modal,
 .glass-dropdown,
 .table-scroll,
-.sidebar-nav-container {
+.sidebar-nav-container,
+.mn-scroll-contain {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Prevent sticky :hover states on touch devices while preserving :active press feedback */
-@media (hover: none) {
-  .glass-card:hover,
-  .elevation-hover:hover,
-  .glass-button-primary:hover,
-  .btn-primary:hover,
-  .glass-button-secondary:hover,
-  .btn-secondary:hover,
-  .glass-icon-button:hover:not(:disabled),
-  .header-profile-trigger:hover,
-  .phase5-widget-card:hover,
-  .phase7-deadline-row:hover,
-  .phase7-elective-item-card:hover,
-  .hr-ops-kpi-card:hover,
-  .hr-ops-launch-tile:hover,
-  .hr-ops-dept-row:hover,
-  .hr-ops-cert-card:hover,
-  .snapshot-card:hover {
-    transform: none !important;
+/* Capability-Gated Hover Helpers (Replaces Sticky Inline JS onMouseEnter Mutations) */
+.mn-hover-card,
+.mn-hover-lift-card,
+.mn-hover-row,
+.mn-hover-outline-btn,
+.mn-hover-text-btn {
+  touch-action: manipulation;
+  transition: transform 140ms var(--ease-out),
+              background-color 150ms ease,
+              border-color 150ms ease,
+              box-shadow 150ms ease,
+              color 150ms ease;
+}
+
+.mn-hover-card:active,
+.mn-hover-lift-card:active,
+.mn-hover-outline-btn:active,
+.mn-hover-text-btn:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mn-hover-card:hover {
+    border-color: #93C5FD !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06) !important;
+  }
+  .mn-hover-lift-card:hover {
+    transform: translateY(-3px);
+    border-color: #93C5FD !important;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.09) !important;
+  }
+  .mn-hover-row:hover {
+    background-color: #F8FBFF !important;
+  }
+  .mn-hover-outline-btn:hover {
+    background-color: #F0F9FF !important;
+    border-color: #0F6CBD !important;
+    color: #0F6CBD !important;
+  }
+  .mn-hover-text-btn:hover {
+    color: #0F6CBD !important;
+  }
+}
+
+/* Immediate pointer-down press feedback across interactive cards & rows */
+.glass-card:active,
+.hr-ops-launch-tile:active,
+.hr-ops-dept-row:active,
+.hr-ops-cert-card:active,
+.phase7-deadline-row:active,
+.phase7-elective-item-card:active {
+  transform: scale(0.985);
+  transition: transform 100ms var(--ease-out);
+}
+
+/* =========================================================
+   MOBILE-NATIVE RESPONSIVE PAGE, PLAYER & GRID PRIMITIVES
+   Eliminates desktop-only column crushing & right-edge clipping
+========================================================= */
+
+.main-content,
+.main-content > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.mn-scroll-x {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Course Viewer Mobile-Native Layout */
+.mn-course-viewer-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.mn-course-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.85rem 1rem;
+  background: #ffffff;
+  padding: 1rem 1.35rem;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: var(--shadow-elevation-rest);
+}
+
+.mn-course-top-left {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.mn-course-top-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.mn-course-viewer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 1.35rem;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+.mn-course-viewer-grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mn-video-stage {
+  background: #0f172a;
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  color: #ffffff;
+  position: relative;
+  width: 100%;
+}
+
+.mn-youtube-frame {
+  width: 100%;
+  height: 420px;
+  border: 0;
+  background: #000000;
+}
+
+.mn-video-element {
+  width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+  background: #000000;
+}
+
+.mn-course-bottom-bar {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 0.85rem 1.25rem;
+  border: 1px solid rgba(52, 133, 240, 0.45);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  box-shadow: var(--shadow-elevation-rest);
+}
+
+.mn-course-bottom-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* Responsive Multi-Column KPI & Split Grids */
+.mn-kpi-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.mn-kpi-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mn-split-2-1 {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.mn-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.mn-transcript-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1024px) {
+  .mn-course-viewer-grid,
+  .trainer-main-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 1rem;
   }
 
-  .glass-card:active,
-  .hr-ops-launch-tile:active,
-  .hr-ops-dept-row:active,
-  .hr-ops-cert-card:active,
-  .phase7-deadline-row:active,
-  .phase7-elective-item-card:active {
-    transform: scale(0.985) !important;
-    transition: transform 100ms var(--ease-out) !important;
+  .mn-split-2-1 {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px;
+  }
+
+  .mn-kpi-grid-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .learning-streaks-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 1rem !important;
+  }
+
+  .mn-kpi-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .mn-grid-2 {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 14px;
+  }
+
+  .mn-transcript-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .mn-course-viewer-shell {
+    gap: 0.9rem;
+  }
+
+  .mn-course-top-bar {
+    padding: 0.85rem 0.95rem;
+    gap: 0.75rem;
+  }
+
+  .mn-course-top-left {
+    flex: 1 1 100%;
+  }
+
+  .mn-course-top-actions {
+    width: 100%;
+  }
+
+  .mn-course-top-actions > button,
+  .mn-course-top-actions > div {
+    flex: 1 1 auto;
+  }
+
+  .mn-course-top-actions > div > button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .mn-video-stage {
+    min-height: 0 !important;
+    border-radius: 12px;
+  }
+
+  .mn-youtube-frame {
+    height: auto !important;
+    aspect-ratio: 16 / 9;
+    min-height: 205px;
+  }
+
+  .mn-video-element {
+    aspect-ratio: 16 / 9;
+    max-height: 54dvh;
+  }
+
+  .mn-course-bottom-bar {
+    padding: 0.8rem 0.95rem calc(0.8rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 560px) {
+  .mn-kpi-grid-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mn-transcript-meta-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mn-course-bottom-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mn-course-bottom-nav {
+    width: 100%;
+  }
+
+  .mn-course-bottom-nav > button {
+    flex: 1 1 0%;
+    justify-content: center;
+  }
+
+  .header .header-cert-label {
+    display: none;
+  }
+
+  .header .header-cert-btn {
+    padding: 0.42rem 0.6rem !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .header .brand-tagline,
+  .header .fairmacs-brand-tagline {
+    display: none !important;
   }
 }
 

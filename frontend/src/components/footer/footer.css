@@ -108,8 +108,10 @@
   animation: fairmacsMarqueeLoop 46s linear infinite;
 }
 
-.fairmacs-marquee-viewport:hover .fairmacs-marquee-track {
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-marquee-viewport:hover .fairmacs-marquee-track {
   animation-play-state: paused;
+}
 }
 
 .fairmacs-marquee-group {
@@ -380,11 +382,13 @@
   font-size: 0.86rem;
 }
 
-.fairmacs-magnetic-cta:hover {
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-magnetic-cta:hover {
   background-color: #3478E5;
   border-color: rgba(147, 197, 253, 0.65);
   box-shadow: 0 12px 32px rgba(52, 120, 229, 0.42),
               0 0 24px rgba(52, 120, 229, 0.28);
+}
 }
 
 .fairmacs-magnetic-cta:focus-visible {
@@ -399,8 +403,10 @@
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.fairmacs-magnetic-cta:hover .fairmacs-magnetic-cta-arrow {
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-magnetic-cta:hover .fairmacs-magnetic-cta-arrow {
   transform: translate3d(3px, -3px, 0);
+}
 }
 
 /* Back-to-Top Circular Control */
@@ -423,12 +429,14 @@
               box-shadow 0.28s ease;
 }
 
-.fairmacs-back-to-top:hover {
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-back-to-top:hover {
   background-color: #3478E5;
   border-color: rgba(147, 197, 253, 0.7);
   color: #FFFFFF;
   transform: translate3d(0, -2px, 0) rotate(8deg);
   box-shadow: 0 8px 24px rgba(52, 120, 229, 0.38);
+}
 }
 
 .fairmacs-back-to-top:focus-visible {
@@ -440,8 +448,10 @@
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.fairmacs-back-to-top:hover .fairmacs-back-to-top-icon {
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-back-to-top:hover .fairmacs-back-to-top-icon {
   transform: translate3d(0, -3px, 0);
+}
 }
 
 /* --------------------------------------------------------------------------
@@ -576,14 +586,22 @@
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.fairmacs-footer-link:hover,
 .fairmacs-footer-link:focus-visible {
   color: #FFFFFF;
 }
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-footer-link:hover {
+  color: #FFFFFF;
+}
+}
 
-.fairmacs-footer-link:hover::after,
 .fairmacs-footer-link:focus-visible::after {
   transform: scaleX(1);
+}
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-footer-link:hover::after {
+  transform: scaleX(1);
+}
 }
 
 .fairmacs-footer-link:focus-visible {
@@ -598,10 +616,15 @@
               opacity 0.22s ease;
 }
 
-.fairmacs-footer-link:hover .fairmacs-footer-link-arrow,
 .fairmacs-footer-link:focus-visible .fairmacs-footer-link-arrow {
   opacity: 1;
   transform: translate3d(3px, -2px, 0);
+}
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-footer-link:hover .fairmacs-footer-link-arrow {
+  opacity: 1;
+  transform: translate3d(3px, -2px, 0);
+}
 }
 
 .fairmacs-role-badge {
@@ -820,9 +843,11 @@
   width: fit-content;
 }
 
-.fairmacs-footer-contact-email:hover {
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-footer-contact-email:hover {
   color: #FFFFFF;
   text-decoration: underline;
+}
 }
 
 .fairmacs-footer-legal-links {
@@ -842,9 +867,11 @@
   transition: color 0.2s ease;
 }
 
-.fairmacs-footer-legal-link:hover {
+@media (hover: hover) and (pointer: fine) {
+  .fairmacs-footer-legal-link:hover {
   color: #FFFFFF;
   text-decoration: underline;
+}
 }
 
 /* --------------------------------------------------------------------------

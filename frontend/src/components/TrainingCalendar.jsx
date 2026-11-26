@@ -752,7 +752,7 @@ export default function TrainingCalendar() {
               boxSizing: 'border-box',
               outline: 'none',
             }}
-          />
+           enterKeyHint="search" />
         </div>
       </section>
 
@@ -874,6 +874,7 @@ export default function TrainingCalendar() {
                         transition: 'all 0.15s ease',
                       }}
                       onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
                         if (dayEvents.length > 0) {
                           e.currentTarget.style.borderColor = '#93C5FD';
                           e.currentTarget.style.boxShadow = '0 4px 12px rgba(15, 23, 42, 0.06)';
@@ -1174,6 +1175,7 @@ export default function TrainingCalendar() {
                                 flexWrap: 'wrap',
                               }}
                               onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
                                 e.currentTarget.style.borderColor = isOverdue ? '#F87171' : '#93C5FD';
                                 e.currentTarget.style.boxShadow = '0 4px 14px rgba(15, 23, 42, 0.06)';
                               }}
@@ -1514,7 +1516,7 @@ export default function TrainingCalendar() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '55vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '55dvh', overflowY: 'auto' }}>
               {selectedDayEvents.events.map((item) => {
                 const isOverdue = item.status === EVENT_STATUSES.OVERDUE;
                 const colors = getEventBadgeStyle(item);

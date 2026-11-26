@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
+import '../styles/landing-glass.css';
 import { getCookieConsent, setCookieConsent } from '../utils/analytics';
 
 const PUBLIC_BANNER_PATHS = new Set(['/', '/login', '/privacy-policy', '/terms']);
 
 export default function CookieConsentBanner() {
   const location = useLocation();
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const existing = getCookieConsent();
-    setVisible(!existing);
-  }, []);
+  const [visible, setVisible] = useState(() => !getCookieConsent());
 
   const handleChoice = (choice) => {
     setCookieConsent(choice);
@@ -27,25 +23,28 @@ export default function CookieConsentBanner() {
     <aside
       role="region"
       aria-label="Cookie and storage preferences"
-      className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-4xl rounded-2xl border border-white/15 bg-[#0b1a2e]/95 backdrop-blur-2xl p-4 sm:p-5 text-white shadow-2xl"
+      style={{
+        bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))',
+      }}
+      className="fixed left-3 right-3 sm:left-4 sm:right-4 z-50 mx-auto max-w-4xl glass glass--strong p-4 sm:p-5 text-[#1F2328]"
     >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/15 border border-blue-400/25 text-blue-300">
-            <ShieldCheck size={18} />
+          <div className="mt-0.5 hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#BFE3FF]/75 text-[#0B5CAB]">
+            <ShieldCheck size={18} aria-hidden="true" />
           </div>
-          <p className="text-xs sm:text-sm leading-relaxed text-slate-200">
+          <p className="text-xs sm:text-sm leading-relaxed text-[#4A5058]">
             Fairmacs Learning Academy uses essential browser storage to keep employee sessions secure and optional analytics cookies to improve learning performance. Read our{' '}
             <Link
               to="/privacy-policy"
-              className="font-semibold text-blue-300 underline underline-offset-2 hover:text-white"
+              className="font-semibold text-[#0B5CAB] underline underline-offset-2"
             >
               Privacy Policy
             </Link>{' '}
             and{' '}
             <Link
               to="/terms"
-              className="font-semibold text-blue-300 underline underline-offset-2 hover:text-white"
+              className="font-semibold text-[#0B5CAB] underline underline-offset-2"
             >
               Terms of Use
             </Link>
@@ -57,14 +56,14 @@ export default function CookieConsentBanner() {
           <button
             type="button"
             onClick={() => handleChoice('essential')}
-            className="rounded-xl border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 transition"
+            className="fla-btn-secondary !py-2 !px-3.5 text-xs"
           >
             Essential Only
           </button>
           <button
             type="button"
             onClick={() => handleChoice('all')}
-            className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition shadow-md shadow-blue-950/40"
+            className="fla-btn-primary !py-2 !px-4 text-xs"
           >
             Accept All
           </button>

@@ -877,8 +877,8 @@ export default function CourseBuilderModal({ courseId = '', initialCourseId = ''
         <input style={inputStyle} value={quiz.title} onChange={(e) => updateQuiz(setter, { title: e.target.value })} placeholder="Final Assessment" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
-        <div><label style={labelStyle}>Passing score (%)</label><input style={inputStyle} type="number" min="0" max="100" value={quiz.passingScore} onChange={(e) => updateQuiz(setter, { passingScore: e.target.value })} /></div>
-        <div><label style={labelStyle}>Time limit (min)</label><input style={inputStyle} type="number" min="1" value={quiz.timeLimitMinutes ?? ''} onChange={(e) => updateQuiz(setter, { timeLimitMinutes: e.target.value })} /></div>
+        <div><label style={labelStyle}>Passing score (%)</label><input style={inputStyle} type="number" min="0" max="100" value={quiz.passingScore} onChange={(e) => updateQuiz(setter, { passingScore: e.target.value })}  inputMode="numeric" /></div>
+        <div><label style={labelStyle}>Time limit (min)</label><input style={inputStyle} type="number" min="1" value={quiz.timeLimitMinutes ?? ''} onChange={(e) => updateQuiz(setter, { timeLimitMinutes: e.target.value })}  inputMode="numeric" /></div>
       </div>
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: '0.85rem', color: '#334155' }}>
         <label><input type="checkbox" checked={quiz.randomizeQuestions} onChange={(e) => updateQuiz(setter, { randomizeQuestions: e.target.checked })} /> Randomize questions</label>
@@ -1124,7 +1124,7 @@ export default function CourseBuilderModal({ courseId = '', initialCourseId = ''
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               <div><label style={labelStyle}>Position *</label><select style={inputStyle} value={courseInfo.position || courseInfo.level || 'P0'} onChange={(e) => setCourseInfo({ ...courseInfo, level: e.target.value, position: e.target.value })}><option value="P0">P0 — Trainee</option><option value="P1">P1 — Assistant</option><option value="P2">P2 — Executive / Senior Executive</option><option value="P3">P3 — Assistant Manager / Manager / Senior Manager</option><option value="P4">P4 — Vice President</option></select></div>
               <div><label style={labelStyle}>Duration label</label><input style={inputStyle} value={courseInfo.duration} onChange={(e) => setCourseInfo({ ...courseInfo, duration: e.target.value })} placeholder="e.g. 3 Hours" /></div>
-              <div><label style={labelStyle}>Duration (hours)</label><input style={inputStyle} type="number" min="0" step="1" value={courseInfo.durationHours} onChange={(e) => setCourseInfo({ ...courseInfo, durationHours: e.target.value })} placeholder="e.g. 3" /></div>
+              <div><label style={labelStyle}>Duration (hours)</label><input style={inputStyle} type="number" min="0" step="1" value={courseInfo.durationHours} onChange={(e) => setCourseInfo({ ...courseInfo, durationHours: e.target.value })} placeholder="e.g. 3"  inputMode="numeric" /></div>
             </div>
             <div><label style={labelStyle}>Description</label><textarea style={{ ...inputStyle, minHeight: 100, resize: 'vertical' }} value={courseInfo.description} onChange={(e) => setCourseInfo({ ...courseInfo, description: e.target.value })} placeholder="Describe what employees will learn" /></div>
             {/* Course Thumbnail */}
@@ -1661,7 +1661,7 @@ export default function CourseBuilderModal({ courseId = '', initialCourseId = ''
                 <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: '0.84rem' }}>Select individual employees who may take this course optionally.</p>
               </div>
               <label style={labelStyle}><Users size={14} style={{ display: 'inline', verticalAlign: 'middle' }} /> Select employees</label>
-              <input style={inputStyle} value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} placeholder="Search by name, email, department, designation, or position (P0-P4)…" />
+              <input style={inputStyle} value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} placeholder="Search by name, email, department, designation, or position (P0-P4)…"  enterKeyHint="search" />
               <small style={{ color: '#64748b' }}>Tick the checkbox beside each employee. Search alone does not select anyone.</small>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <small style={{ color: '#64748b' }}>{assignment.selectedEmployeeIds.length} employee(s) selected</small>

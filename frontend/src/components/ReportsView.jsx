@@ -1821,6 +1821,7 @@ const exportEmployeeReportToExcel = async (employee) => {
                       }}
 
                       onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
 
                         e.currentTarget.style.background =
 
@@ -2904,7 +2905,7 @@ const exportEmployeeReportToExcel = async (employee) => {
                   color: '#1e293b',
                   minWidth: '180px'
                 }}
-              />
+               enterKeyHint="search" />
               <select
                 value={selectedDepartmentFilter}
                 onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
@@ -3143,7 +3144,7 @@ const exportEmployeeReportToExcel = async (employee) => {
                 color: '#1e293b',
                 minWidth: '200px'
               }}
-            />
+             enterKeyHint="search" />
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{
@@ -4216,7 +4217,7 @@ const TranscriptModal = ({
 
           width: 'min(1100px, 100%)',
 
-          maxHeight: '90vh',
+          maxHeight: '90dvh',
 
           background: '#fff',
 

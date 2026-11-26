@@ -617,7 +617,7 @@ export default function HrCoursesPage() {
                     background: '#FFFFFF',
                     outline: 'none'
                   }}
-                />
+                 enterKeyHint="search" />
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -978,7 +978,7 @@ export default function HrCoursesPage() {
                   background: '#FFFFFF',
                   outline: 'none'
                 }}
-              />
+               enterKeyHint="search" />
             </div>
           </section>
 
@@ -1115,6 +1115,7 @@ export default function HrCoursesPage() {
                       boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)'
                     }}
                     onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
                       e.currentTarget.style.transform = 'translateY(-3px)';
                       e.currentTarget.style.boxShadow = '0 12px 28px rgba(15, 23, 42, 0.09)';
                       e.currentTarget.style.borderColor = '#93C5FD';

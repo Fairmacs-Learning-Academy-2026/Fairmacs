@@ -838,7 +838,7 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
                   outline: 'none',
                   minWidth: '180px',
                 }}
-              />
+               enterKeyHint="search" />
             </div>
 
             <select
@@ -1246,7 +1246,7 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
               background: '#FFFFFF',
               borderRadius: '16px',
               width: 'min(920px, 100%)',
-              maxHeight: '85vh',
+              maxHeight: '85dvh',
               overflow: 'auto',
               padding: '1.5rem 1.75rem',
               boxShadow: '0 25px 60px rgba(15, 23, 42, 0.28)',

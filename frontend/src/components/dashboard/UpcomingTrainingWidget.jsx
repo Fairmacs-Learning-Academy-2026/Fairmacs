@@ -218,6 +218,7 @@ export default function UpcomingTrainingWidget({ limit = 4, className = '', styl
             transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
             e.currentTarget.style.background = '#F0F9FF';
             e.currentTarget.style.borderColor = '#93C5FD';
           }}
@@ -336,6 +337,7 @@ export default function UpcomingTrainingWidget({ limit = 4, className = '', styl
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
                   e.currentTarget.style.borderColor = isOverdue ? '#F87171' : '#93C5FD';
                   e.currentTarget.style.boxShadow = '0 3px 10px rgba(15, 23, 42, 0.05)';
                 }}

@@ -424,19 +424,6 @@ export default function Header({
       </div>
 
       {/* ======================================================
-          DYNAMIC GREETING
-          Hidden on Employee Dashboard to prevent duplicate greeting,
-          and hidden on narrow screens via CSS
-      ====================================================== */}
-      {!isEmployeeDashboard && (
-        <div className="header-greeting">
-          <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--deep-navy)' }}>
-            {getGreeting()}, {firstName} 👋
-          </span>
-        </div>
-      )}
-
-      {/* ======================================================
           USER ACTIONS
       ====================================================== */}
 

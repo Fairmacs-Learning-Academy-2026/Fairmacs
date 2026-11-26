@@ -2432,12 +2432,7 @@ export default function CourseViewer({
       ====================================================== */}
 
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns:
-            '1fr 340px',
-          gap: '1.5rem'
-        }}
+        className="mn-course-viewer-grid"
       >
 
         {/* ===================================================
@@ -2448,7 +2443,8 @@ export default function CourseViewer({
           style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '1rem'
+            gap: '1rem',
+            minWidth: 0
           }}
         >
 
@@ -2458,16 +2454,7 @@ export default function CourseViewer({
 
           <div
             ref={videoWrapperRef}
-            style={{
-              background: '#0f172a',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              minHeight: '400px',
-              display: 'flex',
-              flexDirection: 'column',
-              color: 'white',
-              position: 'relative'
-            }}
+            className="mn-video-stage"
           >
 
             {lessonType === 'video' ? (() => {
@@ -2517,7 +2504,7 @@ export default function CourseViewer({
                     <div
                       key={`yt-container-${activeLesson.dbId ?? activeLesson.id ?? videoId}`}
                       ref={youtubeIframeRef}
-                      style={{ width: '100%', height: '420px', border: 0, background: '#000' }}
+                      className="mn-youtube-frame"
                     />
 
                     {(youtubeBuffering || isOffline) && (
@@ -2719,7 +2706,7 @@ export default function CourseViewer({
                       }}
                       onTimeUpdate={handleVideoTimeUpdate}
                       onEnded={handleVideoEnded}
-                      style={{ width: '100%', maxHeight: '420px', objectFit: 'contain', background: '#000' }}
+                      className="mn-video-element"
                       src={sourceUrl}
                     >
                       Your browser does not support HTML5 video.
@@ -2986,7 +2973,7 @@ export default function CourseViewer({
                       aria-label={documentFilename || activeLesson?.title || 'Lesson PDF content'}
                       style={{
                         width: '100%',
-                        maxHeight: '72vh',
+                        maxHeight: '72dvh',
                         minHeight: '500px',
                         overflowY: 'auto',
                         overflowX: 'hidden',
@@ -3569,18 +3556,7 @@ export default function CourseViewer({
       ====================================================== */}
 
       <div
-        style={{
-          background: 'white',
-          borderRadius: '12px',
-          padding: '0.85rem 1.5rem',
-          border:
-            '1px solid #3485f0ff',
-          display: 'flex',
-          justifyContent:
-            'space-between',
-          alignItems: 'center',
-          boxShadow: 'var(--shadow-sm)'
-        }}
+        className="mn-course-bottom-bar"
       >
         <div
           style={{
@@ -3597,16 +3573,12 @@ export default function CourseViewer({
               color: '#0284c7'
             }}
           >
-            {progressPercent}%
-            Complete
+            {progressPercent}% Complete
           </span>
         </div>
 
         <div
-          style={{
-            display: 'flex',
-            gap: '0.75rem'
-          }}
+          className="mn-course-bottom-nav"
         >
           <button
             className="btn-secondary"

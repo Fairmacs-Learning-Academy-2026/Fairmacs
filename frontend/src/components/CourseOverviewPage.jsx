@@ -435,6 +435,7 @@ export default function CourseOverviewPage({
               transition: 'all 0.15s ease'
             }}
             onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
               e.currentTarget.style.borderColor = '#0F6CBD';
               e.currentTarget.style.color = '#0F6CBD';
             }}
@@ -464,6 +465,7 @@ export default function CourseOverviewPage({
               gap: '0.35rem'
             }}
             onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
               e.currentTarget.style.color = '#0F6CBD';
             }}
             onMouseLeave={(e) => {

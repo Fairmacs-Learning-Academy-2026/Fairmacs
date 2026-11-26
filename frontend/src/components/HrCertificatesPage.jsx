@@ -314,6 +314,7 @@ export default function HrCertificatesPage({ onViewCertificate }) {
                     transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
+              if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) return;
                     e.currentTarget.style.borderColor = '#CBD5E1';
                     e.currentTarget.style.background = '#F8FAFC';
                   }}

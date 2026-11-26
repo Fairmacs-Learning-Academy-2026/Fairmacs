@@ -824,7 +824,7 @@ export default function QuizModal({
       <div className="modal-overlay">
         <div
           className="modal-content animate-fade-in"
-          style={{ maxWidth: '850px', padding: 0, overflow: 'hidden', maxHeight: '90vh', overflowY: 'auto' }}
+          style={{ maxWidth: '850px', padding: 0, overflow: 'hidden', maxHeight: '90dvh', overflowY: 'auto' }}
         >
           <div style={{
             background: '#0f172a', padding: '1.25rem 1.5rem',

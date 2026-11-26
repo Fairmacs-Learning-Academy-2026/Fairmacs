@@ -106,7 +106,7 @@ export default function PolicyEmployeeHistoryModal({
       }}
     >
       <div
-        className="bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 relative z-10"
+        className="bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[92dvh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 relative z-10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Fixed Header */}

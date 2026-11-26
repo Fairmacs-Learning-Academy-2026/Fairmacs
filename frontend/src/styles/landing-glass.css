@@ -1,0 +1,360 @@
+/* ==========================================================================
+   FAIRMACS LEARNING ACADEMY — BRIGHT DAYLIGHT GLASSMORPHIC DESIGN SYSTEM
+   Hard Rule: Light daylight surfaces ONLY. Zero dark themes, zero black surfaces.
+   ========================================================================== */
+
+:root {
+  color-scheme: light only;
+
+  /* Daylight Surfaces (nothing darker than #F4F1EC) */
+  --bg-base: #FBF8F3;          /* warm alabaster */
+  --bg-pearl: #F4F1EC;         /* soft pearl */
+
+  /* High-Contrast Ink (WCAG AAA/AA against worst-case pastel wash) */
+  --ink: #1F2328;              /* charcoal text, never pure black (~14.8:1) */
+  --ink-soft: #4A5058;         /* body copy, >= 7:1 on --bg-base */
+  --ink-muted: #575E68;        /* secondary labels, >= 5.5:1 on --bg-base */
+
+  /* Iridescent Daylight Mesh Washes */
+  --accent-sky: #BFE3FF;
+  --accent-peach: #FFD9C7;
+  --accent-mint: #CFF3E3;
+  --accent-lilac: #E4DAFF;
+
+  /* Saturated Maritime Brand Accent (derived from Fairmacs sail; white contrast 6.72:1 >= 4.5:1) */
+  --brand: #0B5CAB;
+  --brand-hover: #08498A;
+  --brand-ring: rgba(11, 92, 171, 0.24);
+  --brand-tint: rgba(11, 92, 171, 0.09);
+
+  /* True Frosted Glass Surfaces */
+  --glass-fill: rgba(255, 255, 255, 0.55);
+  --glass-fill-strong: rgba(255, 255, 255, 0.74);
+  --glass-border: rgba(255, 255, 255, 0.80);
+  --glass-shadow:
+    0 1px 1px rgba(31, 35, 40, 0.04),
+    0 8px 24px rgba(31, 35, 40, 0.06),
+    0 24px 64px rgba(120, 140, 180, 0.14);
+
+  /* Typography Pair (Max 2 families: Fraunces display + Inter body) */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Blur Scale */
+  --glass-blur-radius: 22px;
+}
+
+@media (max-width: 639px) {
+  :root {
+    --glass-blur-radius: 14px;
+  }
+}
+
+/* Root Landing Surface */
+.fla-daylight-root {
+  color-scheme: light only;
+  position: relative;
+  min-height: 100svh;
+  background-color: var(--bg-base);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Display Typography */
+.fla-display-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.65rem, 5.4vw + 0.95rem, 5.35rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+  color: var(--ink);
+  font-optical-sizing: auto;
+}
+
+.fla-display-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.4vw + 0.8rem, 3.35rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  color: var(--ink);
+  font-optical-sizing: auto;
+}
+
+.fla-display-h3 {
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 1.6vw + 0.7rem, 1.75rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+/* Generous Vertical Section Rhythm */
+.fla-section {
+  position: relative;
+  padding-block: clamp(4.75rem, 9vw, 8.5rem);
+}
+
+.fla-container {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 3.5vw, 2rem);
+}
+
+/* Alternating Daylight Section Washes */
+.fla-wash-sky {
+  background: radial-gradient(ellipse 80% 60% at 18% 30%, rgba(191, 227, 255, 0.48), transparent 70%),
+              radial-gradient(ellipse 70% 55% at 85% 70%, rgba(228, 218, 255, 0.42), transparent 72%);
+}
+
+.fla-wash-peach {
+  background: linear-gradient(180deg, rgba(244, 241, 236, 0.72) 0%, rgba(251, 248, 243, 0.4) 100%),
+              radial-gradient(ellipse 75% 58% at 80% 28%, rgba(255, 217, 199, 0.50), transparent 70%),
+              radial-gradient(ellipse 65% 55% at 15% 75%, rgba(191, 227, 255, 0.36), transparent 70%);
+}
+
+.fla-wash-mint {
+  background: radial-gradient(ellipse 75% 60% at 22% 40%, rgba(207, 243, 227, 0.52), transparent 70%),
+              radial-gradient(ellipse 70% 55% at 82% 65%, rgba(191, 227, 255, 0.40), transparent 70%);
+}
+
+.fla-wash-lilac {
+  background: linear-gradient(180deg, rgba(244, 241, 236, 0.68) 0%, rgba(251, 248, 243, 0.5) 100%),
+              radial-gradient(ellipse 75% 58% at 75% 32%, rgba(228, 218, 255, 0.50), transparent 70%),
+              radial-gradient(ellipse 65% 55% at 20% 72%, rgba(255, 217, 199, 0.38), transparent 70%);
+}
+
+/* True Frosted Glass Recipe (.glass & .glass--strong) */
+.glass {
+  background: var(--glass-fill);
+  backdrop-filter: blur(var(--glass-blur-radius)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur-radius)) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.glass--strong {
+  background: var(--glass-fill-strong);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(16px) saturate(155%);
+  -webkit-backdrop-filter: blur(16px) saturate(155%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 10px rgba(31, 35, 40, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass {
+    background: rgba(255, 255, 255, 0.88);
+  }
+  .glass--strong {
+    background: rgba(255, 255, 255, 0.94);
+  }
+}
+
+/* Subtle Anti-Banding SVG Noise Overlay (0.03 opacity) */
+.fla-noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+/* Tilt Card Specular Glare Layer (driven by --mx, --my CSS vars) */
+.fla-tilt-card {
+  position: relative;
+  overflow: hidden;
+  transform-style: preserve-3d;
+}
+
+.fla-tilt-glare {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: var(--glare-opacity, 0);
+  transition: opacity 0.25s ease;
+  background: radial-gradient(
+    360px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.72),
+    rgba(255, 255, 255, 0.16) 42%,
+    transparent 72%
+  );
+}
+
+/* Visible Accessible Focus Rings (2px --brand + 2px white offset) */
+.fla-daylight-root :focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px var(--brand);
+}
+
+/* Primary Saturated Brand Button (White on #0B5CAB = 6.72:1 contrast) */
+.fla-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  background-color: var(--brand);
+  color: #FFFFFF;
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 0.875rem 1.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 8px 22px rgba(11, 92, 171, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 180ms ease;
+}
+
+.fla-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  color: var(--ink);
+  font-weight: 600;
+  border-radius: 9999px;
+  padding: 0.875rem 1.5rem;
+  border: 1px solid rgba(31, 35, 40, 0.12);
+  box-shadow: 0 4px 14px rgba(31, 35, 40, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+              transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Mobile-Native Rule: Gate :hover behind (hover: hover) and (pointer: fine) */
+@media (hover: hover) and (pointer: fine) {
+  .fla-btn-primary:hover {
+    background-color: var(--brand-hover);
+    box-shadow: 0 12px 28px rgba(11, 92, 171, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+  .fla-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(11, 92, 171, 0.28);
+  }
+  .fla-nav-link:hover {
+    color: var(--brand);
+    background: rgba(255, 255, 255, 0.65);
+  }
+}
+
+/* Mobile-Native Rule: Immediate press feedback on :active */
+.fla-btn-primary:active,
+.fla-btn-secondary:active,
+.fla-chip:active {
+  transform: scale(0.97);
+}
+
+/* Mobile-Native Rule: >=16px inputs prevent iOS auto-zoom */
+.fla-input {
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(31, 35, 40, 0.15);
+  border-radius: 16px;
+  padding: 0.8rem 1rem;
+  width: 100%;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.fla-input::placeholder {
+  color: #6E7681;
+}
+
+.fla-input:focus {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--brand);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+/* Marquee Infinite Track + Edge Masks */
+.fla-marquee-mask {
+  mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 10%, #000 90%, transparent 100%);
+}
+
+@keyframes flaMarqueeScroll {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.fla-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: flaMarqueeScroll 34s linear infinite;
+}
+
+.fla-marquee-mask:focus-within .fla-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .fla-marquee-mask:hover .fla-marquee-track {
+    animation-play-state: paused;
+  }
+}
+
+/* Accessible FAQ Accordion via grid-template-rows */
+.fla-accordion-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fla-accordion-panel[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.fla-accordion-inner {
+  overflow: hidden;
+}
+
+/* Tabular Numerals for Counters & Progress */
+.fla-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Safe-Area Aware Sticky Elements */
+.fla-safe-top {
+  padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+}
+
+.fla-safe-bottom {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+  .fla-marquee-track {
+    animation: none !important;
+  }
+  .fla-accordion-panel {
+    transition: none !important;
+  }
+}

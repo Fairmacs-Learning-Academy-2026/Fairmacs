@@ -448,7 +448,7 @@ export default function ProfilePage() {
                     onChange={(e) => setPersonalForm({ ...personalForm, personalEmail: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                     placeholder="e.g. employee@gmail.com"
-                  />
+                   autoCapitalize="none" autoCorrect="off" inputMode="email" />
                 </div>
 
                 <div>
@@ -461,7 +461,7 @@ export default function ProfilePage() {
                     onChange={(e) => setPersonalForm({ ...personalForm, mobileNumber: e.target.value })}
                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                     placeholder="+91 98765 43210"
-                  />
+                   inputMode="tel" />
                 </div>
 
                 <div>
@@ -1036,7 +1036,7 @@ export default function ProfilePage() {
                   onChange={(e) => setEmergencyForm({ ...emergencyForm, primaryPhone: e.target.value })}
                   placeholder="+91 98765 43210"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
-                />
+                 inputMode="tel" />
               </div>
 
               <div>
@@ -1047,7 +1047,7 @@ export default function ProfilePage() {
                   onChange={(e) => setEmergencyForm({ ...emergencyForm, secondaryPhone: e.target.value })}
                   placeholder="+91 98765 43211"
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
-                />
+                 inputMode="tel" />
               </div>
 
               <label className="flex items-center gap-2 cursor-pointer pt-1">

@@ -555,7 +555,7 @@ export default function CourseCatalog({
                 borderRadius: '10px',
                 fontSize: '0.9rem'
               }}
-            />
+             enterKeyHint="search" />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>

@@ -370,7 +370,7 @@ export default function PolicyPdfViewerModal({
       className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-2 sm:p-4 overflow-hidden animate-in fade-in duration-200"
       style={{ zIndex: 99999 }}
     >
-      <div className="bg-white dark:bg-slate-900 w-full max-w-6xl h-[92vh] max-h-[92vh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 relative z-10">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-6xl h-[92dvh] max-h-[92dvh] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 relative z-10">
         
         {/* ========================================================= */}
         {/* 1. COMPREHENSIVE HEADER & METADATA BAR                     */}

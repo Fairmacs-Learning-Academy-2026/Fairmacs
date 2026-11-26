@@ -171,14 +171,14 @@ export default function LearningStreaks() {
         aria-busy="true"
         aria-label="Loading learning streaks"
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <div className="skeleton-shimmer" style={{ width: '220px', height: '24px', borderRadius: '8px' }} />
-          <div style={{ display: 'flex', gap: '0.65rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem', marginBottom: '1.25rem' }}>
+          <div className="skeleton-shimmer" style={{ width: '220px', maxWidth: '100%', height: '24px', borderRadius: '8px' }} />
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
             <div className="skeleton-shimmer" style={{ width: '110px', height: '32px', borderRadius: '16px' }} />
             <div className="skeleton-shimmer" style={{ width: '100px', height: '32px', borderRadius: '16px' }} />
           </div>
         </div>
-        <div className="learning-streaks-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 320px) 1fr', gap: '1.5rem' }}>
+        <div className="learning-streaks-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(270px, 320px) minmax(0, 1fr)', gap: '1.5rem' }}>
           <div className="skeleton-shimmer" style={{ height: '190px', borderRadius: '18px' }} />
           <div className="skeleton-shimmer" style={{ height: '190px', borderRadius: '18px' }} />
         </div>

@@ -497,7 +497,7 @@ export default function NotificationsPage() {
                 fontSize: '0.82rem',
                 background: 'rgba(255,255,255,0.9)'
               }}
-            />
+             enterKeyHint="search" />
           </div>
 
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>

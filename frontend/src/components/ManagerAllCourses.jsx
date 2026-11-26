@@ -85,7 +85,7 @@ export default function ManagerAllCourses() {
     </div>
 
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-      <div style={{ flex: '1 1 260px', position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8' }} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search course title or ID…" style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 9, padding: '10px 12px 10px 38px', background: '#fff', fontSize: 13 }} /></div>
+      <div style={{ flex: '1 1 260px', position: 'relative' }}><Search size={17} style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8' }} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search course title or ID…" style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 9, padding: '10px 12px 10px 38px', background: '#fff', fontSize: 13 }}  enterKeyHint="search" /></div>
       <select value={position} onChange={e => setPosition(e.target.value)} style={selectStyle} aria-label="Filter by position"><option value="ALL">All positions</option>{['P0','P1','P2','P3','P4'].map(v => <option key={v}>{v}</option>)}</select>
       <select value={trainingType} onChange={e => setTrainingType(e.target.value)} style={selectStyle} aria-label="Filter by assignment type"><option value="ALL">All assignment types</option><option value="MANDATORY">Mandatory</option><option value="RECOMMENDED">Recommended</option></select>
     </div>

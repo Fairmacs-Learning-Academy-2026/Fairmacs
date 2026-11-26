@@ -3,9 +3,16 @@ import { useLocation } from 'react-router-dom';
 import { applyDocumentMeta } from '../utils/pageMeta';
 import { trackPageView } from '../utils/analytics';
 
+const PUBLIC_ALABASTER_PATHS = new Set([
+  '/',
+  '/privacy-policy',
+  '/terms',
+  '/thank-you',
+]);
+
 /**
  * Automatically updates document.title, meta description, Open Graph tags,
- * and records SPA pageviews on every route navigation.
+ * mobile status-bar theme-color, and SPA pageviews on every route navigation.
  */
 export default function PageTitleManager() {
   const location = useLocation();
@@ -22,6 +29,18 @@ export default function PageTitleManager() {
       courseTitle: stateCourseTitle,
       courseDescription: stateCourseDescription,
     });
+
+    if (typeof document !== 'undefined') {
+      const topSurfaceColor = PUBLIC_ALABASTER_PATHS.has(location.pathname)
+        ? '#FBF8F3'
+        : location.pathname === '/login'
+        ? '#FAFBFC'
+        : '#F2F7FC';
+      const themeMetas = document.querySelectorAll('meta[name="theme-color"]');
+      themeMetas.forEach((meta) => {
+        meta.setAttribute('content', topSurfaceColor);
+      });
+    }
 
     trackPageView(
       location.pathname,

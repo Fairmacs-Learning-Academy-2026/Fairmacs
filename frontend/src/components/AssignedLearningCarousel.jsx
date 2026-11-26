@@ -190,6 +190,9 @@ export default function AssignedLearningCarousel({
   ]);
 
   const handleMouseEnter = () => {
+    if (typeof window !== 'undefined' && !window.matchMedia?.('(hover: hover) and (pointer: fine)').matches) {
+      return;
+    }
     setIsHovered(true);
   };
 
@@ -305,6 +308,7 @@ export default function AssignedLearningCarousel({
       {/* CAROUSEL TRACK VIEWPORT */}
       <div
         className="carousel-track-viewport cinematic-track-viewport"
+        style={{ touchAction: 'pan-y' }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

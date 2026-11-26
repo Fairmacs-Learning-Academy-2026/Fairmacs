@@ -689,7 +689,7 @@ export default function PolicyManagerReportsTab({
                     setEmpPage(1);
                   }}
                   className="w-full h-8 pl-8 pr-3 text-xs border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                />
+                 enterKeyHint="search" />
               </div>
 
               <select

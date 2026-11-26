@@ -174,7 +174,7 @@ export default function PolicyPublishModal({
       }}
     >
       <div
-        className="bg-white dark:bg-slate-900 w-full max-w-3xl max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 relative z-10"
+        className="bg-white dark:bg-slate-900 w-full max-w-3xl max-h-[92dvh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 relative z-10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -350,7 +350,7 @@ export default function PolicyPublishModal({
                         onChange={(e) => setEmpSearch(e.target.value)}
                         placeholder="Search eligible employees by name, ID or department..."
                         className="w-full pl-9 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                      />
+                       enterKeyHint="search" />
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button

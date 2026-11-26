@@ -233,7 +233,7 @@ export default function PolicyApprovalTab({
           }}
         >
           <div
-            className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh] z-10"
+            className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90dvh] z-10"
             onClick={(e) => e.stopPropagation()}
           >
             <div
