@@ -21,11 +21,11 @@ export default function EducationalOrgJsonLd() {
     email: SITE_CONTENT.contact.email,
     address: {
       '@type': 'PostalAddress',
-      streetAddress: 'New No. 31, Old No. 14, Moore Street, George Town',
-      addressLocality: 'Chennai',
+      streetAddress: 'No.4/244, 1st street Noombal road, Sri Devi nagar, Kattupakkam',
+      addressLocality: 'Poonamallee, Chennai',
       addressRegion: 'Tamil Nadu',
-      postalCode: '600001',
-      addressCountry: 'IN',
+      postalCode: '600077',
+      addressCountry: 'INDIA',
     },
   };
 

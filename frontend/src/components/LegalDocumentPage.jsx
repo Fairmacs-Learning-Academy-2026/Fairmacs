@@ -167,7 +167,7 @@ export default function LegalDocumentPage({ type = 'privacy' }) {
             <div className="flex items-start gap-2.5">
               <MapPin size={16} className="mt-0.5 shrink-0 text-[#0B5CAB]" aria-hidden="true" />
               <span>
-                New No. 31, Old No. 14, Moore Street, George Town, Chennai – 600 001, Tamil Nadu, India
+                 No.4/244, 1st street Noombal road, Sri Devi nagar, Kattupakkam, Poonamallee, Goparasanallur, Tamil Nadu - 600077.
               </span>
             </div>
             <div className="flex items-center gap-2.5">

@@ -24,10 +24,10 @@ export const SITE_CONTENT = {
   },
 
   contact: {
-    addressLine1: 'New No. 31, Old No. 14, Moore Street',
-    addressLine2: 'George Town, Chennai – 600 001, Tamil Nadu, India',
+    addressLine1: 'No.4/244, 1st street Noombal road, Sri Devi nagar, Kattupakkam',
+    addressLine2: 'Poonamallee, Chennai, Tamil Nadu - 600077, India',
     fullAddress:
-      'New No. 31, Old No. 14, Moore Street, George Town, Chennai – 600 001, Tamil Nadu, India',
+      ' No.4/244, 1st street Noombal road, Sri Devi nagar, Kattupakkam, Poonamallee, Goparasanallur, Tamil Nadu 600077',
     email: 'hr-training@fairmacs.com',
     phone: '',
     whatsappUrl: '',

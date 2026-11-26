@@ -145,7 +145,7 @@ export default function FooterNavigation({
         </p>
         <address className="fairmacs-footer-contact-address">
           <span>Fairmacs Shipping &amp; Transport Services Pvt. Ltd.</span>
-          <span>New No. 31, Old No. 14, Moore Street, George Town, Chennai – 600 001, Tamil Nadu, India</span>
+          <span>No.4/244, 1st street Noombal road, Sri Devi nagar, Kattupakkam, Poonamallee, Goparasanallur, Tamil Nadu 600077</span>
           <a href="mailto:hr-training@fairmacs.com" className="fairmacs-footer-contact-email">
             hr-training@fairmacs.com
           </a>
