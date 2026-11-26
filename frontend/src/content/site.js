@@ -56,11 +56,6 @@ export const SITE_CONTENT = {
       'Tamper-Evident Cert IDs',
       'Self-Paced + Live Cohorts',
     ],
-    floatingChips: [
-      { id: 'chip-live', label: 'Live trainer doubt-clearing', sub: 'Calendar-synced cohorts' },
-      { id: 'chip-cert', label: 'Verifiable PDF credentials', sub: 'FM-CERT registry' },
-      { id: 'chip-sop', label: 'Watermarked SOP library', sub: 'Zoho WorkDrive cloud' },
-    ],
   },
 
   divisions: [
@@ -474,7 +469,7 @@ export const SITE_CONTENT = {
       stepNumber: '03',
       title: 'Server-Verified Assessments',
       description:
-        'Validate practical decision-making through timed, scenario-driven quizzes graded authoritatively on the backend—plus live trainer doubt-clearing.',
+        'Validate practical decision-making through timed, scenario-driven quizzes graded authoritatively on the backend—plus   .',
       detailBadge: 'Scenario-Based Mastery',
     },
     {
