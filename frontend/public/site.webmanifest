@@ -1,7 +1,7 @@
 {
   "name": "Fairmacs Learning Academy",
-  "short_name": "Fairmacs Academy",
-  "description": "Central enterprise learning, compliance policies, and professional development across Fairmacs.",
+  "short_name": "Fairmacs",
+  "description": "Central enterprise learning and professional development across Fairmacs.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#06111f",
