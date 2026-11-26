@@ -42,7 +42,6 @@ export const SITE_CONTENT = {
   ],
 
   hero: {
-    eyebrow: 'Fairmacs Learning Academy · Maritime, Freight & Enterprise Mastery',
     headlineLines: [
       ['Ship', 'smarter'],
       ['decisions', 'across'],
