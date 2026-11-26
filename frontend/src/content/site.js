@@ -42,6 +42,11 @@ export const SITE_CONTENT = {
   ],
 
   hero: {
+    eyebrow: 'Enterprise Learning for Global Logistics Teams',
+    floatingChips: [
+      { label: 'Role-mapped learning paths' },
+      { label: 'Verifiable certificates' },
+    ],
     headlineLines: [
       ['Ship', 'smarter'],
       ['decisions', 'across'],
