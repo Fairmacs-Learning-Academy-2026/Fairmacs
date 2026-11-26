@@ -127,18 +127,16 @@ export default function LegalDocumentPage({ type = 'privacy' }) {
           <button
             type="button"
             onClick={() => navigate('/privacy-policy')}
-            className={`rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition ${
-              isPrivacy ? 'bg-[#0B5CAB] text-white shadow-sm' : 'text-[#4A5058] hover:text-[#1F2328]'
-            }`}
+            className={`rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition ${isPrivacy ? 'bg-[#0B5CAB] text-white shadow-sm' : 'text-[#4A5058] hover:text-[#1F2328]'
+              }`}
           >
             Privacy Policy
           </button>
           <button
             type="button"
             onClick={() => navigate('/terms')}
-            className={`rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition ${
-              !isPrivacy ? 'bg-[#0B5CAB] text-white shadow-sm' : 'text-[#4A5058] hover:text-[#1F2328]'
-            }`}
+            className={`rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition ${!isPrivacy ? 'bg-[#0B5CAB] text-white shadow-sm' : 'text-[#4A5058] hover:text-[#1F2328]'
+              }`}
           >
             Terms of Use
           </button>
@@ -167,16 +165,16 @@ export default function LegalDocumentPage({ type = 'privacy' }) {
             <div className="flex items-start gap-2.5">
               <MapPin size={16} className="mt-0.5 shrink-0 text-[#0B5CAB]" aria-hidden="true" />
               <span>
-                 No.4/244, 1st street Noombal road, Sri Devi nagar, Kattupakkam, Poonamallee, Goparasanallur, Tamil Nadu - 600077.
+                No.4/244, 1st street Noombal road, Sri Devi nagar, Kattupakkam, Poonamallee, Goparasanallur, Tamil Nadu - 600077.
               </span>
             </div>
             <div className="flex items-center gap-2.5">
               <Mail size={16} className="shrink-0 text-[#0B5CAB]" aria-hidden="true" />
               <a
-                href="mailto:hr-training@fairmacs.com"
+                href="mailto:fla@fairmacs.com"
                 className="font-semibold text-[#0B5CAB] underline underline-offset-4"
               >
-                hr-training@fairmacs.com
+                fla@fairmacs.com
               </a>
             </div>
           </div>

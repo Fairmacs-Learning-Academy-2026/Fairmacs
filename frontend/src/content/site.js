@@ -28,7 +28,7 @@ export const SITE_CONTENT = {
     addressLine2: 'Poonamallee, Chennai, Tamil Nadu - 600077, India',
     fullAddress:
       ' No.4/244, 1st street Noombal road, Sri Devi nagar, Kattupakkam, Poonamallee, Goparasanallur, Tamil Nadu 600077',
-    email: 'hr-training@fairmacs.com',
+    email: 'fla@fairmacs.com',
     phone: '',
     whatsappUrl: '',
     linkedinUrl: '',
@@ -636,7 +636,7 @@ export const SITE_CONTENT = {
       id: 'faq-tracks',
       question: 'Can department managers request a custom training cohort or new SOP module?',
       answer:
-        'Yes. Department heads and trainers can submit a cohort or curriculum request using the enquiry form below (or contact hr-training@fairmacs.com), and HR Admins can assign courses by department, role group, or individual.',
+        'Yes. Department heads and trainers can submit a cohort or curriculum request using the enquiry form below (or contact fla@fairmacs.com), and HR Admins can assign courses by department, role group, or individual.',
     },
     {
       id: 'faq-certs',
@@ -654,7 +654,7 @@ export const SITE_CONTENT = {
       id: 'faq-support',
       question: 'Who should I contact if I need a password reset or enrolment help?',
       answer:
-        'Use the Forgot Password guide on the Sign In screen or email the Fairmacs HR & Learning Administration team at hr-training@fairmacs.com.',
+        'Use the Forgot Password guide on the Sign In screen or email the Fairmacs HR & Learning Administration team at fla@fairmacs.com.',
     },
   ],
 };

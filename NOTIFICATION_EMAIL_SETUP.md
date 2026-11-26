@@ -66,7 +66,7 @@ Before enabling email in production:
 | `NOTIFICATION_EMAIL_PROVIDER` | `ZEPTOMAIL` | Email provider mode (`ZEPTOMAIL`) |
 | `NOTIFICATION_EMAIL_FROM` | `no-reply@fairmacs.com` | Verified sender email address |
 | `NOTIFICATION_EMAIL_FROM_NAME` | `Fairmacs Learning Hub` | Sender display name |
-| `NOTIFICATION_EMAIL_REPLY_TO` | `hr-training@fairmacs.com` | Reply-to address for employee questions |
+| `NOTIFICATION_EMAIL_REPLY_TO` | `fla@fairmacs.com` | Reply-to address for employee questions |
 | `NOTIFICATION_EMAIL_MAX_RETRIES` | `3` | Maximum delivery attempts per notification |
 | `ZEPTOMAIL_API_URL` | `https://api.zeptomail.in/v1.1/email` | Regional ZeptoMail endpoint (`.in`, `.com`, `.eu`) |
 | `ZEPTOMAIL_SEND_TOKEN` | *(empty)* | Zoho ZeptoMail Send Mail Token (never commit to Git) |
@@ -102,7 +102,7 @@ Before enabling email in production:
    - `ZEPTOMAIL_SEND_TOKEN` = `Zoho-enczapikey <your-production-token>`
    - `NOTIFICATION_EMAIL_FROM` = `no-reply@fairmacs.com`
    - `NOTIFICATION_EMAIL_FROM_NAME` = `Fairmacs Learning Hub`
-   - `NOTIFICATION_EMAIL_REPLY_TO` = `hr-training@fairmacs.com`
+   - `NOTIFICATION_EMAIL_REPLY_TO` = `fla@fairmacs.com`
    - `NOTIFICATION_EMAIL_ENABLED` = `true`
 3. Save changes to trigger a redeploy.
 

@@ -24,8 +24,8 @@ public class NotificationEmailProperties {
     @Value("${app.notifications.email.from-name:Fairmacs Learning Academy}")
     private String fromName = "Fairmacs Learning Academy";
 
-    @Value("${app.notifications.email.reply-to:hr-training@fairmacs.com}")
-    private String replyTo = "hr-training@fairmacs.com";
+    @Value("${app.notifications.email.reply-to:fla@fairmacs.com}")
+    private String replyTo = "fla@fairmacs.com";
 
     @Value("${app.notifications.email.zeptomail.api-url:https://api.zeptomail.in/v1.1/email}")
     private String zeptoMailApiUrl = "https://api.zeptomail.in/v1.1/email";

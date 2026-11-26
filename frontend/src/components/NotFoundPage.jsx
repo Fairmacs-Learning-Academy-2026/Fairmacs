@@ -106,8 +106,8 @@ export default function NotFoundPage() {
 
       <footer className="relative z-10 mx-auto w-full max-w-5xl text-center text-xs text-[#4A5058]">
         © {new Date().getFullYear()} Fairmacs Shipping &amp; Transport Services Pvt. Ltd. · Need help?{' '}
-        <a href="mailto:hr-training@fairmacs.com" className="font-semibold text-[#0B5CAB] underline">
-          hr-training@fairmacs.com
+        <a href="mailto:fla@fairmacs.com" className="font-semibold text-[#0B5CAB] underline">
+          fla@fairmacs.com
         </a>
       </footer>
     </div>
