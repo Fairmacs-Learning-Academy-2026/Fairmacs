@@ -1,12 +1,14 @@
 
 package com.fairmacs.lms.integration.zoho;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.util.HtmlUtils;
 
 import java.util.Map;
@@ -27,14 +29,18 @@ public class ZohoOAuthController {
     @GetMapping({"/connect-url", "/auth-url"})
     @PreAuthorize("hasRole('HR_ADMIN')")
     public ResponseEntity<Map<String, String>> connectUrl(
-            @RequestParam(required = false) String origin) {
+            @RequestParam(required = false) String origin,
+            HttpServletRequest request) {
+        String derivedCallback = deriveCallbackUri(request);
+        String effectiveRedirectUri = zohoOAuthService.resolveEffectiveRedirectUri(derivedCallback);
         String authorizationUrl =
-                zohoOAuthService.createAuthorizationUrl(origin);
+                zohoOAuthService.createAuthorizationUrl(origin, derivedCallback);
 
         return ResponseEntity.ok(
                 Map.of(
                         "authorizationUrl", authorizationUrl,
-                        "url", authorizationUrl
+                        "url", authorizationUrl,
+                        "redirectUri", effectiveRedirectUri
                 )
         );
     }
@@ -50,7 +56,7 @@ public class ZohoOAuthController {
 
         if (error != null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(renderErrorHtml("Zoho authorization was declined: " + HtmlUtils.htmlEscape(error), dashboardUrl));
+                    .body(renderErrorHtml("Zoho authorization was declined: " + error, dashboardUrl));
         }
 
         if (code == null || code.isBlank()
@@ -64,22 +70,44 @@ public class ZohoOAuthController {
 
             return ResponseEntity.ok(renderSuccessHtml(dashboardUrl));
         } catch (Exception ex) {
+            String msg = ex.getMessage() != null ? ex.getMessage() : "Unknown error";
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(renderErrorHtml("Zoho authorization failed: " + HtmlUtils.htmlEscape(ex.getMessage()), dashboardUrl));
+                    .body(renderErrorHtml("Zoho authorization failed: " + msg, dashboardUrl));
         }
     }
 
     @GetMapping("/status")
     @PreAuthorize("hasRole('HR_ADMIN')")
-    public ResponseEntity<Map<String, Object>> status() {
+    public ResponseEntity<Map<String, Object>> status(HttpServletRequest request) {
+        String derivedCallback = deriveCallbackUri(request);
         return ResponseEntity.ok(
                 Map.of(
                         "connected", zohoOAuthService.isConnected(),
+                        "redirectUri", zohoOAuthService.resolveEffectiveRedirectUri(derivedCallback),
                         "message", zohoOAuthService.isConnected()
                                 ? "Zoho authorization completed in this running instance."
                                 : "Zoho WorkDrive is not connected."
                 )
         );
+    }
+
+    private String deriveCallbackUri(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            String baseUrl = ServletUriComponentsBuilder.fromRequestUri(request)
+                    .replacePath(null)
+                    .replaceQuery(null)
+                    .build()
+                    .toUriString();
+            if (baseUrl.startsWith("http://") && !baseUrl.contains("localhost") && !baseUrl.contains("127.0.0.1")) {
+                baseUrl = "https://" + baseUrl.substring("http://".length());
+            }
+            return baseUrl.replaceAll("/+$", "") + "/api/integrations/zoho/callback";
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private String resolveDashboardUrl(String origin) {
@@ -103,12 +131,12 @@ public class ZohoOAuthController {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Zoho WorkDrive Connected | Fairmacs KMS</title>
-                <meta http-equiv="refresh" content="3;url=%s">
+                <meta http-equiv="refresh" content="3;url={{DASHBOARD_URL}}">
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                        background: linear-gradient(135deg, #F8FAFC 0%%, #EFF6FF 100%%);
+                        background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);
                         min-height: 100vh;
                         display: flex;
                         align-items: center;
@@ -173,7 +201,7 @@ public class ZohoOAuthController {
                         align-items: center;
                         justify-content: center;
                         gap: 0.5rem;
-                        width: 100%%;
+                        width: 100%;
                         background: #0F6CBD;
                         color: #FFFFFF;
                         text-decoration: none;
@@ -211,7 +239,7 @@ public class ZohoOAuthController {
                     <div><span class="badge">Fairmacs KMS · Cloud Storage</span></div>
                     <h1>Zoho WorkDrive Connected</h1>
                     <p>Authorization succeeded! Your corporate Zoho WorkDrive integration is active and ready to stream documents.</p>
-                    <a href="%s" class="btn" id="returnBtn">
+                    <a href="{{DASHBOARD_URL}}" class="btn" id="returnBtn">
                         <span>Return to Dashboard</span>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -223,7 +251,7 @@ public class ZohoOAuthController {
                     </div>
                 </div>
                 <script>
-                    var targetUrl = "%s";
+                    var targetUrl = "{{DASHBOARD_URL}}";
                     var count = 3;
                     var timerSpan = document.getElementById("timer");
                     var timer = setInterval(function() {
@@ -237,7 +265,7 @@ public class ZohoOAuthController {
                 </script>
             </body>
             </html>
-            """.formatted(escapedUrl, escapedUrl, escapedUrl);
+            """.replace("{{DASHBOARD_URL}}", escapedUrl);
     }
 
     private String renderErrorHtml(String errorMessage, String dashboardUrl) {
@@ -254,7 +282,7 @@ public class ZohoOAuthController {
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                        background: linear-gradient(135deg, #F8FAFC 0%%, #FEF2F2 100%%);
+                        background: linear-gradient(135deg, #F8FAFC 0%, #FEF2F2 100%);
                         min-height: 100vh;
                         display: flex;
                         align-items: center;
@@ -268,7 +296,7 @@ public class ZohoOAuthController {
                         border-radius: 20px;
                         box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
                         max-width: 480px;
-                        width: 100%%;
+                        width: 100%;
                         padding: 2.75rem 2.25rem;
                         text-align: center;
                         animation: fadeIn 0.4s ease-out;
@@ -319,7 +347,7 @@ public class ZohoOAuthController {
                         align-items: center;
                         justify-content: center;
                         gap: 0.5rem;
-                        width: 100%%;
+                        width: 100%;
                         background: #0F6CBD;
                         color: #FFFFFF;
                         text-decoration: none;
@@ -349,13 +377,15 @@ public class ZohoOAuthController {
                     </div>
                     <div><span class="badge">Fairmacs KMS · Authorization Error</span></div>
                     <h1>Zoho Authorization Incomplete</h1>
-                    <p>%s</p>
-                    <a href="%s" class="btn">
+                    <p>{{ERROR_MESSAGE}}</p>
+                    <a href="{{DASHBOARD_URL}}" class="btn">
                         <span>Return to Dashboard</span>
                     </a>
                 </div>
             </body>
             </html>
-            """.formatted(escapedMsg, escapedUrl);
+            """
+                .replace("{{ERROR_MESSAGE}}", escapedMsg)
+                .replace("{{DASHBOARD_URL}}", escapedUrl);
     }
 }

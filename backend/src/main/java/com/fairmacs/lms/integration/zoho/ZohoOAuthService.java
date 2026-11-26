@@ -54,6 +54,8 @@ public class ZohoOAuthService {
             new ConcurrentHashMap<>();
     private final Map<String, String> stateFrontendOrigins =
             new ConcurrentHashMap<>();
+    private final Map<String, String> stateRedirectUris =
+            new ConcurrentHashMap<>();
 
     private volatile String accessToken;
     private volatile Instant accessTokenExpiresAt;
@@ -74,25 +76,31 @@ public class ZohoOAuthService {
     }
 
     public String createAuthorizationUrl() {
-        return createAuthorizationUrl(null);
+        return createAuthorizationUrl(null, null);
     }
 
     public String createAuthorizationUrl(String frontendOrigin) {
+        return createAuthorizationUrl(frontendOrigin, null);
+    }
+
+    public String createAuthorizationUrl(String frontendOrigin, String requestDerivedCallbackUri) {
         String state = UUID.randomUUID().toString();
         Instant expiry = Instant.now().plusSeconds(300);
         pendingStates.put(state, expiry);
         if (frontendOrigin != null && !frontendOrigin.isBlank()) {
             stateFrontendOrigins.put(state, frontendOrigin.trim());
         }
+        String effectiveRedirectUri = resolveEffectiveRedirectUri(requestDerivedCallbackUri);
+        stateRedirectUris.put(state, effectiveRedirectUri);
         saveOAuthState(state, expiry);
 
-        log.info("Generating Zoho OAuth authorization URL with redirect_uri: {}", redirectUri);
+        log.info("Generating Zoho OAuth authorization URL with redirect_uri: {}", effectiveRedirectUri);
 
         return UriComponentsBuilder
-                .fromUriString(accountsUrl + "/oauth/v2/auth")
-                .queryParam("client_id", clientId)
+                .fromUriString(accountsUrl.trim().replaceAll("/+$", "") + "/oauth/v2/auth")
+                .queryParam("client_id", clientId != null ? clientId.trim() : "")
                 .queryParam("response_type", "code")
-                .queryParam("redirect_uri", redirectUri)
+                .queryParam("redirect_uri", effectiveRedirectUri)
                 .queryParam(
                         "scope",
                         "WorkDrive.files.READ,WorkDrive.files.CREATE,ZohoFiles.files.READ")
@@ -103,6 +111,27 @@ public class ZohoOAuthService {
                 .build()
                 .encode()
                 .toUriString();
+    }
+
+    public String resolveEffectiveRedirectUri(String requestDerivedCallbackUri) {
+        String configured = redirectUri != null ? redirectUri.trim().replaceAll("/+$", "") : "";
+        String derived = requestDerivedCallbackUri != null ? requestDerivedCallbackUri.trim().replaceAll("/+$", "") : "";
+
+        if (configured.isEmpty()) {
+            return !derived.isEmpty()
+                    ? derived
+                    : "https://fairmacs-lms-api.onrender.com/api/integrations/zoho/callback";
+        }
+
+        boolean configuredIsLocal = configured.contains("localhost") || configured.contains("127.0.0.1");
+        boolean derivedIsLocal = derived.contains("localhost") || derived.contains("127.0.0.1");
+
+        // Auto-correct environment mismatch (e.g., Render env var left as localhost, or local dev using Render default)
+        if (!derived.isEmpty() && configuredIsLocal != derivedIsLocal) {
+            return derived;
+        }
+
+        return configured;
     }
 
     public String getFrontendOriginForState(String state) {
@@ -120,13 +149,18 @@ public class ZohoOAuthService {
                     "Invalid or expired Zoho OAuth state.");
         }
 
+        String effectiveRedirectUri = state != null ? stateRedirectUris.remove(state) : null;
+        if (effectiveRedirectUri == null || effectiveRedirectUri.isBlank()) {
+            effectiveRedirectUri = resolveEffectiveRedirectUri(null);
+        }
+
         MultiValueMap<String, String> form =
                 new LinkedMultiValueMap<>();
 
         form.add("grant_type", "authorization_code");
-        form.add("client_id", clientId);
-        form.add("client_secret", clientSecret);
-        form.add("redirect_uri", redirectUri);
+        form.add("client_id", clientId != null ? clientId.trim() : "");
+        form.add("client_secret", clientSecret != null ? clientSecret.trim() : "");
+        form.add("redirect_uri", effectiveRedirectUri);
         form.add("code", code);
 
         Map<?, ?> result = restTemplate.postForObject(
