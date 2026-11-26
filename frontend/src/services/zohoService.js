@@ -13,8 +13,13 @@ export const getZohoConnectUrl = async () => {
     throw new Error("Please log in to Fairmacs KMS first.");
   }
 
+  const originParam =
+    typeof window !== 'undefined' && window.location?.origin
+      ? `?origin=${encodeURIComponent(window.location.origin)}`
+      : '';
+
   const response = await fetch(
-    `${API_BASE_URL}/integrations/zoho/connect-url`,
+    `${API_BASE_URL}/integrations/zoho/connect-url${originParam}`,
     {
       method: "GET",
       headers: getAuthHeaders(),

@@ -13,9 +13,9 @@ spring.application.name=fairmacs-lms
 zoho.client-id=${ZOHO_CLIENT_ID:your_zoho_client_id}
 zoho.client-secret=${ZOHO_CLIENT_SECRET:your_zoho_client_secret}
 zoho.redirect-uri=${ZOHO_REDIRECT_URI:https://fairmacs-lms-api.onrender.com/api/integrations/zoho/callback}
-zoho.accounts-url=https://accounts.zoho.com
-zoho.api-base-url=https://www.zohoapis.com/workdrive
-zoho.download-base-url=https://download.zoho.com
+zoho.accounts-url=${ZOHO_ACCOUNTS_URL:https://accounts.zoho.com}
+zoho.api-base-url=${ZOHO_API_BASE_URL:https://www.zohoapis.com/workdrive}
+zoho.download-base-url=${ZOHO_DOWNLOAD_BASE_URL:https://download.zoho.com}
 zoho.course-documents-folder-id=${ZOHO_COURSE_DOCUMENTS_FOLDER_ID:your_zoho_folder_id}
 # Zoho WorkDrive Course Thumbnails Destination Folder
 # Web URL: https://workdrive.zoho.com/folder/k3kdv441a3f090a3d4cb183ee44f638c0daee

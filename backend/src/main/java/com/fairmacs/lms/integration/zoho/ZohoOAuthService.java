@@ -52,6 +52,8 @@ public class ZohoOAuthService {
 
     private final Map<String, Instant> pendingStates =
             new ConcurrentHashMap<>();
+    private final Map<String, String> stateFrontendOrigins =
+            new ConcurrentHashMap<>();
 
     private volatile String accessToken;
     private volatile Instant accessTokenExpiresAt;
@@ -72,10 +74,19 @@ public class ZohoOAuthService {
     }
 
     public String createAuthorizationUrl() {
+        return createAuthorizationUrl(null);
+    }
+
+    public String createAuthorizationUrl(String frontendOrigin) {
         String state = UUID.randomUUID().toString();
         Instant expiry = Instant.now().plusSeconds(300);
         pendingStates.put(state, expiry);
+        if (frontendOrigin != null && !frontendOrigin.isBlank()) {
+            stateFrontendOrigins.put(state, frontendOrigin.trim());
+        }
         saveOAuthState(state, expiry);
+
+        log.info("Generating Zoho OAuth authorization URL with redirect_uri: {}", redirectUri);
 
         return UriComponentsBuilder
                 .fromUriString(accountsUrl + "/oauth/v2/auth")
@@ -92,6 +103,13 @@ public class ZohoOAuthService {
                 .build()
                 .encode()
                 .toUriString();
+    }
+
+    public String getFrontendOriginForState(String state) {
+        if (state == null || state.isBlank()) {
+            return null;
+        }
+        return stateFrontendOrigins.remove(state);
     }
 
     public synchronized void exchangeCode(String code, String state) {
