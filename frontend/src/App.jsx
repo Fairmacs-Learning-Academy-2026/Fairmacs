@@ -54,6 +54,8 @@ import NotificationsPage from './components/NotificationsPage';
 import ProfilePage from './components/ProfilePage';
 import PasswordModal from './components/PasswordModal';
 import ErrorBoundary from './components/ErrorBoundary';
+import PageTitleManager from './components/PageTitleManager';
+import { resolvePageTitle } from './utils/pageMeta';
 
 
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -205,6 +207,13 @@ function MainApp() {
     return () => { cancelled = true; };
   }, [location.pathname]);
 
+
+  useEffect(() => {
+    const courseTitle = selectedCourse?.title || selectedCourse?.courseTitle;
+    if (courseTitle && /^\/courses\/[^/]+\/learn\/?$/i.test(location.pathname)) {
+      document.title = resolvePageTitle(location.pathname, { courseTitle });
+    }
+  }, [selectedCourse, location.pathname]);
 
   const [activeQuiz, setActiveQuiz] =
     useState(null);
@@ -1065,6 +1074,8 @@ export default function App() {
   return (
 
     <Router>
+
+      <PageTitleManager />
 
       <AuthProvider>
 

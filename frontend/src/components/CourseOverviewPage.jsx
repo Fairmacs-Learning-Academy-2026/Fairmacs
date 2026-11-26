@@ -97,6 +97,13 @@ export default function CourseOverviewPage({
 
   const [course, setCourse] = useState(initialCourseData);
   const [loading, setLoading] = useState(!initialCourseData);
+
+  useEffect(() => {
+    const title = course?.title || course?.courseTitle;
+    if (title && typeof document !== 'undefined') {
+      document.title = `${title} — Course Overview | Fairmacs KMS`;
+    }
+  }, [course?.title, course?.courseTitle]);
   const [error, setError] = useState('');
   const [completedLessonsMap, setCompletedLessonsMap] = useState({});
   const [expandedModules, setExpandedModules] = useState({});
