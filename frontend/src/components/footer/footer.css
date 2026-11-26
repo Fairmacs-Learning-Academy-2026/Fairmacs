@@ -802,6 +802,51 @@
   }
 }
 
+.fairmacs-footer-contact-address {
+  margin-top: 0.95rem;
+  font-style: normal;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: rgba(226, 238, 252, 0.68);
+}
+
+.fairmacs-footer-contact-email {
+  color: #93C5FD;
+  text-decoration: none;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.fairmacs-footer-contact-email:hover {
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
+.fairmacs-footer-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.fairmacs-footer-legal-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: rgba(226, 238, 252, 0.8);
+  font-size: inherit;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.fairmacs-footer-legal-link:hover {
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
 /* --------------------------------------------------------------------------
    8. ACCESSIBILITY: PREFERS REDUCED MOTION
    -------------------------------------------------------------------------- */

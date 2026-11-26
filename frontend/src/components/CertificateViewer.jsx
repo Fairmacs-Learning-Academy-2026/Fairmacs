@@ -94,7 +94,7 @@ export default function CertificateViewer({ certificate, onClose, verificationDa
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 700, fontSize: '0.95rem' }}>
             <Award style={{ width: 20, height: 20, color: '#38bdf8' }} />
-            <span>Fairmacs - KMS • {certId}</span>
+            <span>Fairmacs Learning Academy • {certId}</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

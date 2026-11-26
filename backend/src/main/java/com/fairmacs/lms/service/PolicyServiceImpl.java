@@ -1168,7 +1168,7 @@ public class PolicyServiceImpl implements PolicyService {
                 ? user.getEmployeeId().trim()
                 : (user != null && user.getId() != null) ? "EMP" + user.getId() : "EMP-001";
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
-        String watermarkText = "CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | " + employeeName + " | " + employeeId + " | Fairmacs KMS | " + timestamp;
+        String watermarkText = "CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | " + employeeName + " | " + employeeId + " | Fairmacs Learning Academy | " + timestamp;
 
         byte[] watermarkedBytes = policyWatermarkService.embedWatermark(doc.content(), watermarkText);
         DownloadedDocument watermarkedDoc = new DownloadedDocument(watermarkedBytes, doc.filename(), doc.contentType());

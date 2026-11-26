@@ -15,7 +15,7 @@ import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("Fairmacs KMS Policy & Course PDF Watermark Service Test Suite")
+@DisplayName("Fairmacs Learning Academy Policy & Course PDF Watermark Service Test Suite")
 public class PolicyWatermarkServiceTest {
 
     private final PolicyWatermarkService watermarkService = new PolicyWatermarkService();
@@ -50,7 +50,7 @@ public class PolicyWatermarkServiceTest {
         assertEquals(3, originalPages);
 
         // 2. Apply watermark for Employee 1
-        String watermarkText1 = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | Fairmacs KMS | 17/11/2026 12:45:00";
+        String watermarkText1 = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | Fairmacs Learning Academy | 17/11/2026 12:45:00";
         byte[] watermarkedBytes1 = watermarkService.embedWatermark(originalBytes, watermarkText1);
 
         assertNotNull(watermarkedBytes1);
@@ -67,7 +67,7 @@ public class PolicyWatermarkServiceTest {
         watermarkedReader.close();
 
         // 5. Watermark for Employee 2 (distinct employee watermark)
-        String watermarkText2 = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Karthik Subramanian | EMP2003 | Fairmacs KMS | 17/11/2026 12:45:05";
+        String watermarkText2 = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Karthik Subramanian | EMP2003 | Fairmacs Learning Academy | 17/11/2026 12:45:05";
         byte[] watermarkedBytes2 = watermarkService.embedWatermark(originalBytes, watermarkText2);
 
         assertNotEquals(computeSha256(watermarkedBytes1), computeSha256(watermarkedBytes2),
@@ -93,7 +93,7 @@ public class PolicyWatermarkServiceTest {
         byte[] originalBytes = originalOut.toByteArray();
         String originalHash = computeSha256(originalBytes);
 
-        String watermarkText = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | Fairmacs KMS | 17/11/2026 12:50:00";
+        String watermarkText = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | Fairmacs Learning Academy | 17/11/2026 12:50:00";
         byte[] watermarkedBytes = watermarkService.embedWatermark(originalBytes, watermarkText);
 
         assertNotNull(watermarkedBytes);
@@ -131,7 +131,7 @@ public class PolicyWatermarkServiceTest {
         byte[] originalBytes = originalOut.toByteArray();
         String originalHash = computeSha256(originalBytes);
 
-        String watermarkText = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Karthik Subramanian | EMP2003 | Fairmacs KMS | 17/11/2026 12:55:00";
+        String watermarkText = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Karthik Subramanian | EMP2003 | Fairmacs Learning Academy | 17/11/2026 12:55:00";
         byte[] watermarkedBytes = watermarkService.embedWatermark(originalBytes, watermarkText);
 
         assertNotNull(watermarkedBytes);
@@ -166,7 +166,7 @@ public class PolicyWatermarkServiceTest {
 
         byte[] originalBytes = originalOut.toByteArray();
 
-        String watermarkText = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | Fairmacs KMS | 17/11/2026 13:00:00";
+        String watermarkText = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | Fairmacs Learning Academy | 17/11/2026 13:00:00";
         byte[] watermarkedBytes = watermarkService.embedWatermark(originalBytes, watermarkText);
 
         assertNotNull(watermarkedBytes);

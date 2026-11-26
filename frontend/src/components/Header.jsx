@@ -417,7 +417,7 @@ export default function Header({
           className="brand-logo"
           onClick={onNavigateHome}
           style={{ cursor: 'pointer' }}
-          title="Fairmacs - KMS"
+          title="Fairmacs Learning Academy"
         >
           <FairmacsLogo variant="default" height={38} />
         </div>

@@ -500,7 +500,7 @@ export default function DepartmentCourseEmployees() {
                 </div>
 
                 <p className="mt-1 text-[14px] text-[#697d96]">
-                  Employee enrollment and progress from the KMS database.
+                  Employee enrollment and progress from the Fairmacs Learning Academy database.
                 </p>
               </div>
 

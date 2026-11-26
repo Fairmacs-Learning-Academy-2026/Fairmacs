@@ -71,7 +71,7 @@ assert(
   accessServiceCode.includes('generateWatermarkText') &&
   accessServiceCode.includes('CONFIDENTIAL') &&
   accessServiceCode.includes('PROPERTY OF FAIRMACS') &&
-  accessServiceCode.includes('FAIRMACS KMS'),
+  accessServiceCode.includes('FAIRMACS LEARNING ACADEMY'),
   'LessonDocumentAccessService formats watermark text with CONFIDENTIAL, PROPERTY OF FAIRMACS, employee name, ID, and timestamp'
 );
 
@@ -105,7 +105,7 @@ assert(
   courseViewerCode.includes('watermarkString') &&
   courseViewerCode.includes('CONFIDENTIAL') &&
   courseViewerCode.includes('PROPERTY OF FAIRMACS') &&
-  courseViewerCode.includes('FAIRMACS KMS'),
+  courseViewerCode.includes('FAIRMACS LEARNING ACADEMY'),
   'CourseViewer constructs robust fallback and live watermark string matching corporate specification'
 );
 

@@ -379,7 +379,7 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
     onOpenVerifiedCertificate(certPayload, {
       authentic: true,
       certificate: certPayload,
-      message: 'Certificate authenticity verified via KMS Registry.',
+      message: 'Certificate authenticity verified via Fairmacs Learning Academy Registry.',
     });
   };
 

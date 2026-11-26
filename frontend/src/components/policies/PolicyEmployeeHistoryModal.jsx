@@ -421,7 +421,7 @@ export default function PolicyEmployeeHistoryModal({
         {/* Fixed Footer */}
         <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            Fairmacs KMS Compliance & Acknowledgement Tracking Module
+            Fairmacs Learning Academy Compliance & Acknowledgement Tracking Module
           </div>
           <button
             type="button"

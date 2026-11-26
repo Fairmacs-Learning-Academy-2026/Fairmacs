@@ -616,7 +616,7 @@ export default function Sidebar({
         {/* Section 1: Header Area with Brand & Close Control */}
         <div className="sidebar-header-area">
           <div className="sidebar-brand-row sidebar-mobile-header">
-            <span className="sidebar-brand-title fairmacs-brand-wordmark">FAIRMACS KMS</span>
+            <span className="sidebar-brand-title fairmacs-brand-wordmark">FAIRMACS LEARNING ACADEMY</span>
             <button
               type="button"
               className="sidebar-close-btn"
@@ -793,12 +793,12 @@ export default function Sidebar({
                 scheduleRetract(0);
                 logout();
               }}
-              aria-label="Log out of Fairmacs KMS"
+              aria-label="Log out of Fairmacs Learning Academy"
               className="sidebar-logout-btn"
               onMouseEnter={(e) =>
                 showTooltip(e, {
                   id: 'logout',
-                  label: 'Log Out from KMS',
+                  label: 'Log Out from Academy',
                   onClick: () => {
                     scheduleRetract(0);
                     logout();
@@ -810,7 +810,7 @@ export default function Sidebar({
                 showTooltip(e, {
                   id: 'logout',
                   label: 'Log Out',
-                  sublabel: 'Log Out from KMS',
+                  sublabel: 'Log Out from Academy',
                   onClick: () => {
                     scheduleRetract(0);
                     logout();

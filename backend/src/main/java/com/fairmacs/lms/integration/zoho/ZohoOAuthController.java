@@ -130,7 +130,7 @@ public class ZohoOAuthController {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Zoho WorkDrive Connected | Fairmacs KMS</title>
+                <title>Zoho WorkDrive Connected | Fairmacs Learning Academy</title>
                 <meta http-equiv="refresh" content="3;url={{DASHBOARD_URL}}">
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -236,7 +236,7 @@ public class ZohoOAuthController {
                             <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
                     </div>
-                    <div><span class="badge">Fairmacs KMS · Cloud Storage</span></div>
+                    <div><span class="badge">Fairmacs Learning Academy · Cloud Storage</span></div>
                     <h1>Zoho WorkDrive Connected</h1>
                     <p>Authorization succeeded! Your corporate Zoho WorkDrive integration is active and ready to stream documents.</p>
                     <a href="{{DASHBOARD_URL}}" class="btn" id="returnBtn">
@@ -277,7 +277,7 @@ public class ZohoOAuthController {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Zoho WorkDrive Connection Issue | Fairmacs KMS</title>
+                <title>Zoho WorkDrive Connection Issue | Fairmacs Learning Academy</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
                     body {
@@ -375,7 +375,7 @@ public class ZohoOAuthController {
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
                     </div>
-                    <div><span class="badge">Fairmacs KMS · Authorization Error</span></div>
+                    <div><span class="badge">Fairmacs Learning Academy · Authorization Error</span></div>
                     <h1>Zoho Authorization Incomplete</h1>
                     <p>{{ERROR_MESSAGE}}</p>
                     <a href="{{DASHBOARD_URL}}" class="btn">

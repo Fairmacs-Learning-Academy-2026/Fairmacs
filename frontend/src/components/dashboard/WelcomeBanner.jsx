@@ -146,7 +146,7 @@ export default function WelcomeBanner({ onOpenNotifications }) {
 
             {/* Supporting Message */}
             <p className="welcome-banner-subtitle">
-              Welcome to Fairmacs KMS! Track your active courses, level up your skills, and own your growth.
+              Welcome to Fairmacs Learning Academy! Track your active courses, level up your skills, and own your growth.
             </p>
           </div>
         </div>

@@ -175,7 +175,7 @@ public class LessonDocumentAccessService {
 
     /**
      * Generates standard diagonal watermark text string:
-     * CONFIDENTIAL – PROPERTY OF FAIRMACS | Employee Name | Employee Code | FAIRMACS KMS | Date & Time
+     * CONFIDENTIAL – PROPERTY OF FAIRMACS | Employee Name | Employee Code | FAIRMACS LEARNING ACADEMY | Date & Time
      */
     public String generateWatermarkText(User user, LocalDateTime timestamp) {
         String employeeName = (user != null && user.getFullName() != null && !user.getFullName().isBlank())
@@ -191,7 +191,7 @@ public class LessonDocumentAccessService {
         String formattedTime = (timestamp != null ? timestamp : LocalDateTime.now())
                 .format(DateTimeFormatter.ofPattern("d MMM yyyy, hh:mm a", Locale.ENGLISH));
 
-        return "CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | " + employeeName + " | " + employeeCode + " | FAIRMACS KMS | " + formattedTime;
+        return "CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | " + employeeName + " | " + employeeCode + " | FAIRMACS LEARNING ACADEMY | " + formattedTime;
     }
 
     /**

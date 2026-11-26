@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { applyDocumentMeta } from '../utils/pageMeta';
 import {
   ArrowLeft,
   Compass,
@@ -101,9 +102,12 @@ export default function CourseOverviewPage({
   useEffect(() => {
     const title = course?.title || course?.courseTitle;
     if (title && typeof document !== 'undefined') {
-      document.title = `${title} — Course Overview | Fairmacs KMS`;
+      applyDocumentMeta(location.pathname, {
+        courseTitle: title,
+        courseDescription: course?.description || '',
+      });
     }
-  }, [course?.title, course?.courseTitle]);
+  }, [course?.title, course?.courseTitle, course?.description, location.pathname]);
   const [error, setError] = useState('');
   const [completedLessonsMap, setCompletedLessonsMap] = useState({});
   const [expandedModules, setExpandedModules] = useState({});

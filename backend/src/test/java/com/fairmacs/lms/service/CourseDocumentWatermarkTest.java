@@ -232,7 +232,7 @@ public class CourseDocumentWatermarkTest {
         assertTrue(wmText.contains("PROPERTY OF FAIRMACS"));
         assertTrue(wmText.contains("Priya Nair"));
         assertTrue(wmText.contains("EMP2002"));
-        assertTrue(wmText.contains("FAIRMACS KMS"));
+        assertTrue(wmText.contains("FAIRMACS LEARNING ACADEMY"));
     }
 
     @Test
@@ -241,13 +241,13 @@ public class CourseDocumentWatermarkTest {
         String wm1 = accessService.generateWatermarkText(employee1, LocalDateTime.of(2026, 11, 17, 11, 30));
         assertTrue(wm1.contains("Priya Nair"), "Watermark must contain Employee 1 name");
         assertTrue(wm1.contains("EMP2002"), "Watermark must contain Employee 1 ID");
-        assertTrue(wm1.contains("FAIRMACS KMS"));
+        assertTrue(wm1.contains("FAIRMACS LEARNING ACADEMY"));
         assertTrue(wm1.contains("17 Nov 2026, 11:30 AM"));
 
         String wm2 = accessService.generateWatermarkText(employee2, LocalDateTime.of(2026, 11, 17, 11, 30));
         assertTrue(wm2.contains("Karthik Subramanian"), "Watermark must contain Employee 2 name");
         assertTrue(wm2.contains("EMP2003"), "Watermark must contain Employee 2 ID");
-        assertTrue(wm2.contains("FAIRMACS KMS"));
+        assertTrue(wm2.contains("FAIRMACS LEARNING ACADEMY"));
     }
 
     @Test
@@ -395,7 +395,7 @@ public class CourseDocumentWatermarkTest {
         byte[] largePdfBytes = largeBaos.toByteArray();
         assertTrue(largePdfBytes.length > 0);
 
-        String wmText = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | FAIRMACS KMS | 17 Nov 2026, 11:30 AM";
+        String wmText = "CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | FAIRMACS LEARNING ACADEMY | 17 Nov 2026, 11:30 AM";
         byte[] watermarkedLarge = watermarkService.embedWatermark(largePdfBytes, wmText, 45.0f);
 
         assertNotNull(watermarkedLarge);

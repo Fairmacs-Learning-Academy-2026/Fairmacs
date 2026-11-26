@@ -16,7 +16,7 @@ export default function FooterCTA({
   const getCtaConfig = () => {
     if (isPublic) {
       return {
-        eyebrow: 'Fairmacs Knowledge Management System',
+        eyebrow: 'Fairmacs Learning Academy',
         heading: 'Empowering learning across every boundary.',
         buttonLabel: "Let's move possibilities forward",
         targetPath: '/login',
@@ -49,7 +49,7 @@ export default function FooterCTA({
       case 'EMPLOYEE':
       default:
         return {
-          eyebrow: 'Knowledge Management System',
+          eyebrow: 'Fairmacs Learning Academy',
           heading: 'Build capability and stay ahead every day.',
           buttonLabel: 'Continue your learning journey',
           targetPath: '/courses',

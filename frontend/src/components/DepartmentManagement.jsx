@@ -450,7 +450,7 @@ export default function DepartmentManagement() {
 
             >
 
-              Departments are loaded directly from the KMS database.
+              Departments are loaded directly from the Fairmacs Learning Academy database.
 
             </div>
 

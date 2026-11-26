@@ -82,7 +82,7 @@ export default function HrCertificatesPage({ onViewCertificate }) {
     onViewCertificate(certPayload, {
       authentic: true,
       certificate: certPayload,
-      message: 'Certificate authenticity verified via KMS Registry.',
+      message: 'Certificate authenticity verified via Fairmacs Learning Academy Registry.',
     });
   };
 

@@ -21,8 +21,8 @@ public class NotificationEmailProperties {
     @Value("${app.notifications.email.from-address:no-reply@fairmacs.com}")
     private String fromAddress = "no-reply@fairmacs.com";
 
-    @Value("${app.notifications.email.from-name:Fairmacs Learning Hub}")
-    private String fromName = "Fairmacs Learning Hub";
+    @Value("${app.notifications.email.from-name:Fairmacs Learning Academy}")
+    private String fromName = "Fairmacs Learning Academy";
 
     @Value("${app.notifications.email.reply-to:hr-training@fairmacs.com}")
     private String replyTo = "hr-training@fairmacs.com";

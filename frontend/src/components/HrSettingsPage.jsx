@@ -101,7 +101,7 @@ export default function HrSettingsPage() {
               </h3>
             </div>
             <p style={{ fontSize: '0.8125rem', color: '#64748B', lineHeight: 1.5, margin: '0 0 1rem 0' }}>
-              Fairmacs KMS connects to corporate Zoho WorkDrive for video lesson streaming, PDF guides, and course
+              Fairmacs Learning Academy connects to corporate Zoho WorkDrive for video lesson streaming, PDF guides, and course
               materials with persistent OAuth validation.
             </p>
             {zohoError && (

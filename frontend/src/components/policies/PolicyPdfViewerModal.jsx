@@ -87,9 +87,9 @@ export default function PolicyPdfViewerModal({
     return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
   }, []);
 
-  // Complete Unified Watermark String: CONFIDENTIAL – PROPERTY OF FAIRMACS | Name | EmployeeID | Fairmacs KMS | Timestamp
+  // Complete Unified Watermark String: CONFIDENTIAL – PROPERTY OF FAIRMACS | Name | EmployeeID | Fairmacs Learning Academy | Timestamp
   const watermarkString = useMemo(() => {
-    return `CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | ${employeeName} | ${employeeId} | Fairmacs KMS | ${localViewingTime}`;
+    return `CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | ${employeeName} | ${employeeId} | Fairmacs Learning Academy | ${localViewingTime}`;
   }, [employeeName, employeeId, localViewingTime]);
 
   // Unified SVG Watermark Tile Pattern

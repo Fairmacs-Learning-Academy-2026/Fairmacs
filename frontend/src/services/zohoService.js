@@ -10,7 +10,7 @@ export const getZohoConnectUrl = async () => {
   const token = getAuthToken();
 
   if (!token) {
-    throw new Error("Please log in to Fairmacs KMS first.");
+    throw new Error("Please log in to Fairmacs Learning Academy first.");
   }
 
   const originParam =

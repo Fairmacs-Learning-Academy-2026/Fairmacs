@@ -55,7 +55,11 @@ import ProfilePage from './components/ProfilePage';
 import PasswordModal from './components/PasswordModal';
 import ErrorBoundary from './components/ErrorBoundary';
 import PageTitleManager from './components/PageTitleManager';
-import { resolvePageTitle } from './utils/pageMeta';
+import NotFoundPage from './components/NotFoundPage';
+import LegalDocumentPage from './components/LegalDocumentPage';
+import ThankYouPage from './components/ThankYouPage';
+import CookieConsentBanner from './components/CookieConsentBanner';
+import { applyDocumentMeta } from './utils/pageMeta';
 
 
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -211,7 +215,10 @@ function MainApp() {
   useEffect(() => {
     const courseTitle = selectedCourse?.title || selectedCourse?.courseTitle;
     if (courseTitle && /^\/courses\/[^/]+\/learn\/?$/i.test(location.pathname)) {
-      document.title = resolvePageTitle(location.pathname, { courseTitle });
+      applyDocumentMeta(location.pathname, {
+        courseTitle,
+        courseDescription: selectedCourse?.description || '',
+      });
     }
   }, [selectedCourse, location.pathname]);
 
@@ -1104,6 +1111,21 @@ export default function App() {
             }
           />
 
+          <Route
+            path="/privacy-policy"
+            element={<LegalDocumentPage type="privacy" />}
+          />
+
+          <Route
+            path="/terms"
+            element={<LegalDocumentPage type="terms" />}
+          />
+
+          <Route
+            path="/thank-you"
+            element={<ThankYouPage />}
+          />
+
 
           {/* =================================================
               UNAUTHORIZED
@@ -1498,20 +1520,17 @@ export default function App() {
 
 
           {/* =================================================
-              UNKNOWN ROUTES
+              UNKNOWN ROUTES (CUSTOM 404 PAGE)
           ================================================= */}
 
           <Route
             path="*"
-            element={
-              <Navigate
-                to="/"
-                replace
-              />
-            }
+            element={<NotFoundPage />}
           />
 
         </Routes>
+
+        <CookieConsentBanner />
 
       </AuthProvider>
 

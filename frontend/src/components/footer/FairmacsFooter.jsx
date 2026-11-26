@@ -84,8 +84,26 @@ export default function FairmacsFooter({
           <FooterWordmark />
 
           <div className="fairmacs-footer-legal-bar">
-            <span>© {currentYear} Fairmacs. All Rights Reserved</span>
-            <span>Fairmacs Knowledge Management System</span>
+            <span>© {currentYear} Fairmacs Shipping &amp; Transport Services Pvt. Ltd. All Rights Reserved</span>
+            <div className="fairmacs-footer-legal-links">
+              <button
+                type="button"
+                className="fairmacs-footer-legal-link"
+                onClick={() => handleNavigate('/privacy-policy')}
+              >
+                Privacy Policy
+              </button>
+              <span aria-hidden="true">·</span>
+              <button
+                type="button"
+                className="fairmacs-footer-legal-link"
+                onClick={() => handleNavigate('/terms')}
+              >
+                Terms of Use
+              </button>
+              <span aria-hidden="true" className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline">Fairmacs Learning Academy</span>
+            </div>
           </div>
         </div>
       </div>

@@ -89,7 +89,7 @@ public class EmailTemplateRenderer {
                         <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%%;background:#FFFFFF;border-radius:16px;border:1px solid #DCEBFA;overflow:hidden;box-shadow:0 8px 24px rgba(16,42,67,0.08);">
                           <tr>
                             <td style="background:linear-gradient(135deg,#102A43,#1677FF);padding:24px 32px;color:#FFFFFF;">
-                              <div style="font-size:12px;letter-spacing:1.2px;text-transform:uppercase;opacity:0.85;font-weight:700;">Fairmacs Learning Hub</div>
+                              <div style="font-size:12px;letter-spacing:1.2px;text-transform:uppercase;opacity:0.85;font-weight:700;">Fairmacs Learning Academy</div>
                               <div style="font-size:20px;font-weight:700;margin-top:6px;">%s</div>
                             </td>
                           </tr>
@@ -139,7 +139,7 @@ public class EmailTemplateRenderer {
         );
 
         String text = """
-                Fairmacs Learning Hub — %s (%s)
+                Fairmacs Learning Academy — %s (%s)
                 ============================================================
                 Hello %s,
 

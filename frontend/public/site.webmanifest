@@ -1,0 +1,29 @@
+{
+  "name": "Fairmacs Learning Academy",
+  "short_name": "Fairmacs Academy",
+  "description": "Central enterprise learning, compliance policies, and professional development across Fairmacs.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06111f",
+  "theme_color": "#06111f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/fairmacs-logo-square.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/fairmacs-logo-square.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

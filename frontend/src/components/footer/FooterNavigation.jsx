@@ -10,7 +10,7 @@ const PUBLIC_EXPLORE_LINKS = [
 ];
 
 const PUBLIC_QUICK_LINKS = [
-  { label: 'Login to KMS', path: '/login' },
+  { label: 'Login to Academy', path: '/login' },
   { label: 'Learning Journey', sectionId: 'learning' },
   { label: 'Company Overview', sectionId: 'about' },
 ];
@@ -92,7 +92,7 @@ export default function FooterNavigation({
             <FairmacsEmblem size={26} fill="#1B365D" />
           </div>
           <div>
-            <div className="fairmacs-footer-brand-name fairmacs-brand-wordmark">FAIRMACS KMS</div>
+            <div className="fairmacs-footer-brand-name fairmacs-brand-wordmark">FAIRMACS LEARNING ACADEMY</div>
             <div className="fairmacs-footer-brand-sub fairmacs-brand-tagline">ACROSS ALL BOUNDARIES</div>
           </div>
           <span className="fairmacs-role-badge">
@@ -143,6 +143,13 @@ export default function FooterNavigation({
           A central learning and knowledge management platform connecting
           Fairmacs people, processes and business functions.
         </p>
+        <address className="fairmacs-footer-contact-address">
+          <span>Fairmacs Shipping &amp; Transport Services Pvt. Ltd.</span>
+          <span>New No. 31, Old No. 14, Moore Street, George Town, Chennai – 600 001, Tamil Nadu, India</span>
+          <a href="mailto:hr-training@fairmacs.com" className="fairmacs-footer-contact-email">
+            hr-training@fairmacs.com
+          </a>
+        </address>
       </div>
 
       {/* 2. Explore */}

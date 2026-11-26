@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 console.log('=============================================================================');
-console.log(' Fairmacs KMS PDF Watermark Text Clipping & Visibility Fix Verification');
+console.log(' Fairmacs Learning Academy PDF Watermark Text Clipping & Visibility Fix Verification');
 console.log('=============================================================================');
 
 let passed = 0;
@@ -46,7 +46,7 @@ assert(
   'watermarkUtil.js implements calculateRotatedBoundingBox using exact trigonometric rotated bounds'
 );
 
-const testWatermark = 'CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | FAIRMACS KMS | 17/11/2026, 11:30 AM';
+const testWatermark = 'CONFIDENTIAL – PROPERTY OF FAIRMACS | Priya Nair | EMP2002 | FAIRMACS LEARNING ACADEMY | 17/11/2026, 11:30 AM';
 const bounds = calculateRotatedBoundingBox(testWatermark.length, 11, 45);
 
 assert(
@@ -149,14 +149,14 @@ assert(
 assert(
   modalCode.includes('PROPERTY OF FAIRMACS') &&
   modalCode.includes('CONFIDENTIAL') &&
-  modalCode.includes('Fairmacs KMS'),
+  modalCode.includes('Fairmacs Learning Academy'),
   'PolicyPdfViewerModal preserves PROPERTY OF FAIRMACS, CONFIDENTIAL, employee name, ID, and timestamp'
 );
 
 assert(
   courseViewerCode.includes('PROPERTY OF FAIRMACS') &&
   courseViewerCode.includes('CONFIDENTIAL') &&
-  courseViewerCode.includes('FAIRMACS KMS'),
+  courseViewerCode.includes('FAIRMACS LEARNING ACADEMY'),
   'CourseViewer preserves corporate confidential watermark specification'
 );
 

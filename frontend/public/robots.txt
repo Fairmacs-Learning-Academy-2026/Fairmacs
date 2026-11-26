@@ -1,0 +1,27 @@
+# Fairmacs Learning Academy — Crawler Policy
+# Public corporate welcome & legal pages are indexable; authenticated employee workspaces are private.
+
+User-agent: *
+Allow: /$
+Allow: /login
+Allow: /privacy-policy
+Allow: /terms
+
+Disallow: /dashboard
+Disallow: /trainer
+Disallow: /manager
+Disallow: /admin
+Disallow: /hr
+Disallow: /courses
+Disallow: /progress
+Disallow: /training-calendar
+Disallow: /reports
+Disallow: /certificates
+Disallow: /notifications
+Disallow: /profile
+Disallow: /drafts
+Disallow: /unauthorized
+Disallow: /thank-you
+Disallow: /api/
+
+Sitemap: /sitemap.xml

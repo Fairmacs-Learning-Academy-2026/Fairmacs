@@ -43,7 +43,7 @@ assert(modalCode.includes('window.URL.revokeObjectURL'), 'PolicyPdfViewerModal r
 assert(modalCode.includes('useAuth'), 'PolicyPdfViewerModal uses authenticated AuthContext');
 assert(modalCode.includes('watermarkString') || modalCode.includes('CONFIDENTIAL'), 'PolicyPdfViewerModal constructs confidential watermark');
 assert(modalCode.includes('employeeName') && modalCode.includes('employeeId'), 'Watermark contains authenticated employee name and employee ID');
-assert(modalCode.includes('Fairmacs KMS'), 'Watermark contains Fairmacs KMS branding');
+assert(modalCode.includes('Fairmacs Learning Academy'), 'Watermark contains Fairmacs Learning Academy branding');
 assert(modalCode.includes('pointer-events-none'), 'Watermark overlay has pointer-events-none so it does not block navigation');
 assert(modalCode.includes('select-none'), 'Watermark overlay has select-none to prevent selection interference');
 assert(modalCode.includes('policy-pdf-page-watermark'), 'Watermark is implemented as a per-page overlay attached to each rendered page');

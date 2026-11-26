@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { resolvePageTitle } from '../utils/pageMeta';
+import { applyDocumentMeta } from '../utils/pageMeta';
+import { trackPageView } from '../utils/analytics';
 
 /**
- * Automatically updates document.title on every route change.
- * Dynamic pages (such as CourseOverviewPage and CourseViewer) refine the title
- * further once entity metadata finishes loading.
+ * Automatically updates document.title, meta description, Open Graph tags,
+ * and records SPA pageviews on every route navigation.
  */
 export default function PageTitleManager() {
   const location = useLocation();
@@ -15,9 +15,18 @@ export default function PageTitleManager() {
       location.state?.courseData?.title ||
       location.state?.courseData?.courseTitle ||
       '';
-    document.title = resolvePageTitle(location.pathname, {
+    const stateCourseDescription =
+      location.state?.courseData?.description || '';
+
+    applyDocumentMeta(location.pathname, {
       courseTitle: stateCourseTitle,
+      courseDescription: stateCourseDescription,
     });
+
+    trackPageView(
+      location.pathname,
+      typeof document !== 'undefined' ? document.title : ''
+    );
   }, [location.pathname, location.state]);
 
   return null;

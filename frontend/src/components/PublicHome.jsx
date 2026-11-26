@@ -17,6 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import FairmacsFooter from './footer/FairmacsFooter';
 import FairmacsEmblem from './FairmacsEmblem';
+import { trackEvent } from '../utils/analytics';
 
 const leadershipMessages = [
   {
@@ -63,6 +64,7 @@ export default function PublicHome() {
 
   const goToLogin = () => {
     setMobileMenu(false);
+    trackEvent('public_login_cta_click', { location: 'public_home' });
     navigate('/login');
   };
 
@@ -131,22 +133,24 @@ export default function PublicHome() {
               </button>
             </nav>
 
-            {/* Login */}
-            <button
-              onClick={goToLogin}
-              className="hidden sm:flex items-center gap-2 rounded-xl border border-blue-400/30 bg-blue-500/15 px-4 py-2.5 text-sm font-semibold text-blue-100 hover:bg-blue-500/25 transition"
-            >
-              <LogIn size={17} />
-              Login
-            </button>
+            {/* Sticky Login CTA + Mobile Menu */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToLogin}
+                className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-blue-400/30 bg-blue-600 sm:bg-blue-500/15 px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white sm:text-blue-100 hover:bg-blue-500 sm:hover:bg-blue-500/25 transition shadow-md sm:shadow-none"
+              >
+                <LogIn size={16} />
+                <span>Login</span>
+              </button>
 
-            {/* Mobile menu */}
-            <button
-              onClick={() => setMobileMenu(!mobileMenu)}
-              className="md:hidden rounded-lg p-2 hover:bg-white/10"
-            >
-              {mobileMenu ? <X size={21} /> : <Menu size={21} />}
-            </button>
+              <button
+                onClick={() => setMobileMenu(!mobileMenu)}
+                aria-label={mobileMenu ? 'Close navigation menu' : 'Open navigation menu'}
+                className="md:hidden rounded-lg p-2 hover:bg-white/10"
+              >
+                {mobileMenu ? <X size={21} /> : <Menu size={21} />}
+              </button>
+            </div>
           </div>
 
           {mobileMenu && (
@@ -201,7 +205,7 @@ export default function PublicHome() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-4 py-2 text-xs font-medium text-blue-200 mb-7">
                 <Sparkles size={14} />
-                Knowledge Management System
+                Fairmacs Learning Academy
               </div>
 
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight">
@@ -263,7 +267,7 @@ export default function PublicHome() {
                   <div className="flex items-center justify-between mb-8">
                     <div>
                       <div className="fairmacs-brand-wordmark text-sm text-slate-400">
-                        FAIRMACS KMS
+                        FAIRMACS LEARNING ACADEMY
                       </div>
                       <div className="mt-1 text-xl font-semibold">
                         Learning Hub
@@ -332,7 +336,7 @@ export default function PublicHome() {
             </h2>
 
             <p className="mt-6 text-lg leading-8 text-slate-400">
-              The Fairmacs KMS provides a central space for employees to
+              Fairmacs Learning Academy provides a central space for employees to
               access learning resources, understand business functions,
               develop professional capabilities and continue growing within
               the organisation.
@@ -518,7 +522,7 @@ export default function PublicHome() {
 
           <p className="mt-6 max-w-2xl mx-auto text-lg leading-8 text-slate-400">
             Access your courses, assessments and professional
-            development resources through the Fairmacs KMS.
+            development resources through Fairmacs Learning Academy.
           </p>
 
           <button
@@ -526,7 +530,7 @@ export default function PublicHome() {
             className="mt-9 inline-flex items-center gap-3 rounded-xl bg-blue-600 px-7 py-4 font-semibold hover:bg-blue-500 transition shadow-xl shadow-blue-900/20"
           >
             <LogIn size={18} />
-            Login to KMS
+            Login to Academy
             <ArrowRight size={18} />
           </button>
 

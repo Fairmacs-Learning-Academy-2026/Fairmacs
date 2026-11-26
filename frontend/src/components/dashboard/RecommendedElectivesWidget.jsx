@@ -156,7 +156,7 @@ export default function RecommendedElectivesWidget({
                     {thumbnail ? (
                       <img
                         src={thumbnail}
-                        alt=""
+                        alt={course.title ? `${course.title} course thumbnail` : 'Recommended course thumbnail'}
                         className="phase7-elective-banner-img"
                         loading="lazy"
                         onError={(e) => {

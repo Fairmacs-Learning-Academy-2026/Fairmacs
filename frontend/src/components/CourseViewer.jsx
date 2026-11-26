@@ -155,7 +155,7 @@ export default function CourseViewer({
       minute: '2-digit',
       hour12: true
     });
-    return `CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | ${empName} | ${empCode} | FAIRMACS KMS | ${timeStr}`;
+    return `CONFIDENTIAL \u2013 PROPERTY OF FAIRMACS | ${empName} | ${empCode} | FAIRMACS LEARNING ACADEMY | ${timeStr}`;
   }, [watermarkData, user]);
 
   const watermarkSvgUrl = useMemo(() => {
