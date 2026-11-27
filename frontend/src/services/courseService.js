@@ -157,7 +157,8 @@ export const courseService = {
     }
 
     try {
-
+      console.count('[learning dashboard] request');
+      console.trace('[learning dashboard] caller');
       const response = await fetch(
         `${API_BASE_URL}/learning/dashboard`,
         {

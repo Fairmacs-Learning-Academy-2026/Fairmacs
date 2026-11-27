@@ -236,14 +236,12 @@ export default function HrAdminDashboard({ onOpenVerifiedCertificate }) {
     loadAssignedCourses();
     fetchRecentCertificates(6);
 
-    const handleSync = () => {
+    // subscribeEnrollmentSync already handles same-tab and cross-tab enrollment updates.
+    const unsubscribe = subscribeEnrollmentSync(() => {
       loadAssignedCourses();
-    };
-    window.addEventListener('lms:enrollment-updated', handleSync);
-    const unsubscribe = subscribeEnrollmentSync(handleSync);
+    });
 
     return () => {
-      window.removeEventListener('lms:enrollment-updated', handleSync);
       unsubscribe();
     };
   }, [loadHrMetrics, loadAssignedCourses, fetchRecentCertificates]);
