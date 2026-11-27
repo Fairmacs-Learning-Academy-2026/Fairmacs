@@ -619,6 +619,11 @@ export default function Sidebar({
         onTouchEnd={handleDrawerTouchEnd}
         onTouchCancel={handleDrawerTouchEnd}
       >
+        {/* Visible Edge Peek Indicator (When sidebar is retracted) */}
+        {!isEmerged && !mobileOpen && (
+          <div className="sidebar-dock-peek-pill" aria-hidden="true" />
+        )}
+
         {/* Section 1: Header Area with Brand & Close Control */}
         <div className="sidebar-header-area">
           <div className="sidebar-brand-row sidebar-mobile-header">
