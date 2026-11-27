@@ -686,12 +686,15 @@ export default function QuizModal({
         >
           <div
             style={{
-              background: '#0f172a',
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              borderBottom: '1px solid rgba(226, 232, 240, 0.9)',
               padding: '1.25rem 1.5rem',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              color: 'white',
+              color: '#1F2328',
             }}
           >
             <div>
@@ -699,7 +702,7 @@ export default function QuizModal({
                 style={{
                   fontSize: '0.75rem',
                   fontWeight: 700,
-                  color: '#38bdf8',
+                  color: '#0B5CAB',
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                 }}
@@ -827,14 +830,18 @@ export default function QuizModal({
           style={{ maxWidth: '850px', padding: 0, overflow: 'hidden', maxHeight: '90dvh', overflowY: 'auto' }}
         >
           <div style={{
-            background: '#0f172a', padding: '1.25rem 1.5rem',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderBottom: '1px solid rgba(226, 232, 240, 0.9)',
+            padding: '1.25rem 1.5rem',
             display: 'flex', justifyContent: 'space-between',
-            alignItems: 'center', gap: '1rem', color: 'white',
+            alignItems: 'center', gap: '1rem', color: '#1F2328',
             position: 'sticky', top: 0, zIndex: 2
           }}>
             <div>
               <div style={{
-                fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8',
+                fontSize: '0.72rem', fontWeight: 800, color: '#0B5CAB',
                 textTransform: 'uppercase', letterSpacing: '1px'
               }}>
                 Read-only preview
@@ -842,7 +849,7 @@ export default function QuizModal({
               <h2 style={{ fontSize: '1.15rem', fontWeight: 800, margin: '0.25rem 0 0' }}>
                 {previewData?.title || quiz?.title || 'Quiz Preview'}
               </h2>
-              <p style={{ margin: '0.35rem 0 0', color: '#cbd5e1', fontSize: '0.8rem' }}>
+              <p style={{ margin: '0.35rem 0 0', color: '#656D76', fontSize: '0.8rem' }}>
                 {previewQuestions.length} questions · No attempt or learner progress will be changed
               </p>
             </div>
@@ -946,12 +953,15 @@ export default function QuizModal({
       >
         <div
           style={{
-            background: '#0f172a',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            borderBottom: '1px solid rgba(226, 232, 240, 0.9)',
             padding: '1.25rem 1.5rem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            color: 'white',
+            color: '#1F2328',
           }}
         >
           <div>
@@ -959,7 +969,7 @@ export default function QuizModal({
               style={{
                 fontSize: '0.75rem',
                 fontWeight: 700,
-                color: '#38bdf8',
+                color: '#0B5CAB',
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
               }}

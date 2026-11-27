@@ -593,11 +593,7 @@ function MainApp() {
     }
 
     if (location.pathname === '/hr/departments') {
-      return (
-        <div style={{ background: '#FFFFFF', borderRadius: '14px', border: '1px solid #E2E8F0', padding: 'clamp(0.85rem, 2.5vw, 1.5rem)', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' }}>
-          <DepartmentManagement />
-        </div>
-      );
+      return <DepartmentManagement />;
     }
 
     if (location.pathname === '/hr/courses') {
