@@ -16,15 +16,15 @@ export const PARTICLE_CONFIG = {
   dashLengthMin: 3.2,
   dashLengthMax: 7.5,
   dashWidthMin: 1.4,
-  dashWidthMax: 2.3,
+  dashWidthMax: 2.5,
 
   // Card Attenuation (keeps login card text crisp)
   cardMargin: 24.0,
   cardAlphaMultiplier: 0.45,
 
   // Organic Ambient Drift
-  driftAmplitude: 6.0,
-  driftSpeed: 0.65,
+  driftAmplitude: 8.0,
+  driftSpeed: 0.75,
 
   // Cursor Scatter / Repulsion Physics
   repulsionRadius: 155.0,

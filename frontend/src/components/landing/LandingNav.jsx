@@ -64,20 +64,15 @@ export default function LandingNav({ onLoginClick, onPrimaryCtaClick }) {
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' })}
-            className="flex items-center gap-2.5 text-left rounded-full pr-2"
-            aria-label="Fairmacs Learning Academy — Back to top"
+            className="flex items-center text-left rounded-full focus:outline-none"
+            aria-label="Fairmacs — Across All Boundaries"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm border border-white/90">
-              <FairmacsEmblem size={23} fill="#0B5CAB" />
-            </span>
-            <span className="leading-tight">
-              <span className="block text-sm sm:text-base font-bold tracking-tight text-[#1F2328]">
-                Fairmacs
-              </span>
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-[#4A5058]">
-                Learning Academy
-              </span>
-            </span>
+            <img
+              src="/fairmacs-header-logo.png"
+              alt="FAIRMACS — ACROSS ALL BOUNDARIES"
+              className="h-9 sm:h-10 w-auto object-contain block"
+              style={{ height: '38px', width: 'auto', display: 'block' }}
+            />
           </button>
 
           {/* Desktop 4 Navigation Links */}

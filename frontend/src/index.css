@@ -204,7 +204,7 @@
 .brand-tagline {
   font-family: var(--font-brand) !important;
   font-weight: 400 !important;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.24em !important;
 }
 
 /* Custom Scrollbars */
