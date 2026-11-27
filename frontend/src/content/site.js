@@ -11,7 +11,6 @@ export const SITE_CONTENT = {
     name: 'Fairmacs Learning Academy',
     legalEntity: 'Fairmacs Shipping & Transport Services Pvt. Ltd.',
     tagline: 'Across All Boundaries',
-    primaryCtaLabel: 'Request a Training Demo',
     secondaryCtaLabel: 'Employee Sign In',
     loginPath: '/login',
   },
