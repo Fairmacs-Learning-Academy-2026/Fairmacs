@@ -1,0 +1,710 @@
+/* ==========================================================================
+   FAIRMACS LEARNING ACADEMY — APPLE-DESIGN DEPARTMENT DIRECTORY
+   Tokens, Inset Lists, Frosted Glass Platters, and Gesture Sheets
+   Hard Rules:
+   - Zero dark themes (Daylight frosted glass only)
+   - Mobile native: >=16px inputs, 44px+ hit areas, safe-area insets
+   - Hardware verified: hover gated to (hover: hover) and (pointer: fine)
+   ========================================================================== */
+
+.dept-apple-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  color: #0F172A;
+  padding-bottom: 2.5rem;
+  isolation: isolate;
+  min-width: 0;
+}
+
+/* Ambient Subtle Daylight Iridescence */
+.dept-apple-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: visible;
+  background:
+    radial-gradient(ellipse 50% 36% at 10% 8%, rgba(186, 230, 253, 0.45), transparent 70%),
+    radial-gradient(ellipse 45% 34% at 90% 12%, rgba(224, 231, 255, 0.42), transparent 70%),
+    radial-gradient(ellipse 48% 40% at 75% 75%, rgba(207, 250, 254, 0.38), transparent 72%),
+    radial-gradient(ellipse 40% 32% at 25% 85%, rgba(254, 243, 199, 0.28), transparent 72%);
+}
+
+/* Apple Floating Vibrancy Bar */
+.dept-apple-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.25rem 0 0.5rem;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  box-shadow: none;
+}
+
+@media (min-width: 768px) {
+  .dept-apple-toolbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+}
+
+.dept-apple-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.dept-apple-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #0284C7;
+}
+
+.dept-apple-title {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #0F172A;
+  line-height: 1.15;
+}
+
+.dept-apple-subtitle {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #475569;
+  letter-spacing: -0.005em;
+}
+
+/* Controls Cluster */
+.dept-apple-controls-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* Apple Spotlight Search Input */
+.dept-apple-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+  max-width: 360px;
+}
+
+.dept-apple-search-icon {
+  position: absolute;
+  left: 0.85rem;
+  color: #64748B;
+  pointer-events: none;
+}
+
+.dept-apple-search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 2rem 0 2.35rem;
+  border-radius: 9999px;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.75);
+  font-size: 16px; /* Prevents iOS auto-zoom */
+  color: #0F172A;
+  outline: none;
+  transition: all 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (min-width: 768px) {
+  .dept-apple-search-input {
+    font-size: 0.84rem;
+  }
+}
+
+.dept-apple-search-input:focus {
+  background: #FFFFFF;
+  border-color: #38BDF8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
+}
+
+.dept-apple-search-clear {
+  position: absolute;
+  right: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #CBD5E1;
+  color: #334155;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Apple Segmented Control Pill Track */
+.dept-segmented-track {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.22rem;
+  border-radius: 9999px;
+  background: rgba(241, 245, 249, 0.85);
+  border: 1px solid rgba(203, 213, 225, 0.65);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.dept-segmented-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.75rem;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 650;
+  color: #475569;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 100ms cubic-bezier(0.22, 1, 0.36, 1),
+              background 140ms ease,
+              color 140ms ease,
+              box-shadow 140ms ease;
+}
+
+.dept-segmented-tab:active {
+  transform: scale(0.96);
+}
+
+.dept-segmented-tab[data-active="true"] {
+  background: #FFFFFF;
+  color: #0F172A;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+/* Apple Buttons */
+.dept-apple-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 38px;
+  padding: 0 0.95rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #1E293B;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 100ms ease-out, background 140ms ease;
+}
+
+.dept-apple-btn:active {
+  transform: scale(0.96);
+  background: #F1F5F9;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dept-apple-btn:hover {
+    background: #FFFFFF;
+    border-color: #94A3B8;
+  }
+}
+
+/* Apple 3-Card Bento Telemetry Grid */
+.dept-telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.dept-telemetry-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.25rem 1.35rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 8px 24px rgba(30, 58, 138, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  min-height: 140px;
+}
+
+.dept-telemetry-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dept-telemetry-label {
+  font-size: 0.76rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748B;
+}
+
+.dept-telemetry-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.dept-telemetry-number {
+  font-size: clamp(1.85rem, 3.2vw, 2.35rem);
+  font-weight: 850;
+  letter-spacing: -0.03em;
+  color: #0F172A;
+  line-height: 1.1;
+  margin: 0.4rem 0 0.2rem;
+}
+
+.dept-telemetry-subtext {
+  font-size: 0.78rem;
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Division Cards Grid */
+.dept-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 1.1rem;
+}
+
+.dept-card-platter {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.3rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.03),
+    0 10px 28px rgba(30, 58, 138, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 160ms ease;
+  min-height: 220px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dept-card-platter:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 4px 6px rgba(15, 23, 42, 0.04),
+      0 16px 36px rgba(30, 58, 138, 0.09),
+      inset 0 1px 0 rgba(255, 255, 255, 1);
+    border-color: rgba(56, 189, 248, 0.5);
+  }
+}
+
+.dept-card-platter:active {
+  transform: scale(0.985);
+}
+
+/* Card Header */
+.dept-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dept-card-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.dept-card-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #E0F2FE 0%, #BAE6FD 100%);
+  color: #0369A1;
+  font-weight: 800;
+  font-size: 1.05rem;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  flex-shrink: 0;
+}
+
+.dept-card-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 750;
+  color: #0F172A;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dept-card-lead {
+  font-size: 0.76rem;
+  color: #64748B;
+  margin-top: 2px;
+}
+
+/* Apple Status Pill */
+.dept-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.71rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dept-status-pill.is-met {
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+.dept-status-pill.is-active {
+  background: #E0F2FE;
+  color: #0369A1;
+  border: 1px solid #BAE6FD;
+}
+
+.dept-status-pill.is-neutral {
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid #E2E8F0;
+}
+
+/* Card Body & KPIs */
+.dept-card-body {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.dept-card-desc {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dept-card-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.dept-card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(241, 245, 249, 0.75);
+  font-size: 0.76rem;
+  font-weight: 650;
+  color: #334155;
+}
+
+/* Card Footer Action Bar */
+.dept-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(226, 232, 240, 0.7);
+}
+
+.dept-action-peek {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 9999px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 650;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 120ms ease;
+}
+
+.dept-action-peek:active {
+  transform: scale(0.96);
+}
+
+.dept-action-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 9999px;
+  background: #0B5CAB;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 12px rgba(11, 92, 171, 0.22);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 120ms ease;
+}
+
+.dept-action-open:active {
+  transform: scale(0.96);
+}
+
+/* Apple Inset Grouped List View (Card Row Platters with Gentle Curves & Spacing) */
+.dept-inset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.dept-list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1.35rem;
+  background: rgba(255, 255, 255, 0.76);
+  backdrop-filter: blur(20px) saturate(165%);
+  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.02),
+    0 4px 14px rgba(30, 58, 138, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+              background 140ms ease,
+              border-color 140ms ease,
+              box-shadow 140ms ease;
+}
+
+.dept-list-row:last-child {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.9);
+}
+
+/* Fixed-width Grid Alignment for List Metrics */
+.dept-list-metrics-cluster {
+  display: grid;
+  grid-template-columns: 56px 56px 96px 16px;
+  align-items: center;
+  justify-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.dept-metric-chip {
+  width: 100%;
+  justify-content: center;
+  padding: 0.35rem 0;
+}
+
+.dept-status-fixed {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+.dept-row-chevron {
+  justify-self: end;
+}
+
+.dept-list-row:active {
+  transform: scale(0.99);
+  background: rgba(241, 245, 249, 0.9);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dept-list-row:hover {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(56, 189, 248, 0.45);
+    box-shadow:
+      0 2px 4px rgba(15, 23, 42, 0.03),
+      0 8px 20px rgba(30, 58, 138, 0.07),
+      inset 0 1px 0 rgba(255, 255, 255, 1);
+  }
+}
+
+/* Apple Quick-Look Bottom Sheet / Modal */
+.dept-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100050;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  touch-action: none;
+}
+
+@media (min-width: 768px) {
+  .dept-sheet-overlay {
+    align-items: center;
+    padding: 1.5rem;
+  }
+}
+
+.dept-sheet-platter {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 25px 60px -10px rgba(15, 23, 42, 0.28);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (min-width: 768px) {
+  .dept-sheet-platter {
+    border-radius: 24px;
+    max-height: 84dvh;
+  }
+}
+
+/* Drag Handle */
+.dept-sheet-drag-handle-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0.6rem 0 0.2rem;
+  cursor: grab;
+  touch-action: pan-x;
+}
+
+.dept-sheet-drag-pill {
+  width: 38px;
+  height: 5px;
+  border-radius: 9999px;
+  background: #CBD5E1;
+}
+
+/* Sheet Header */
+.dept-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.4rem;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.dept-sheet-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.dept-sheet-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #F1F5F9;
+  border: none;
+  color: #475569;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 100ms ease;
+}
+
+.dept-sheet-close-btn:active {
+  transform: scale(0.92);
+}
+
+/* Sheet Scroll Body */
+.dept-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Sheet Footer */
+.dept-sheet-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.85rem 1.4rem;
+  border-top: 1px solid #E2E8F0;
+  background: rgba(248, 250, 252, 0.8);
+}

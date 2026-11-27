@@ -155,23 +155,25 @@ export default function CertificateViewer({ certificate, onClose }) {
           overflow: 'hidden',
           borderRadius: '16px',
           boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.45)',
-          background: '#0a192f',
+          background: 'rgba(255, 255, 255, 0.96)', border: '1px solid rgba(255, 255, 255, 0.95)',
         }}
       >
         {/* Modal Top Bar */}
         <div
           style={{
-            background: 'linear-gradient(90deg, #0a192f 0%, #0f2b48 100%)',
+            background: 'rgba(255, 255, 255, 0.94)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
             padding: '1rem 1.5rem',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            color: 'white',
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            color: '#1F2328',
+            borderBottom: '1px solid rgba(226, 232, 240, 0.9)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: 700, fontSize: '0.95rem' }}>
-            <Award style={{ width: 20, height: 20, color: '#38bdf8' }} />
+            <Award style={{ width: 20, height: 20, color: '#0B5CAB' }} />
             <span>Fairmacs - KMS • {certId}</span>
           </div>
 
@@ -211,11 +213,11 @@ export default function CertificateViewer({ certificate, onClose }) {
               onClick={onClose}
               aria-label="Close certificate"
               style={{
-                background: 'rgba(255,255,255,0.1)',
-                border: 'none',
+                background: 'rgba(241, 245, 249, 0.85)',
+                border: '1px solid rgba(203, 213, 225, 0.8)',
                 padding: '0.45rem',
                 borderRadius: '50%',
-                color: 'white',
+                color: '#475569',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -228,7 +230,7 @@ export default function CertificateViewer({ certificate, onClose }) {
         </div>
 
         {/* Certificate Display Area */}
-        <div style={{ padding: '1rem', background: '#071322' }}>
+        <div style={{ padding: '1rem', background: '#EFECE6' }}>
           <div
             className="certificate-print-area"
             style={{
