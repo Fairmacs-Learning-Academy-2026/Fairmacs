@@ -924,11 +924,26 @@ public class NotificationSchedulerService {
             return null;
         }
         try {
-            NotificationJobLog logEntry = new NotificationJobLog(jobName, executionKey);
+            Optional<NotificationJobLog> existingOpt = jobLogRepository.findByExecutionKey(executionKey);
+            NotificationJobLog logEntry;
+            if (existingOpt != null && existingOpt.isPresent()) {
+                logEntry = existingOpt.get();
+                logEntry.setJobName(jobName);
+                logEntry.setStatus("STARTED");
+                logEntry.setStartedAt(LocalDateTime.now());
+                logEntry.setCompletedAt(null);
+                logEntry.setProcessedCount(0);
+                logEntry.setNotificationsCreated(0);
+                logEntry.setFailureCount(0);
+                logEntry.setSummaryMessage(null);
+            } else {
+                logEntry = new NotificationJobLog(jobName, executionKey);
+            }
             return jobLogRepository.save(logEntry);
         } catch (Exception ex) {
-            log.debug("Could not create NotificationJobLog for {}: {}", executionKey, ex.getMessage());
-            return null;
+            log.debug("Could not create/update NotificationJobLog for {}: {}", executionKey, ex.getMessage());
+            Optional<NotificationJobLog> fallbackOpt = jobLogRepository.findByExecutionKey(executionKey);
+            return fallbackOpt != null ? fallbackOpt.orElse(null) : null;
         }
     }
 
