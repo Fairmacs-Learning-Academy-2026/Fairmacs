@@ -132,8 +132,11 @@ export default function Overview({
 
     initialLoad();
 
-    // Universal cross-tab and visibility/focus synchronization bus
-    const unsubscribe = subscribeEnrollmentSync(handleEnrollmentUpdated);
+    // Direct window event listener for same-tab updates
+    window.addEventListener('lms:enrollment-updated', handleEnrollmentUpdated);
+
+    // Universal cross-tab and visibility/focus synchronization bus (skipSameTabEvent prevents double-firing)
+    const unsubscribe = subscribeEnrollmentSync(handleEnrollmentUpdated, { skipSameTabEvent: true });
 
     // 60-second periodic background revalidation for active tabs (e.g. kiosk or unattended open tab)
     const intervalId = setInterval(() => {
@@ -144,6 +147,7 @@ export default function Overview({
 
     return () => {
       mounted = false;
+      window.removeEventListener('lms:enrollment-updated', handleEnrollmentUpdated);
       unsubscribe();
       clearInterval(intervalId);
     };

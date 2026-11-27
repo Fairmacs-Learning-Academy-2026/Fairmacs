@@ -82,6 +82,7 @@ export function subscribeEnrollmentSync(onSync, options = {}) {
   const debounceMs = Math.max(100, Number(options.debounceMs || 300));
   const revalidateOnFocus = options.revalidateOnFocus !== false;
   const focusThrottleMs = Math.max(5000, Number(options.focusThrottleMs || 60000));
+  const skipSameTabEvent = Boolean(options.skipSameTabEvent);
 
   let debounceTimer = null;
   let lastTriggeredAt = 0;
@@ -134,7 +135,9 @@ export function subscribeEnrollmentSync(onSync, options = {}) {
   };
 
   if (typeof window !== 'undefined') {
-    window.addEventListener(EVENT_ENROLLMENT_UPDATED, handleWindowCustomEvent);
+    if (!skipSameTabEvent) {
+      window.addEventListener(EVENT_ENROLLMENT_UPDATED, handleWindowCustomEvent);
+    }
     window.addEventListener('storage', handleStorageEvent);
 
     if (revalidateOnFocus) {
