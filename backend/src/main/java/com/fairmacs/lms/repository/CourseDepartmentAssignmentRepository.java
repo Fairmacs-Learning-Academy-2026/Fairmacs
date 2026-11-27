@@ -22,6 +22,14 @@ public interface CourseDepartmentAssignmentRepository extends JpaRepository<Cour
     """)
     List<CourseDepartmentAssignment> findByCourseIdWithDepartment(@Param("courseId") Long courseId);
 
+    @Query("""
+        SELECT cda
+        FROM CourseDepartmentAssignment cda
+        JOIN FETCH cda.department
+        WHERE cda.course.id IN :courseIds
+    """)
+    List<CourseDepartmentAssignment> findByCourseIdInWithDepartment(@Param("courseIds") java.util.Collection<Long> courseIds);
+
     List<CourseDepartmentAssignment> findByDepartment_Id(Long departmentId);
 
     List<CourseDepartmentAssignment> findByDepartment_NameIgnoreCase(String departmentName);

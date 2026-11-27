@@ -7,9 +7,33 @@ import {
   getAuthToken,
   handleUnauthorized,
 } from '../utils/apiConfig';
+import { EVENT_ENROLLMENT_UPDATED } from '../utils/enrollmentSync';
 
 const getToken = () => getAuthToken();
 const forceLogout = () => handleUnauthorized(true);
+
+const DASHBOARD_CACHE_TTL_MS = 15000;
+let cachedDashboard = null;
+let cachedDashboardAt = 0;
+let cachedDashboardToken = '';
+let inFlightDashboardPromise = null;
+
+let cachedAllCourses = null;
+let cachedAllCoursesAt = 0;
+let inFlightAllCoursesPromise = null;
+
+export function invalidateCourseServiceCache() {
+  cachedDashboard = null;
+  cachedDashboardAt = 0;
+  inFlightDashboardPromise = null;
+  cachedAllCourses = null;
+  cachedAllCoursesAt = 0;
+  inFlightAllCoursesPromise = null;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(EVENT_ENROLLMENT_UPDATED, invalidateCourseServiceCache);
+}
 
 
 // ============================================================
@@ -18,48 +42,83 @@ const forceLogout = () => handleUnauthorized(true);
 
 export const courseService = {
 
+  invalidateDashboardCache: invalidateCourseServiceCache,
+
+  getCachedLearningDashboard: () => {
+    const token = getToken() || '';
+    if (
+      cachedDashboard &&
+      cachedDashboardToken === token &&
+      Date.now() - cachedDashboardAt < DASHBOARD_CACHE_TTL_MS
+    ) {
+      return cachedDashboard;
+    }
+    return null;
+  },
+
   // ==========================================================
   // GET ALL COURSES
   // ==========================================================
 
-  getAllCourses: async () => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/courses`,
-        {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        }
-      );
-
-      if (response.status === 401) {
-        forceLogout();
-        return [];
-      }
-
-      if (response.status === 403) {
-        console.error(
-          'Get courses returned 403 Forbidden.'
-        );
-        return [];
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch courses (${response.status})`
-        );
-      }
-
-      return await response.json();
-
-    } catch (error) {
-      console.error(
-        'Get courses error:',
-        error
-      );
-
-      return [];
+  getAllCourses: async (options = {}) => {
+    const force = Boolean(options?.force);
+    const now = Date.now();
+    if (!force && cachedAllCourses && now - cachedAllCoursesAt < DASHBOARD_CACHE_TTL_MS) {
+      return cachedAllCourses;
     }
+    if (!force && inFlightAllCoursesPromise) {
+      return inFlightAllCoursesPromise;
+    }
+
+    const reqPromise = (async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/courses`,
+          {
+            method: 'GET',
+            headers: getAuthHeaders(),
+          }
+        );
+
+        if (response.status === 401) {
+          forceLogout();
+          return [];
+        }
+
+        if (response.status === 403) {
+          console.error(
+            'Get courses returned 403 Forbidden.'
+          );
+          return [];
+        }
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch courses (${response.status})`
+          );
+        }
+
+        const data = await response.json();
+        cachedAllCourses = data;
+        cachedAllCoursesAt = Date.now();
+        return data;
+
+      } catch (error) {
+        console.error(
+          'Get courses error:',
+          error
+        );
+
+        return [];
+      } finally {
+        if (inFlightAllCoursesPromise === reqPromise) {
+          inFlightAllCoursesPromise = null;
+        }
+      }
+    })();
+
+    inFlightAllCoursesPromise = reqPromise;
+    return reqPromise;
   },
 
 
@@ -144,7 +203,7 @@ export const courseService = {
   // GET EMPLOYEE LEARNING DASHBOARD
   // ==========================================================
 
-  getLearningDashboard: async () => {
+  getLearningDashboard: async (options = {}) => {
 
     const token = getToken();
 
@@ -156,92 +215,118 @@ export const courseService = {
       return null;
     }
 
-    try {
-      console.count('[learning dashboard] request');
-      console.trace('[learning dashboard] caller');
-      const response = await fetch(
-        `${API_BASE_URL}/learning/dashboard`,
-        {
-          method: 'GET',
-
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-          },
-        }
-      );
-
-
-      // ------------------------------------------------------
-      // UNAUTHORIZED
-      // ------------------------------------------------------
-
-      if (response.status === 401) {
-
-        console.error(
-          'Learning dashboard returned 401 Unauthorized.'
-        );
-
-        forceLogout();
-
-        return null;
-      }
-
-
-      // ------------------------------------------------------
-      // FORBIDDEN
-      // ------------------------------------------------------
-
-      if (response.status === 403) {
-
-        console.error(
-          'Learning dashboard returned 403 Forbidden.'
-        );
-
-        console.error(
-          'The JWT was rejected or the authenticated user does not have permission.'
-        );
-
-        return null;
-      }
-
-
-      // ------------------------------------------------------
-      // OTHER HTTP ERRORS
-      // ------------------------------------------------------
-
-      if (!response.ok) {
-
-        const errorText =
-          await response.text();
-
-        console.error(
-          'Learning dashboard request failed:',
-          response.status,
-          errorText
-        );
-
-        throw new Error(
-          `Failed to fetch learning dashboard (${response.status})`
-        );
-      }
-
-
-      // ------------------------------------------------------
-      // SUCCESS
-      // ------------------------------------------------------
-
-      return await response.json();
-
-    } catch (error) {
-
-      console.error(
-        'Get learning dashboard error:',
-        error
-      );
-
-      return null;
+    const force = Boolean(options?.force);
+    const now = Date.now();
+    if (
+      !force &&
+      cachedDashboard &&
+      cachedDashboardToken === token &&
+      now - cachedDashboardAt < DASHBOARD_CACHE_TTL_MS
+    ) {
+      return cachedDashboard;
     }
+
+    if (!force && inFlightDashboardPromise && cachedDashboardToken === token) {
+      return inFlightDashboardPromise;
+    }
+
+    cachedDashboardToken = token;
+    const reqPromise = (async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/learning/dashboard`,
+          {
+            method: 'GET',
+
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+            },
+          }
+        );
+
+
+        // ------------------------------------------------------
+        // UNAUTHORIZED
+        // ------------------------------------------------------
+
+        if (response.status === 401) {
+
+          console.error(
+            'Learning dashboard returned 401 Unauthorized.'
+          );
+
+          forceLogout();
+
+          return null;
+        }
+
+
+        // ------------------------------------------------------
+        // FORBIDDEN
+        // ------------------------------------------------------
+
+        if (response.status === 403) {
+
+          console.error(
+            'Learning dashboard returned 403 Forbidden.'
+          );
+
+          console.error(
+            'The JWT was rejected or the authenticated user does not have permission.'
+          );
+
+          return null;
+        }
+
+
+        // ------------------------------------------------------
+        // OTHER HTTP ERRORS
+        // ------------------------------------------------------
+
+        if (!response.ok) {
+
+          const errorText =
+            await response.text();
+
+          console.error(
+            'Learning dashboard request failed:',
+            response.status,
+            errorText
+          );
+
+          throw new Error(
+            `Failed to fetch learning dashboard (${response.status})`
+          );
+        }
+
+
+        // ------------------------------------------------------
+        // SUCCESS
+        // ------------------------------------------------------
+
+        const data = await response.json();
+        cachedDashboard = data;
+        cachedDashboardAt = Date.now();
+        return data;
+
+      } catch (error) {
+
+        console.error(
+          'Get learning dashboard error:',
+          error
+        );
+
+        return null;
+      } finally {
+        if (inFlightDashboardPromise === reqPromise) {
+          inFlightDashboardPromise = null;
+        }
+      }
+    })();
+
+    inFlightDashboardPromise = reqPromise;
+    return reqPromise;
   },
 
 

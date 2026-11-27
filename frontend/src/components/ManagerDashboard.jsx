@@ -199,11 +199,9 @@ export default function ManagerDashboard({ onOpenVerifiedCertificate }) {
     const handleSync = () => {
       loadAssignedCourses();
     };
-    window.addEventListener('lms:enrollment-updated', handleSync);
     const unsubscribe = subscribeEnrollmentSync(handleSync);
 
     return () => {
-      window.removeEventListener('lms:enrollment-updated', handleSync);
       unsubscribe();
     };
   }, [loadReport, loadAssignedCourses]);

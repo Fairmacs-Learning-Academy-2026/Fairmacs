@@ -14,14 +14,21 @@ import com.fairmacs.lms.repository.ModuleRepository;
 import com.fairmacs.lms.repository.LessonRepository;
 import com.fairmacs.lms.repository.QuizRepository;
 import com.fairmacs.lms.repository.CourseThumbnailRepository;
+import com.fairmacs.lms.repository.CourseDepartmentAssignmentRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class CourseMapper {
@@ -31,6 +38,97 @@ public class CourseMapper {
     private final ModuleRepository moduleRepository;
     private final LessonRepository lessonRepository;
     private final CourseThumbnailRepository courseThumbnailRepository;
+    private CourseDepartmentAssignmentRepository courseDepartmentAssignmentRepository;
+
+    @Autowired(required = false)
+    public void setCourseDepartmentAssignmentRepository(CourseDepartmentAssignmentRepository repo) {
+        this.courseDepartmentAssignmentRepository = repo;
+    }
+
+    public static final class SummaryBatchContext {
+        private final Map<Long, Integer> moduleCounts;
+        private final Map<Long, Integer> lessonCounts;
+        private final Map<Long, String> thumbnailUrls;
+        private final Map<Long, List<com.fairmacs.lms.entity.CourseDepartmentAssignment>> assignmentsByCourseId;
+
+        public SummaryBatchContext(
+                Map<Long, Integer> moduleCounts,
+                Map<Long, Integer> lessonCounts,
+                Map<Long, String> thumbnailUrls,
+                Map<Long, List<com.fairmacs.lms.entity.CourseDepartmentAssignment>> assignmentsByCourseId) {
+            this.moduleCounts = moduleCounts != null ? moduleCounts : Map.of();
+            this.lessonCounts = lessonCounts != null ? lessonCounts : Map.of();
+            this.thumbnailUrls = thumbnailUrls != null ? thumbnailUrls : Map.of();
+            this.assignmentsByCourseId = assignmentsByCourseId != null ? assignmentsByCourseId : Map.of();
+        }
+    }
+
+    public SummaryBatchContext preloadSummaryContext(Collection<Course> courses) {
+        if (courses == null || courses.isEmpty()) {
+            return new SummaryBatchContext(Map.of(), Map.of(), Map.of(), Map.of());
+        }
+        Set<Long> courseIds = courses.stream()
+                .filter(Objects::nonNull)
+                .map(Course::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (courseIds.isEmpty()) {
+            return new SummaryBatchContext(Map.of(), Map.of(), Map.of(), Map.of());
+        }
+
+        Map<Long, Integer> moduleCounts = new HashMap<>();
+        if (moduleRepository != null) {
+            try {
+                for (Object[] row : moduleRepository.countByCourseIds(courseIds)) {
+                    if (row != null && row.length >= 2 && row[0] instanceof Number cid && row[1] instanceof Number cnt) {
+                        moduleCounts.put(cid.longValue(), cnt.intValue());
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        Map<Long, Integer> lessonCounts = new HashMap<>();
+        if (lessonRepository != null) {
+            try {
+                for (Object[] row : lessonRepository.countByCourseIds(courseIds)) {
+                    if (row != null && row.length >= 2 && row[0] instanceof Number cid && row[1] instanceof Number cnt) {
+                        lessonCounts.put(cid.longValue(), cnt.intValue());
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        Map<Long, String> thumbnailUrls = new HashMap<>();
+        Set<Long> missingBannerCourseIds = courses.stream()
+                .filter(Objects::nonNull)
+                .filter(c -> c.getId() != null && (c.getBanner() == null || c.getBanner().isBlank()))
+                .map(Course::getId)
+                .collect(Collectors.toSet());
+        if (!missingBannerCourseIds.isEmpty() && courseThumbnailRepository != null) {
+            try {
+                for (com.fairmacs.lms.entity.CourseThumbnail ct : courseThumbnailRepository.findByCourseIdInOrderByCreatedAtDesc(missingBannerCourseIds)) {
+                    if (ct != null && ct.getCourseId() != null && ct.getStorageId() != null) {
+                        thumbnailUrls.putIfAbsent(ct.getCourseId(), "/api/courses/thumbnails/" + ct.getStorageId());
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        Map<Long, List<com.fairmacs.lms.entity.CourseDepartmentAssignment>> assignmentsByCourseId = new HashMap<>();
+        if (courseDepartmentAssignmentRepository != null) {
+            try {
+                for (com.fairmacs.lms.entity.CourseDepartmentAssignment a : courseDepartmentAssignmentRepository.findByCourseIdInWithDepartment(courseIds)) {
+                    if (a != null && a.getCourse() != null && a.getCourse().getId() != null) {
+                        assignmentsByCourseId
+                                .computeIfAbsent(a.getCourse().getId(), k -> new ArrayList<>())
+                                .add(a);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return new SummaryBatchContext(moduleCounts, lessonCounts, thumbnailUrls, assignmentsByCourseId);
+    }
 
     @Autowired
     public CourseMapper(
@@ -76,6 +174,24 @@ public class CourseMapper {
             String assignmentType,
             Integer precalculatedModuleCount,
             Integer precalculatedLessonCount) {
+        return toSummary(course, enrollment, assignmentType, precalculatedModuleCount, precalculatedLessonCount, null);
+    }
+
+    public CourseDTO toSummary(
+            Course course,
+            Enrollment enrollment,
+            String assignmentType,
+            SummaryBatchContext batchContext) {
+        return toSummary(course, enrollment, assignmentType, null, null, batchContext);
+    }
+
+    public CourseDTO toSummary(
+            Course course,
+            Enrollment enrollment,
+            String assignmentType,
+            Integer precalculatedModuleCount,
+            Integer precalculatedLessonCount,
+            SummaryBatchContext batchContext) {
 
         CourseDTO dto = new CourseDTO();
 
@@ -86,8 +202,12 @@ public class CourseMapper {
         // Resolve assigned departments to replace legacy category / Uncategorized
         List<String> depts = new ArrayList<>();
         List<com.fairmacs.lms.dto.CourseDepartmentAssignmentDTO> assignmentDTOs = new ArrayList<>();
-        if (course.getDepartmentAssignments() != null && !course.getDepartmentAssignments().isEmpty()) {
-            for (com.fairmacs.lms.entity.CourseDepartmentAssignment a : course.getDepartmentAssignments()) {
+        List<com.fairmacs.lms.entity.CourseDepartmentAssignment> rawAssignments =
+                (batchContext != null && course.getId() != null && batchContext.assignmentsByCourseId.containsKey(course.getId()))
+                        ? batchContext.assignmentsByCourseId.get(course.getId())
+                        : (batchContext == null ? course.getDepartmentAssignments() : List.of());
+        if (rawAssignments != null && !rawAssignments.isEmpty()) {
+            for (com.fairmacs.lms.entity.CourseDepartmentAssignment a : rawAssignments) {
                 if (a.getDepartment() != null) {
                     depts.add(a.getDepartment().getName());
                     assignmentDTOs.add(new com.fairmacs.lms.dto.CourseDepartmentAssignmentDTO(
@@ -189,7 +309,9 @@ public class CourseMapper {
 
         // Thumbnail Resolution
         String banner = course.getBanner();
-        if ((banner == null || banner.isBlank()) && courseThumbnailRepository != null && course.getId() != null) {
+        if ((banner == null || banner.isBlank()) && batchContext != null && course.getId() != null) {
+            banner = batchContext.thumbnailUrls.get(course.getId());
+        } else if ((banner == null || banner.isBlank()) && courseThumbnailRepository != null && course.getId() != null) {
             try {
                 banner = courseThumbnailRepository.findTopByCourseIdOrderByCreatedAtDesc(course.getId())
                         .map(t -> "/api/courses/thumbnails/" + t.getStorageId())
@@ -267,6 +389,9 @@ public class CourseMapper {
         if (precalculatedModuleCount != null && precalculatedLessonCount != null) {
             modCount = precalculatedModuleCount;
             lesCount = precalculatedLessonCount;
+        } else if (batchContext != null && course.getId() != null) {
+            modCount = batchContext.moduleCounts.getOrDefault(course.getId(), 0);
+            lesCount = batchContext.lessonCounts.getOrDefault(course.getId(), 0);
         } else if (course.getId() != null && moduleRepository != null && lessonRepository != null) {
             try {
                 modCount = (int) moduleRepository.countByCourseId(course.getId());

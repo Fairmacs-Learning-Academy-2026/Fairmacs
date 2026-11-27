@@ -1,9 +1,24 @@
-import { notifyEnrollmentUpdated } from '../utils/enrollmentSync';
+import { notifyEnrollmentUpdated, EVENT_ENROLLMENT_UPDATED } from '../utils/enrollmentSync';
 import {
   API_BASE_URL,
   getAuthHeaders as authHeaders,
   handleUnauthorized,
 } from '../utils/apiConfig';
+
+const ENROLLMENTS_CACHE_TTL_MS = 15000;
+let cachedUserEnrollments = null;
+let cachedUserEnrollmentsAt = 0;
+let inFlightUserEnrollmentsPromise = null;
+
+function invalidateUserEnrollmentsCache() {
+  cachedUserEnrollments = null;
+  cachedUserEnrollmentsAt = 0;
+  inFlightUserEnrollmentsPromise = null;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(EVENT_ENROLLMENT_UPDATED, invalidateUserEnrollmentsCache);
+}
 
 async function parseResponse(response) {
   const text = await response.text();
@@ -92,12 +107,33 @@ export const enrollmentService = {
   // ---------------------------------------------------------
   // CURRENT USER ENROLLMENTS
   // ---------------------------------------------------------
-  getUserEnrollments: async () => {
-    const data = await request(`${API_BASE_URL}/enrollments/me`, {
-      method: 'GET',
-    });
+  getUserEnrollments: async (options = {}) => {
+    const force = Boolean(options?.force);
+    const now = Date.now();
+    if (!force && cachedUserEnrollments && now - cachedUserEnrollmentsAt < ENROLLMENTS_CACHE_TTL_MS) {
+      return cachedUserEnrollments;
+    }
+    if (!force && inFlightUserEnrollmentsPromise) {
+      return inFlightUserEnrollmentsPromise;
+    }
 
-    return Array.isArray(data) ? data : [];
+    const reqPromise = request(`${API_BASE_URL}/enrollments/me`, {
+      method: 'GET',
+    })
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        cachedUserEnrollments = list;
+        cachedUserEnrollmentsAt = Date.now();
+        return list;
+      })
+      .finally(() => {
+        if (inFlightUserEnrollmentsPromise === reqPromise) {
+          inFlightUserEnrollmentsPromise = null;
+        }
+      });
+
+    inFlightUserEnrollmentsPromise = reqPromise;
+    return reqPromise;
   },
 
   // ---------------------------------------------------------

@@ -89,6 +89,7 @@ class HrAdminDepartmentAnalyticsTest {
         Enrollment e4 = createEnrollment(104L, ops2, EnrollmentType.SELF_SELECTED, EnrollmentStatus.COMPLETED, 100);
 
         when(enrollmentRepository.findAll()).thenReturn(List.of(e1, e2, e3, e4));
+        when(enrollmentRepository.findAllWithUserAndCourse()).thenReturn(List.of(e1, e2, e3, e4));
         when(certificateRepository.count()).thenReturn(1L);
 
         Map<String, Object> metrics = hrAdminService.getDashboardMetrics();

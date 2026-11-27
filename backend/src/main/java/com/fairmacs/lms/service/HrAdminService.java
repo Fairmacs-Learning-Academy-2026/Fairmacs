@@ -428,7 +428,7 @@ public class HrAdminService {
     @Transactional(readOnly = true)
     public Map<String, Object> getDashboardMetrics() {
         List<User> employees = userRepository.findAll();
-        List<Enrollment> enrollments = enrollmentRepository.findAll();
+        List<Enrollment> enrollments = enrollmentRepository.findAllWithUserAndCourse();
 
         long totalEmployees = employees.size();
 
@@ -511,6 +511,17 @@ public class HrAdminService {
             List<User> activeEmployees,
             List<Enrollment> enrollments
     ) {
+        Map<Long, List<Enrollment>> assignedByUserId = new LinkedHashMap<>();
+        for (Enrollment e : enrollments) {
+            if (e.getUser() != null && e.getUser().getId() != null
+                    && (e.getEnrollmentType() == EnrollmentType.MANDATORY
+                            || e.getEnrollmentType() == EnrollmentType.RECOMMENDED)) {
+                assignedByUserId
+                        .computeIfAbsent(e.getUser().getId(), k -> new ArrayList<>())
+                        .add(e);
+            }
+        }
+
         return activeEmployees.stream()
                 .map(User::getDepartment)
                 .filter(department -> department != null && !department.isBlank())
@@ -527,11 +538,7 @@ public class HrAdminService {
                     List<Double> learnerProgressList = new ArrayList<>();
 
                     for (User employee : departmentEmployees) {
-                        List<Enrollment> assignedEnrollments = enrollments.stream()
-                                .filter(e -> e.getUser() != null && employee.getId().equals(e.getUser().getId()))
-                                .filter(e -> e.getEnrollmentType() == EnrollmentType.MANDATORY
-                                        || e.getEnrollmentType() == EnrollmentType.RECOMMENDED)
-                                .toList();
+                        List<Enrollment> assignedEnrollments = assignedByUserId.getOrDefault(employee.getId(), List.of());
 
                         if (!assignedEnrollments.isEmpty()) {
                             totalAssignedCourses += assignedEnrollments.size();

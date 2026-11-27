@@ -119,11 +119,16 @@ public class CatalogService {
                 ? null
                 : categorySlug;
 
-        return courseRepository.searchCatalog(search, slug).stream()
+        List<Course> filteredCourses = courseRepository.searchCatalog(search, slug).stream()
                 // Existing enrollments remain visible so employees can continue training.
                 .filter(course -> isCourseVisibleToUser(user, course, byCourse.containsKey(course.getId())))
                 .sorted(Comparator.comparing((Course c) -> !Boolean.TRUE.equals(c.getFoundation()))
                         .thenComparing(Course::getTitle))
+                .toList();
+
+        CourseMapper.SummaryBatchContext batchContext = courseMapper.preloadSummaryContext(filteredCourses);
+
+        return filteredCourses.stream()
                 .map(course -> {
                     Enrollment enrollment = byCourse.get(course.getId());
                     boolean targetDeptMandatory = user != null && user.getDepartment() != null
@@ -145,7 +150,7 @@ public class CatalogService {
                                             && a.getAssignmentType() == EnrollmentType.RECOMMENDED));
                     String type = mandatory ? "MANDATORY"
                             : (recommended ? "RECOMMENDED" : "OPTIONAL");
-                    return courseMapper.toSummary(course, enrollment, type);
+                    return courseMapper.toSummary(course, enrollment, type, batchContext);
                 })
                 .collect(Collectors.toList());
     }
@@ -260,7 +265,17 @@ public class CatalogService {
                         (a, b) -> a));
         Set<Long> enrolledIds = new HashSet<>(byCourse.keySet());
 
-        List<Course> recommended = recommendationService.recommendFor(user, enrolledIds);
+        List<Course> recommended = recommendationService.recommendFor(user, enrolledIds).stream()
+                .filter(course -> isCourseVisibleToUser(user, course, false))
+                .limit(6)
+                .toList();
+
+        java.util.List<Course> allDashboardCourses = new java.util.ArrayList<>(enrollments.size() + recommended.size());
+        for (Enrollment e : enrollments) {
+            if (e.getCourse() != null) allDashboardCourses.add(e.getCourse());
+        }
+        allDashboardCourses.addAll(recommended);
+        CourseMapper.SummaryBatchContext batchContext = courseMapper.preloadSummaryContext(allDashboardCourses);
 
         LearningDashboardDTO dto = new LearningDashboardDTO();
         dto.setName(user.getName());
@@ -303,20 +318,27 @@ public class CatalogService {
         int totalMinutes = (int) Math.round(hours * 60);
         dto.setLearningHours((totalMinutes / 60) + "h " + (totalMinutes % 60) + "m");
 
-        dto.setMandatory(mandatory.stream()
-                .map(e -> courseMapper.toSummary(e.getCourse(), e, "MANDATORY"))
-                .toList());
+        // Map each enrollment once and reuse DTOs across enrolled, mandatory, and continueLearning
+        Map<Long, CourseDTO> mappedByEnrollmentId = new java.util.LinkedHashMap<>();
+        List<CourseDTO> enrolledDtos = new java.util.ArrayList<>(enrollments.size());
+        List<CourseDTO> mandatoryDtos = new java.util.ArrayList<>(mandatory.size());
+        for (Enrollment e : enrollments) {
+            String typeLabel = e.getEnrollmentType() == EnrollmentType.MANDATORY ? "MANDATORY" : "OPTIONAL";
+            CourseDTO mapped = courseMapper.toSummary(e.getCourse(), e, typeLabel, batchContext);
+            enrolledDtos.add(mapped);
+            if (e.getId() != null) {
+                mappedByEnrollmentId.put(e.getId(), mapped);
+            }
+            if (e.getEnrollmentType() == EnrollmentType.MANDATORY) {
+                mandatoryDtos.add(mapped);
+            }
+        }
 
-        dto.setEnrolled(enrollments.stream()
-                .map(e -> courseMapper.toSummary(
-                        e.getCourse(), e,
-                        e.getEnrollmentType() == EnrollmentType.MANDATORY ? "MANDATORY" : "OPTIONAL"))
-                .toList());
+        dto.setMandatory(mandatoryDtos);
+        dto.setEnrolled(enrolledDtos);
 
         dto.setRecommended(recommended.stream()
-                .filter(course -> isCourseVisibleToUser(user, course, false))
-                .limit(6)
-                .map(c -> courseMapper.toSummary(c, null, "RECOMMENDED"))
+                .map(c -> courseMapper.toSummary(c, null, "RECOMMENDED", batchContext))
                 .toList());
 
         dto.setCategories(listCategories().stream()
@@ -328,16 +350,21 @@ public class CatalogService {
                 .max(Comparator.comparing(
                         e -> e.getProgressPercent() == null ? 0 : e.getProgressPercent()))
                 .ifPresent(e -> dto.setContinueLearning(
-                        courseMapper.toSummary(
-                                e.getCourse(), e,
-                                e.getEnrollmentType() == EnrollmentType.MANDATORY ? "MANDATORY" : "OPTIONAL")));
+                        e.getId() != null && mappedByEnrollmentId.containsKey(e.getId())
+                                ? mappedByEnrollmentId.get(e.getId())
+                                : courseMapper.toSummary(
+                                        e.getCourse(), e,
+                                        e.getEnrollmentType() == EnrollmentType.MANDATORY ? "MANDATORY" : "OPTIONAL",
+                                        batchContext)));
 
         if (dto.getContinueLearning() == null) {
             mandatory.stream()
                     .filter(e -> e.getStatus() != EnrollmentStatus.COMPLETED)
                     .findFirst()
                     .ifPresent(e -> dto.setContinueLearning(
-                            courseMapper.toSummary(e.getCourse(), e, "MANDATORY")));
+                            e.getId() != null && mappedByEnrollmentId.containsKey(e.getId())
+                                    ? mappedByEnrollmentId.get(e.getId())
+                                    : courseMapper.toSummary(e.getCourse(), e, "MANDATORY", batchContext)));
         }
 
         return dto;

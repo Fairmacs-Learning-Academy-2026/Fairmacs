@@ -81,7 +81,7 @@ export function subscribeEnrollmentSync(onSync, options = {}) {
 
   const debounceMs = Math.max(100, Number(options.debounceMs || 300));
   const revalidateOnFocus = options.revalidateOnFocus !== false;
-  const focusThrottleMs = Math.max(5000, Number(options.focusThrottleMs || 15000));
+  const focusThrottleMs = Math.max(5000, Number(options.focusThrottleMs || 60000));
 
   let debounceTimer = null;
   let lastTriggeredAt = 0;

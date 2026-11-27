@@ -1,9 +1,10 @@
 import { API_BASE_URL as SHARED_API_BASE_URL, authFetch, getAuthHeaders } from '../utils/apiConfig';
-import { courseService } from './courseService';
 import { enrollmentService } from './enrollmentService';
+import { courseService } from './courseService';
 import { policyService } from './policyService';
 
 const API_BASE_URL = SHARED_API_BASE_URL;
+let inFlightCalendarEventsPromise = null;
 
 export const EVENT_TYPES = {
   SESSION: 'SESSION',
@@ -125,18 +126,11 @@ export const calendarService = {
   // Fetch assigned courses with due dates
   async getAssignedCourses() {
     try {
-      let rawList = [];
-      try {
-        const dashboardData = await courseService.getLearningDashboard();
-        if (dashboardData && Array.isArray(dashboardData.enrolled)) {
-          rawList = dashboardData.enrolled;
-        }
-      } catch {}
-
-      if (!rawList.length) {
-        rawList = await enrollmentService.getUserEnrollments();
+      const cachedDashboard = courseService.getCachedLearningDashboard?.();
+      if (cachedDashboard && Array.isArray(cachedDashboard.enrolled)) {
+        return cachedDashboard.enrolled;
       }
-
+      const rawList = await enrollmentService.getUserEnrollments();
       return Array.isArray(rawList) ? rawList : [];
     } catch (err) {
       console.warn('Failed to fetch assigned course deadlines:', err);
@@ -158,6 +152,11 @@ export const calendarService = {
 
   // Unified Calendar Events Normalizer
   async getCalendarEvents() {
+    if (inFlightCalendarEventsPromise) {
+      return inFlightCalendarEventsPromise;
+    }
+
+    const reqPromise = (async () => {
     const todayStr = getTodayIso();
 
     const [sessionsResult, coursesResult, policiesResult] = await Promise.allSettled([
@@ -335,6 +334,16 @@ export const calendarService = {
     });
 
     return unifiedEvents;
+    })();
+
+    inFlightCalendarEventsPromise = reqPromise;
+    try {
+      return await reqPromise;
+    } finally {
+      if (inFlightCalendarEventsPromise === reqPromise) {
+        inFlightCalendarEventsPromise = null;
+      }
+    }
   },
 
   // Schedule a new live session (Management only)

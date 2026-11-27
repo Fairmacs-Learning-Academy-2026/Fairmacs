@@ -132,9 +132,6 @@ export default function Overview({
 
     initialLoad();
 
-    // Direct window event listener for same-tab updates
-    window.addEventListener('lms:enrollment-updated', handleEnrollmentUpdated);
-
     // Universal cross-tab and visibility/focus synchronization bus
     const unsubscribe = subscribeEnrollmentSync(handleEnrollmentUpdated);
 
@@ -147,7 +144,6 @@ export default function Overview({
 
     return () => {
       mounted = false;
-      window.removeEventListener('lms:enrollment-updated', handleEnrollmentUpdated);
       unsubscribe();
       clearInterval(intervalId);
     };

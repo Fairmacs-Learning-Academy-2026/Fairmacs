@@ -937,16 +937,26 @@ public class EnrollmentService {
 
         User user = securityContextUtil.getCurrentUser();
 
-        return enrollmentRepository
+        List<Enrollment> activeEnrollments = enrollmentRepository
                 .findByUserIdWithCourse(user.getId())
                 .stream()
                 .filter(e -> e.getStatus() != EnrollmentStatus.REVOKED)
+                .toList();
+
+        List<Course> courses = activeEnrollments.stream()
+                .map(Enrollment::getCourse)
+                .filter(Objects::nonNull)
+                .toList();
+        CourseMapper.SummaryBatchContext batchContext = courseMapper.preloadSummaryContext(courses);
+
+        return activeEnrollments.stream()
                 .map(e -> courseMapper.toSummary(
                         e.getCourse(),
                         e,
                         e.getEnrollmentType() == EnrollmentType.MANDATORY
                                 ? "MANDATORY"
-                                : "OPTIONAL"
+                                : "OPTIONAL",
+                        batchContext
                 ))
                 .toList();
     }

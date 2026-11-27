@@ -50,9 +50,67 @@ public class DepartmentService {
 
     @Transactional(readOnly = true)
     public List<DepartmentSummaryDTO> getAllDepartments() {
-        return departmentRepository.findAll().stream()
-                .map(this::toSummary)
-                .toList();
+        List<Department> departments = departmentRepository.findAll();
+        if (departments.isEmpty()) {
+            return List.of();
+        }
+
+        // Batch-load users and enrollments once instead of scanning per department (eliminates 2*D+1 N+1 / full-table scans)
+        Map<String, Long> employeeCountByDept = userRepository.findAll().stream()
+                .filter(u -> u.getDepartment() != null && !u.getDepartment().isBlank())
+                .collect(Collectors.groupingBy(
+                        u -> u.getDepartment().trim().toLowerCase(java.util.Locale.ROOT),
+                        Collectors.counting()
+                ));
+
+        List<Enrollment> allEnrollments = enrollmentRepository.findAllWithUserAndCourse();
+
+        List<DepartmentSummaryDTO> summaries = new ArrayList<>(departments.size());
+        for (Department department : departments) {
+            String deptName = department.getName();
+            String deptKey = deptName == null ? "" : deptName.trim().toLowerCase(java.util.Locale.ROOT);
+            int empCount = employeeCountByDept.getOrDefault(deptKey, 0L).intValue();
+
+            Map<Long, List<Enrollment>> groupedByCourse = new LinkedHashMap<>();
+            for (Enrollment e : allEnrollments) {
+                if (e.getUser() == null || e.getCourse() == null || e.getUser().getDepartment() == null) {
+                    continue;
+                }
+                if (e.getUser().getDepartment().equalsIgnoreCase(deptName)
+                        || isCourseOwnedByDepartment(e.getCourse(), deptName)) {
+                    groupedByCourse
+                            .computeIfAbsent(e.getCourse().getId(), k -> new ArrayList<>())
+                            .add(e);
+                }
+            }
+
+            double avgCourseCompletion = 0.0;
+            if (!groupedByCourse.isEmpty()) {
+                double sumRates = 0.0;
+                for (List<Enrollment> courseEnrollments : groupedByCourse.values()) {
+                    double courseRate = courseEnrollments.stream()
+                            .map(Enrollment::getProgressPercent)
+                            .filter(Objects::nonNull)
+                            .mapToInt(Integer::intValue)
+                            .average()
+                            .orElse(0.0);
+                    sumRates += round(courseRate);
+                }
+                avgCourseCompletion = sumRates / groupedByCourse.size();
+            }
+
+            summaries.add(new DepartmentSummaryDTO(
+                    department.getId(),
+                    department.getName(),
+                    department.getHeadId(),
+                    department.getDescription(),
+                    empCount,
+                    groupedByCourse.size(),
+                    round(avgCourseCompletion)
+            ));
+        }
+
+        return summaries;
     }
 
     @Transactional(readOnly = true)

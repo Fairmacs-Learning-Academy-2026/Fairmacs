@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 
 import {
   BrowserRouter as Router,
@@ -21,37 +21,8 @@ import PublicHome from './components/PublicHome';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import FairmacsFooter from './components/footer/FairmacsFooter';
-import Overview from './components/Overview';
-import MyLearning from './components/MyLearning';
-import TrainerDashboard from './components/TrainerDashboard';
-import ManagerDashboard from './components/ManagerDashboard';
-import ManagerAllCourses from './components/ManagerAllCourses';
-import HrAdminDashboard from './components/HrAdminDashboard';
-import EmployeeManagement from './components/EmployeeManagement';
-import DepartmentManagement from './components/DepartmentManagement';
-import HrCoursesPage from './components/HrCoursesPage';
-import HrDraftsPage from './components/HrDraftsPage';
-import HrCertificatesPage from './components/HrCertificatesPage';
-import HrAnnouncementsPage from './components/HrAnnouncementsPage';
-import HrSettingsPage from './components/HrSettingsPage';
-import PolicyHrManagement from './components/policies/PolicyHrManagement';
-import PolicyManagerManagement from './components/policies/manager/PolicyManagerManagement';
-import DepartmentDetails from './components/DepartmentDetails';
-import DepartmentCourseEmployees from './components/DepartmentCourseEmployees';
-import CourseCatalog from './components/CourseCatalog';
-import CourseViewer from './components/CourseViewer';
-import CourseOverviewPage from './components/CourseOverviewPage';
-import QuizModal from './components/QuizModal';
-import CertificateViewer from './components/CertificateViewer';
-import CertificatesPage from './components/CertificatesPage';
-import TrainingCalendar from './components/TrainingCalendar';
-import ReportsView from './components/ReportsView';
 import Login from './components/Login';
 import Unauthorized from './components/Unauthorized';
-import Drafts from './components/Drafts';
-import CourseBuilderModal from './components/CourseBuilderModal';
-import NotificationsPage from './components/NotificationsPage';
-import ProfilePage from './components/ProfilePage';
 import PasswordModal from './components/PasswordModal';
 import ErrorBoundary from './components/ErrorBoundary';
 import PageTitleManager from './components/PageTitleManager';
@@ -60,6 +31,36 @@ import LegalDocumentPage from './components/LegalDocumentPage';
 import ThankYouPage from './components/ThankYouPage';
 import CookieConsentBanner from './components/CookieConsentBanner';
 import { applyDocumentMeta } from './utils/pageMeta';
+
+const Overview = lazy(() => import('./components/Overview'));
+const MyLearning = lazy(() => import('./components/MyLearning'));
+const TrainerDashboard = lazy(() => import('./components/TrainerDashboard'));
+const ManagerDashboard = lazy(() => import('./components/ManagerDashboard'));
+const ManagerAllCourses = lazy(() => import('./components/ManagerAllCourses'));
+const HrAdminDashboard = lazy(() => import('./components/HrAdminDashboard'));
+const EmployeeManagement = lazy(() => import('./components/EmployeeManagement'));
+const DepartmentManagement = lazy(() => import('./components/DepartmentManagement'));
+const HrCoursesPage = lazy(() => import('./components/HrCoursesPage'));
+const HrDraftsPage = lazy(() => import('./components/HrDraftsPage'));
+const HrCertificatesPage = lazy(() => import('./components/HrCertificatesPage'));
+const HrAnnouncementsPage = lazy(() => import('./components/HrAnnouncementsPage'));
+const HrSettingsPage = lazy(() => import('./components/HrSettingsPage'));
+const PolicyHrManagement = lazy(() => import('./components/policies/PolicyHrManagement'));
+const PolicyManagerManagement = lazy(() => import('./components/policies/manager/PolicyManagerManagement'));
+const DepartmentDetails = lazy(() => import('./components/DepartmentDetails'));
+const DepartmentCourseEmployees = lazy(() => import('./components/DepartmentCourseEmployees'));
+const CourseCatalog = lazy(() => import('./components/CourseCatalog'));
+const CourseViewer = lazy(() => import('./components/CourseViewer'));
+const CourseOverviewPage = lazy(() => import('./components/CourseOverviewPage'));
+const QuizModal = lazy(() => import('./components/QuizModal'));
+const CertificateViewer = lazy(() => import('./components/CertificateViewer'));
+const CertificatesPage = lazy(() => import('./components/CertificatesPage'));
+const TrainingCalendar = lazy(() => import('./components/TrainingCalendar'));
+const ReportsView = lazy(() => import('./components/ReportsView'));
+const Drafts = lazy(() => import('./components/Drafts'));
+const CourseBuilderModal = lazy(() => import('./components/CourseBuilderModal'));
+const NotificationsPage = lazy(() => import('./components/NotificationsPage'));
+const ProfilePage = lazy(() => import('./components/ProfilePage'));
 
 
 import ProtectedRoute from './routes/ProtectedRoute';
@@ -950,8 +951,14 @@ function MainApp() {
    * Department detail pages are intentionally rendered outside the
    * global KMS header/sidebar shell. The page owns its complete layout.
    */
+  const routeFallback = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40dvh', color: '#64748b', fontSize: '0.9rem', fontWeight: 600 }}>
+      Loading...
+    </div>
+  );
+
   if (location.pathname.startsWith('/hr/departments/')) {
-    return renderContent();
+    return <Suspense fallback={routeFallback}>{renderContent()}</Suspense>;
   }
 
   return (
@@ -981,7 +988,9 @@ function MainApp() {
           />
 
           <main className="main-content">
-            {renderContent()}
+            <Suspense fallback={routeFallback}>
+              {renderContent()}
+            </Suspense>
           </main>
 
           {!location.pathname.endsWith('/learn') && (
@@ -1006,25 +1015,25 @@ function MainApp() {
       ====================================================== */}
 
       {activeQuiz && (
+        <Suspense fallback={null}>
+          <QuizModal
 
-        <QuizModal
+            quiz={
+              activeQuiz
+            }
 
-          quiz={
-            activeQuiz
-          }
+            onClose={() =>
+              setActiveQuiz(
+                null
+              )
+            }
 
-          onClose={() =>
-            setActiveQuiz(
-              null
-            )
-          }
+            onPassCertificate={
+              handlePassCertificate
+            }
 
-          onPassCertificate={
-            handlePassCertificate
-          }
-
-        />
-
+          />
+        </Suspense>
       )}
 
 
@@ -1033,31 +1042,31 @@ function MainApp() {
       ====================================================== */}
 
       {showCertModal && (
+        <Suspense fallback={null}>
+          <CertificateViewer
 
-        <CertificateViewer
+            certificate={
+              activeCert
+            }
 
-          certificate={
-            activeCert
-          }
+            onClose={() => {
 
-          onClose={() => {
+              setShowCertModal(
+                false
+              );
 
-            setShowCertModal(
-              false
-            );
+              setCertVerificationData(
+                null
+              );
 
-            setCertVerificationData(
-              null
-            );
+            }}
 
-          }}
+            verificationData={
+              certVerificationData
+            }
 
-          verificationData={
-            certVerificationData
-          }
-
-        />
-
+          />
+        </Suspense>
       )}
 
     </div>

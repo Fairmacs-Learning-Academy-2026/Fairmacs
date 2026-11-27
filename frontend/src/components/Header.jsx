@@ -206,8 +206,10 @@ export default function Header({
   // LOAD NOTIFICATIONS (with 60s refresh & cross-page sync)
   // ============================================================
 
+  const activeUserKey = user?.id || user?.employeeId || '';
+
   const loadNotifications = useCallback(async (silent = false) => {
-    if (!user) return;
+    if (!activeUserKey) return;
 
     try {
       if (!silent) setNotificationLoading(true);
@@ -223,13 +225,15 @@ export default function Header({
     } finally {
       if (!silent) setNotificationLoading(false);
     }
-  }, [user]);
+  }, [activeUserKey]);
 
   useEffect(() => {
     loadNotifications(false);
 
     const intervalId = setInterval(() => {
-      loadNotifications(true);
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        loadNotifications(true);
+      }
     }, 60000);
 
     const handleSync = () => {
